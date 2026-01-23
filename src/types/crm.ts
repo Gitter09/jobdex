@@ -1,0 +1,43 @@
+export interface Contact {
+    id: string;
+    // Base Info
+    first_name: string;
+    last_name: string;
+    title?: string;
+    company?: string;
+    location?: string;
+
+    email?: string;
+    linkedin_url?: string;
+    company_website?: string;
+
+    // Legacy support (will be populated with status_label from join)
+    status?: string;
+
+    status_id?: string;
+    status_label?: string;
+    status_color?: string;
+
+    last_contacted_date?: string; // ISO string
+    next_contact_date?: string;
+    cadence_stage?: number;
+
+    intelligence_summary?: string;
+    created_at: string;
+    updated_at: string;
+    tags?: Tag[];
+}
+
+export interface Status {
+    id: string;
+    label: string;
+    color: string;
+    is_default: boolean;
+    position: number;
+}
+
+export interface Tag {
+    id: string;
+    name: string;
+    color: string;
+}
