@@ -24,6 +24,14 @@ Thumbs.db
 # Env files
 .env
 .env.local
+# Agent / IDE
+.roo/
+.continue/
+# Lock (using npm only)
+bun.lock
+# Database
+*.db
+src-tauri/storage/
 # Build outputs
 /build
 /out

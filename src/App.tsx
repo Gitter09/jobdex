@@ -48,7 +48,7 @@ import { useStatuses } from "@/hooks/use-statuses";
 import { getColorHex } from "@/lib/utils";
 import { ManageTagsDialog } from "@/components/tags/manage-tags-dialog";
 import { useTags } from "@/hooks/use-tags";
-import "./App.css";
+import "./index.css";
 
 function Dashboard() {
   const navigate = useNavigate();

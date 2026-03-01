@@ -20,7 +20,7 @@ import { ManageTagsDialog } from "@/components/tags/manage-tags-dialog";
 import { useTags } from "@/hooks/use-tags";
 import { ComposeEmailDialog } from "@/components/email/compose-email-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EmailHistoryTab } from "@/components/contact/email-history-tab";
+import { EmailHistoryTab } from "@/components/contacts/email-history-tab";
 import {
     AlertDialog,
     AlertDialogAction,
