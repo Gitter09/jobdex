@@ -12,11 +12,17 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -25,8 +31,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Send, Loader2, Sparkles } from "lucide-react";
+import { Mail, Send, Loader2, Sparkles, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Contact } from "@/types/crm";
+import { format } from "date-fns";
 
 interface ComposeEmailDialogProps {
     contact: Contact | null;
@@ -34,49 +41,27 @@ interface ComposeEmailDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
-// Email templates
+interface EmailAccount {
+    id: string;
+    email: string;
+    provider: string;
+}
+
 const TEMPLATES = [
     {
         name: "VC Intro",
         subject: "Quick intro - [Your Background]",
-        body: `Hi {{first_name}},
-
-I came across your profile and was impressed by [specific observation].
-
-I'm reaching out because [brief value prop]. I'd love to learn more about [their work/company].
-
-Would you be open to a brief call next week?
-
-Best,
-[Your Name]`,
+        body: `Hi {{first_name}},\n\nI came across your profile and was impressed by [specific observation].\n\nI'm reaching out because [brief value prop]. I'd love to learn more about [their work/company].\n\nWould you be open to a brief call next week?\n\nBest,\n[Your Name]`,
     },
     {
         name: "Job Application",
         subject: "Application - [Position] at [Company]",
-        body: `Hi {{first_name}},
-
-I'm excited to apply for the [Position] role at [Company].
-
-My background in [relevant experience] aligns well with what you're looking for. [Specific achievement].
-
-I've attached my resume for your review. I'd welcome the opportunity to discuss how I can contribute to your team.
-
-Best regards,
-[Your Name]`,
+        body: `Hi {{first_name}},\n\nI'm excited to apply for the [Position] role at [Company].\n\nMy background in [relevant experience] aligns well with what you're looking for. [Specific achievement].\n\nI've attached my resume for your review. I'd welcome the opportunity to discuss how I can contribute to your team.\n\nBest regards,\n[Your Name]`,
     },
     {
         name: "Follow Up",
         subject: "Following up on our conversation",
-        body: `Hi {{first_name}},
-
-I wanted to follow up on [previous context].
-
-[Additional value/question].
-
-Looking forward to hearing from you.
-
-Best,
-[Your Name]`,
+        body: `Hi {{first_name}},\n\nI wanted to follow up on [previous context].\n\n[Additional value/question].\n\nLooking forward to hearing from you.\n\nBest,\n[Your Name]`,
     },
 ];
 
@@ -89,26 +74,34 @@ export function ComposeEmailDialog({
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [sending, setSending] = useState(false);
-    const [gmailConnected, setGmailConnected] = useState(false);
-    const [connecting, setConnecting] = useState(false);
+
+    // Account Selection
+    const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+    const [selectedAccount, setSelectedAccount] = useState<string>("");
+
+    // Scheduling
+    const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
+    const [isScheduling, setIsScheduling] = useState(false);
 
     // AI State
     const { draftEmail, generateSubjectLines, drafting, generatingSubjects } = useEmailAI();
     const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
     const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
-    // Check Gmail connection status
     useEffect(() => {
-        const checkStatus = async () => {
+        const fetchAccounts = async () => {
             try {
-                const connected = await invoke<boolean>("gmail_status");
-                setGmailConnected(connected);
+                const accts = await invoke<EmailAccount[]>("get_email_accounts");
+                setAccounts(accts);
+                if (accts.length > 0 && !selectedAccount) {
+                    setSelectedAccount(accts[0].id);
+                }
             } catch (err) {
-                console.error("Failed to check Gmail status:", err);
+                console.error("Failed to fetch accounts:", err);
             }
         };
         if (open) {
-            checkStatus();
+            fetchAccounts();
         }
     }, [open]);
 
@@ -119,33 +112,49 @@ export function ComposeEmailDialog({
         }
     }, [contact]);
 
-    const handleConnect = async () => {
-        setConnecting(true);
-        try {
-            await invoke("gmail_connect");
-            setGmailConnected(true);
-        } catch (err) {
-            alert(`Failed to connect: ${err}`);
-        } finally {
-            setConnecting(false);
-        }
-    };
-
     const handleSend = async () => {
+        if (!selectedAccount) {
+            toast.error("Please connect an email account first in Settings.");
+            return;
+        }
         if (!to || !subject || !body) {
-            alert("Please fill in all fields");
+            toast.error("Please fill in all fields");
             return;
         }
 
         setSending(true);
         try {
-            await invoke("send_email", { to, subject, body });
-            alert("Email sent successfully!");
+            if (scheduledDate) {
+                if (!contact?.id) {
+                    toast.error("Scheduling requires a contact context currently.");
+                    setSending(false);
+                    return;
+                }
+
+                await invoke("email_schedule", {
+                    accountId: selectedAccount,
+                    contactId: contact.id,
+                    subject,
+                    body,
+                    scheduledAt: Math.floor(scheduledDate.getTime() / 1000)
+                });
+                toast.success(`Email scheduled for ${format(scheduledDate, "PP p")}`);
+            } else {
+                await invoke("email_send", {
+                    accountId: selectedAccount,
+                    to,
+                    subject,
+                    body
+                });
+                toast.success("Email sent successfully!");
+            }
             onOpenChange(false);
             setSubject("");
             setBody("");
+            setScheduledDate(undefined);
+            setIsScheduling(false);
         } catch (err) {
-            alert(`Failed to send: ${err}`);
+            toast.error(`Failed to send: ${err}`);
         } finally {
             setSending(false);
         }
@@ -157,200 +166,189 @@ export function ComposeEmailDialog({
         setBody(template.body.replace(/\{\{first_name\}\}/g, firstName));
     };
 
-    const insertHook = () => {
-        if (contact?.intelligence_summary) {
-            setBody((prev) => prev + "\n\n---\n" + contact.intelligence_summary);
-        }
-    };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[700px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Mail className="h-5 w-5" />
                         Compose Email
                     </DialogTitle>
-                    <DialogDescription>
-                        {gmailConnected
-                            ? `Sending as your connected Gmail account`
-                            : `Connect Gmail to send emails directly`}
-                    </DialogDescription>
                 </DialogHeader>
 
-                {!gmailConnected ? (
+                {accounts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 space-y-4">
                         <p className="text-muted-foreground text-center">
-                            Connect your Gmail account to send emails directly from OutreachOS.
+                            No email accounts connected.
                         </p>
-                        <Button onClick={handleConnect} disabled={connecting}>
-                            {connecting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Connecting...
-                                </>
-                            ) : (
-                                <>
-                                    <Mail className="mr-2 h-4 w-4" />
-                                    Connect Gmail
-                                </>
-                            )}
+                        <Button onClick={() => onOpenChange(false)} variant="outline">
+                            Close and Go to Settings
                         </Button>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {/* Templates */}
-                        <div className="flex gap-2 flex-wrap">
-                            {TEMPLATES.map((template) => (
-                                <Button
-                                    key={template.name}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => applyTemplate(template)}
-                                >
-                                    {template.name}
-                                </Button>
-                            ))}
-                            {contact?.intelligence_summary && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={insertHook}
-                                    className="ml-auto"
-                                >
-                                    <Sparkles className="mr-1 h-3 w-3" />
-                                    Insert Hook
-                                </Button>
-                            )}
+                        <div className="grid grid-cols-4 gap-4 items-center">
+                            <Label className="text-right">From</Label>
+                            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select account" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {accounts.map(acc => (
+                                        <SelectItem key={acc.id} value={acc.id}>
+                                            {acc.email} ({acc.provider})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        {/* Form */}
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <Label htmlFor="to">To</Label>
+                        <div className="grid grid-cols-4 gap-4 items-center">
+                            <Label htmlFor="to" className="text-right">To</Label>
+                            <Input
+                                id="to"
+                                type="email"
+                                value={to}
+                                onChange={(e) => setTo(e.target.value)}
+                                className="col-span-3"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-4 items-start">
+                            <Label htmlFor="subject" className="text-right pt-2">Subject</Label>
+                            <div className="col-span-3 flex gap-2">
                                 <Input
-                                    id="to"
-                                    type="email"
-                                    value={to}
-                                    onChange={(e) => setTo(e.target.value)}
-                                    placeholder="recipient@example.com"
+                                    id="subject"
+                                    value={subject}
+                                    onChange={(e) => setSubject(e.target.value)}
+                                    placeholder="Subject line..."
                                 />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="subject">Subject</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="subject"
-                                        value={subject}
-                                        onChange={(e) => setSubject(e.target.value)}
-                                        placeholder="Email subject"
-                                    />
-                                    <Popover open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                onClick={async () => {
-                                                    if (!contact) {
-                                                        toast.error("Contact context needed for AI");
-                                                        return;
-                                                    }
+                                <Popover open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            disabled={generatingSubjects || !contact}
+                                            onClick={async () => {
+                                                if (contact) {
                                                     const lines = await generateSubjectLines(contact.id);
                                                     setSubjectSuggestions(lines);
                                                     setSuggestionsOpen(true);
-                                                }}
-                                                disabled={generatingSubjects}
-                                            >
-                                                {generatingSubjects ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Sparkles className="h-4 w-4 text-purple-600" />
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="p-0" align="end">
-                                            <Command>
-                                                <CommandList>
-                                                    <CommandGroup heading="AI Suggestions">
-                                                        {subjectSuggestions.map((suggestion) => (
-                                                            <CommandItem
-                                                                key={suggestion}
-                                                                onSelect={() => {
-                                                                    setSubject(suggestion);
-                                                                    setSuggestionsOpen(false);
-                                                                }}
-                                                            >
-                                                                <Sparkles className="mr-2 h-3 w-3" />
-                                                                {suggestion}
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            </div>
-                            <div className="space-y-1 relative">
-                                <Label htmlFor="body">Message</Label>
-                                <Textarea
-                                    id="body"
-                                    value={body}
-                                    onChange={(e) => setBody(e.target.value)}
-                                    placeholder="Write your message..."
-                                    rows={10}
-                                    className="resize-none"
-                                />
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="absolute top-6 right-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                                    onClick={async () => {
-                                        if (!contact) {
-                                            toast.error("Contact context needed for AI");
-                                            return;
-                                        }
-                                        const draft = await draftEmail(contact.id);
-                                        setBody(draft);
-                                    }}
-                                    disabled={drafting}
-                                >
-                                    {drafting ? (
-                                        <>
-                                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                            Drafting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="mr-1 h-3 w-3" />
-                                            Draft with AI
-                                        </>
-                                    )}
-                                </Button>
+                                                }
+                                            }}
+                                        >
+                                            {generatingSubjects ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-600" />}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="p-0" align="end">
+                                        <Command>
+                                            <CommandList>
+                                                <CommandGroup heading="AI Suggestions">
+                                                    {subjectSuggestions.map((suggestion) => (
+                                                        <CommandItem
+                                                            key={suggestion}
+                                                            onSelect={() => {
+                                                                setSubject(suggestion);
+                                                                setSuggestionsOpen(false);
+                                                            }}
+                                                        >
+                                                            <Sparkles className="mr-2 h-3 w-3" />
+                                                            {suggestion}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <Label>Message Body</Label>
+                                <div className="flex gap-2">
+                                    {TEMPLATES.map(t => (
+                                        <Button key={t.name} variant="ghost" size="xs" onClick={() => applyTemplate(t)}>
+                                            {t.name}
+                                        </Button>
+                                    ))}
+                                    <Button
+                                        variant="ghost"
+                                        size="xs"
+                                        className="text-purple-600"
+                                        disabled={drafting || !contact}
+                                        onClick={async () => {
+                                            if (contact) {
+                                                const draft = await draftEmail(contact.id);
+                                                setBody(draft);
+                                            }
+                                        }}
+                                    >
+                                        {drafting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                                        Draft with AI
+                                    </Button>
+                                </div>
+                            </div>
+                            <Textarea
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                rows={12}
+                                className="font-sans"
+                            />
+                        </div>
+
                     </div>
                 )}
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    {gmailConnected && (
+                <DialogFooter className="flex justify-between items-center w-full sm:justify-between">
+                    <Popover open={isScheduling} onOpenChange={setIsScheduling}>
+                        <PopoverTrigger asChild>
+                            <Button variant={scheduledDate ? "secondary" : "ghost"} size="sm">
+                                <Clock className="h-4 w-4 mr-2" />
+                                {scheduledDate ? format(scheduledDate, "MMM d, h:mm a") : "Schedule Send"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-4" align="start">
+                            <div className="space-y-4">
+                                <Label>Schedule Time</Label>
+                                <Input
+                                    type="datetime-local"
+                                    className="w-full block"
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            setScheduledDate(new Date(e.target.value));
+                                        } else {
+                                            setScheduledDate(undefined);
+                                        }
+                                    }}
+                                    min={new Date().toISOString().slice(0, 16)}
+                                />
+                                <div className="flex justify-end pt-2">
+                                    <Button size="sm" onClick={() => setIsScheduling(false)}>Done</Button>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
                         <Button onClick={handleSend} disabled={sending}>
                             {sending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Sending...
+                                    {scheduledDate ? "Scheduling..." : "Sending..."}
                                 </>
                             ) : (
                                 <>
-                                    <Send className="mr-2 h-4 w-4" />
-                                    Send
+                                    {scheduledDate ? <CalendarIcon className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                                    {scheduledDate ? "Schedule" : "Send"}
                                 </>
                             )}
                         </Button>
-                    )}
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

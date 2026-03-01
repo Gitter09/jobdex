@@ -1,0 +1,129 @@
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Contact } from "@/types/crm";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, Mail, ArrowUpRight, ArrowDownLeft, Calendar, Eye, MousePointerClick } from "lucide-react";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+
+interface EmailMessage {
+    id: string;
+    from_email: string;
+    to_email: string;
+    subject: string;
+    body: string;
+    sent_at: string;
+    status: string;
+}
+
+interface TrackingEvent {
+    event_type: string;
+    occurred_at: string;
+    link_url: string | null;
+}
+
+interface EmailHistoryTabProps {
+    contact: Contact;
+}
+
+function EmailMessageItem({ email, contact }: { email: EmailMessage, contact: Contact }) {
+    const isOutbound = email.from_email !== contact.email;
+    const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
+
+    useEffect(() => {
+        if (isOutbound) {
+            invoke<TrackingEvent[]>("get_email_tracking", { messageId: email.id })
+                .then(setTrackingEvents)
+                .catch(console.error);
+        }
+    }, [email.id, isOutbound]);
+
+    const openEvent = trackingEvents.find(e => e.event_type === "open");
+    const clickEvents = trackingEvents.filter(e => e.event_type === "click");
+
+    return (
+        <div className="flex gap-4 group">
+            <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${isOutbound ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>
+                {isOutbound ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+            </div>
+            <div className="flex-1 space-y-1 border rounded-lg p-3 bg-card hover:bg-accent/5 transition-colors">
+                <div className="flex justify-between items-start">
+                    <h4 className="text-sm font-semibold">{email.subject || "(No Subject)"}</h4>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {format(new Date(email.sent_at), "MMM d, yyyy")}
+                    </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span>{isOutbound ? `To: ${email.to_email}` : `From: ${email.from_email}`}</span>
+                    <div className="flex items-center gap-1.5">
+                        {email.status === 'scheduled' && <Badge variant="outline" className="text-[10px] h-5">Scheduled</Badge>}
+                        {openEvent && (
+                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded-sm" title={`Opened at ${new Date(openEvent.occurred_at).toLocaleString()}`}>
+                                <Eye className="w-3 h-3" />
+                                <span>Opened</span>
+                            </div>
+                        )}
+                        {clickEvents.length > 0 && (
+                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-sm" title={`${clickEvents.length} clicks`}>
+                                <MousePointerClick className="w-3 h-3" />
+                                <span>{clickEvents.length} clicked</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-2 font-mono bg-muted/30 p-2 rounded">
+                    {email.body || "(No Body Content)"}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+export function EmailHistoryTab({ contact }: EmailHistoryTabProps) {
+    const [emails, setEmails] = useState<EmailMessage[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchEmails = async () => {
+            setLoading(true);
+            try {
+                const data = await invoke<EmailMessage[]>("get_emails_for_contact", { contactId: contact.id });
+                setEmails(data);
+            } catch (error) {
+                console.error("Failed to fetch emails:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (contact.id) {
+            fetchEmails();
+        }
+    }, [contact.id]);
+
+    if (loading) {
+        return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>;
+    }
+
+    if (emails.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg border border-dashed h-[300px]">
+                <Mail className="h-8 w-8 text-muted-foreground mb-3 opacity-50" />
+                <h3 className="font-medium text-sm text-foreground">No email history</h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                    Emails sent to or received from this contact will appear here.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-4">
+                {emails.map((email) => (
+                    <EmailMessageItem key={email.id} email={email} contact={contact} />
+                ))}
+            </div>
+        </ScrollArea>
+    );
+}

@@ -2,11 +2,9 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tag } from "@/types/crm";
 import { useTags } from "@/hooks/use-tags";
 import { Trash2, Pencil, Plus, X } from "lucide-react";
-import { getColorHex } from "@/lib/utils";
 
 interface ManageTagsDialogProps {
     open: boolean;

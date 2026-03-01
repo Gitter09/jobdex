@@ -13,7 +13,11 @@ use std::path::PathBuf;
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-const GMAIL_SEND_SCOPE: &str = "https://www.googleapis.com/auth/gmail.send";
+// Scopes: Send, Read/Modify (for sync), UserInfo (for identity)
+const GOOGLE_SCOPES: &[&str] = &[
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/userinfo.email",
+];
 const REDIRECT_PORT: u16 = 8420;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,14 +32,14 @@ struct InstalledCredentials {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StoredTokens {
+pub struct OAuthTokenResponse {
     pub access_token: String,
     pub refresh_token: Option<String>,
-    pub expires_at: Option<i64>,
+    pub expires_in: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
-struct TokenResponse {
+struct FullTokenResponse {
     access_token: String,
     refresh_token: Option<String>,
     expires_in: Option<i64>,
@@ -59,13 +63,6 @@ impl GmailClient {
         }
     }
 
-    fn tokens_path(&self) -> PathBuf {
-        self.credentials_path
-            .parent()
-            .unwrap_or(std::path::Path::new("."))
-            .join("tokens.json")
-    }
-
     fn load_credentials(&self) -> Result<(String, String)> {
         let content = fs::read_to_string(&self.credentials_path).map_err(|_| {
             anyhow!(
@@ -78,29 +75,6 @@ impl GmailClient {
             .map_err(|_| anyhow!("Invalid credentials.json format"))?;
 
         Ok((creds.installed.client_id, creds.installed.client_secret))
-    }
-
-    pub fn load_tokens(&self) -> Option<StoredTokens> {
-        let content = fs::read_to_string(self.tokens_path()).ok()?;
-        serde_json::from_str(&content).ok()
-    }
-
-    fn save_tokens(&self, tokens: &StoredTokens) -> Result<()> {
-        let content = serde_json::to_string_pretty(tokens)?;
-        fs::write(self.tokens_path(), content)?;
-        Ok(())
-    }
-
-    pub fn is_connected(&self) -> bool {
-        self.load_tokens().is_some()
-    }
-
-    pub fn disconnect(&self) -> Result<()> {
-        let tokens_path = self.tokens_path();
-        if tokens_path.exists() {
-            fs::remove_file(tokens_path)?;
-        }
-        Ok(())
     }
 
     /// Starts the OAuth flow. Returns the authorization URL to open in browser.
@@ -117,11 +91,19 @@ impl GmailClient {
 
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-        let (auth_url, _csrf_token) = client
+        let mut auth_req = client
             .authorize_url(CsrfToken::new_random)
-            .add_scope(Scope::new(GMAIL_SEND_SCOPE.to_string()))
-            .set_pkce_challenge(pkce_challenge)
-            .url();
+            .set_pkce_challenge(pkce_challenge);
+
+        for scope in GOOGLE_SCOPES {
+            auth_req = auth_req.add_scope(Scope::new(scope.to_string()));
+        }
+
+        // Request offline access to get refresh token
+        auth_req = auth_req.add_extra_param("access_type", "offline");
+        auth_req = auth_req.add_extra_param("prompt", "consent");
+
+        let (auth_url, _csrf_token) = auth_req.url();
 
         Ok((auth_url.to_string(), pkce_verifier))
     }
@@ -154,12 +136,12 @@ impl GmailClient {
         Err(anyhow!("Failed to receive OAuth callback"))
     }
 
-    /// Exchanges authorization code for tokens using direct HTTP request
+    /// Exchanges authorization code for tokens
     pub async fn exchange_code(
         &self,
         code: String,
         pkce_verifier: PkceCodeVerifier,
-    ) -> Result<StoredTokens> {
+    ) -> Result<OAuthTokenResponse> {
         let (client_id, client_secret) = self.load_credentials()?;
         let redirect_url = format!("http://127.0.0.1:{}", REDIRECT_PORT);
 
@@ -184,49 +166,23 @@ impl GmailClient {
             return Err(anyhow!("Token exchange failed: {}", error_text));
         }
 
-        let token_response: TokenResponse = response.json().await?;
+        let token_response: FullTokenResponse = response.json().await?;
 
-        let expires_at = token_response
-            .expires_in
-            .map(|d| chrono::Utc::now().timestamp() + d);
-
-        let tokens = StoredTokens {
+        Ok(OAuthTokenResponse {
             access_token: token_response.access_token,
             refresh_token: token_response.refresh_token,
-            expires_at,
-        };
-
-        self.save_tokens(&tokens)?;
-
-        Ok(tokens)
+            expires_in: token_response.expires_in,
+        })
     }
 
-    /// Refreshes the access token if expired
-    pub async fn refresh_if_needed(&self) -> Result<StoredTokens> {
-        let tokens = self
-            .load_tokens()
-            .ok_or_else(|| anyhow!("Not connected to Gmail. Please authenticate first."))?;
-
-        // Check if token is expired (with 60s buffer)
-        if let Some(expires_at) = tokens.expires_at {
-            if chrono::Utc::now().timestamp() < expires_at - 60 {
-                return Ok(tokens);
-            }
-        } else {
-            return Ok(tokens);
-        }
-
-        // Token expired, refresh it
-        let refresh_token = tokens
-            .refresh_token
-            .ok_or_else(|| anyhow!("No refresh token available"))?;
-
+    /// Refreshes the access token
+    pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthTokenResponse> {
         let (client_id, client_secret) = self.load_credentials()?;
 
         let params = [
             ("client_id", client_id.as_str()),
             ("client_secret", client_secret.as_str()),
-            ("refresh_token", refresh_token.as_str()),
+            ("refresh_token", refresh_token),
             ("grant_type", "refresh_token"),
         ];
 
@@ -242,25 +198,46 @@ impl GmailClient {
             return Err(anyhow!("Token refresh failed: {}", error_text));
         }
 
-        let token_response: TokenResponse = response.json().await?;
+        let token_response: FullTokenResponse = response.json().await?;
 
-        let expires_in = token_response.expires_in.unwrap_or(3600);
-
-        let new_tokens = StoredTokens {
+        Ok(OAuthTokenResponse {
             access_token: token_response.access_token,
-            refresh_token: Some(refresh_token), // Keep original refresh token
-            expires_at: Some(chrono::Utc::now().timestamp() + expires_in),
-        };
+            refresh_token: token_response
+                .refresh_token
+                .or(Some(refresh_token.to_string())), // Keep old refresh token if new one not provided
+            expires_in: token_response.expires_in,
+        })
+    }
 
-        self.save_tokens(&new_tokens)?;
+    /// Get user profile (email)
+    pub async fn get_user_profile(&self, access_token: &str) -> Result<String> {
+        let response = self
+            .http_client
+            .get("https://www.googleapis.com/oauth2/v2/userinfo")
+            .bearer_auth(access_token)
+            .send()
+            .await?;
 
-        Ok(new_tokens)
+        if response.status().is_success() {
+            let json: serde_json::Value = response.json().await?;
+            let email = json["email"]
+                .as_str()
+                .ok_or_else(|| anyhow!("Email field missing in user info"))?;
+            Ok(email.to_string())
+        } else {
+            let error = response.text().await?;
+            Err(anyhow!("Failed to fetch user profile: {}", error))
+        }
     }
 
     /// Sends an email via Gmail API
-    pub async fn send_email(&self, to: &str, subject: &str, body: &str) -> Result<String> {
-        let tokens = self.refresh_if_needed().await?;
-
+    pub async fn send_email(
+        &self,
+        access_token: &str,
+        to: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<String> {
         // Build RFC 2822 email
         let email = format!(
             "To: {}\r\nSubject: {}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{}",
@@ -277,7 +254,7 @@ impl GmailClient {
         let response = self
             .http_client
             .post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send")
-            .bearer_auth(&tokens.access_token)
+            .bearer_auth(access_token)
             .json(&request_body)
             .send()
             .await?;
@@ -290,6 +267,343 @@ impl GmailClient {
             Err(anyhow!("Gmail API error: {:?}", error))
         }
     }
+
+    /// List message IDs from Gmail (inbox + sent), filtered by CRM contacts and timestamp
+    pub async fn list_messages(
+        &self,
+        access_token: &str,
+        contact_emails: &[String],
+        after_timestamp: Option<i64>,
+        max_results: u32,
+    ) -> Result<Vec<GmailMessageStub>> {
+        if contact_emails.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Build search query: (from:e1 OR to:e1 OR from:e2 OR to:e2 ...) after:{ts}
+        // Partition contact emails to avoid hitting URL length limits
+        let mut all_stubs = Vec::new();
+        let chunks = contact_emails.chunks(50); // Use 50 contacts per batch
+
+        for chunk in chunks {
+            let mut or_parts = Vec::new();
+            for email in chunk {
+                or_parts.push(format!("from:{}", email));
+                or_parts.push(format!("to:{}", email));
+            }
+
+            let filter_str = format!("({})", or_parts.join(" OR "));
+            let query = match after_timestamp {
+                Some(ts) => format!("{} after:{}", filter_str, ts),
+                None => filter_str,
+            };
+
+            let url = format!(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages?q={}&maxResults={}",
+                urlencoding::encode(&query),
+                max_results
+            );
+
+            let response = self
+                .http_client
+                .get(&url)
+                .bearer_auth(access_token)
+                .send()
+                .await?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await?;
+                if status.as_u16() == 401 {
+                    return Err(anyhow!("TOKEN_EXPIRED"));
+                }
+                return Err(anyhow!("Gmail list_messages error: {}", error_text));
+            }
+
+            let json: serde_json::Value = response.json().await?;
+            if let Some(messages) = json["messages"].as_array() {
+                for m in messages {
+                    if let (Some(id), Some(thread_id)) = (m["id"].as_str(), m["threadId"].as_str())
+                    {
+                        all_stubs.push(GmailMessageStub {
+                            id: id.to_string(),
+                            thread_id: thread_id.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Deduplicate stubs (if any overlap between chunks)
+        all_stubs.sort_by(|a, b| a.id.cmp(&b.id));
+        all_stubs.dedup_by(|a, b| a.id == b.id);
+
+        // Truncate to max_results if needed
+        if all_stubs.len() > max_results as usize {
+            all_stubs.truncate(max_results as usize);
+        }
+
+        Ok(all_stubs)
+    }
+
+    /// Fetch full message details by ID
+    pub async fn get_message(&self, access_token: &str, message_id: &str) -> Result<GmailMessage> {
+        let url = format!(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{}?format=full",
+            message_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(access_token)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(anyhow!("Gmail get_message error: {}", error_text));
+        }
+
+        let json: serde_json::Value = response.json().await?;
+        let headers = &json["payload"]["headers"];
+
+        let get_header = |name: &str| -> String {
+            headers
+                .as_array()
+                .and_then(|arr| {
+                    arr.iter().find(|h| {
+                        h["name"]
+                            .as_str()
+                            .map(|n| n.eq_ignore_ascii_case(name))
+                            .unwrap_or(false)
+                    })
+                })
+                .and_then(|h| h["value"].as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+
+        let from_email = extract_email_address(&get_header("From"));
+        let to_email = extract_email_address(&get_header("To"));
+        let subject = get_header("Subject");
+        let date_str = get_header("Date");
+
+        // Parse date
+        let sent_at = chrono::DateTime::parse_from_rfc2822(&date_str)
+            .map(|d| d.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now());
+
+        // Extract body: prefer text/plain, fall back to text/html
+        let payload = &json["payload"];
+
+        // DEBUG: print MIME structure so we can diagnose empty bodies
+        eprintln!(
+            "[gmail::get_message] id={} mimeType={:?}",
+            message_id,
+            payload["mimeType"].as_str()
+        );
+        if let Some(parts) = payload["parts"].as_array() {
+            for (i, part) in parts.iter().enumerate() {
+                eprintln!(
+                    "  part[{}] mimeType={:?} bodySize={:?}",
+                    i,
+                    part["mimeType"].as_str(),
+                    part["body"]["size"].as_i64()
+                );
+                // Also log nested parts (e.g. multipart/alternative inside multipart/mixed)
+                if let Some(sub_parts) = part["parts"].as_array() {
+                    for (j, sp) in sub_parts.iter().enumerate() {
+                        eprintln!(
+                            "    sub_part[{}] mimeType={:?} bodySize={:?}",
+                            j,
+                            sp["mimeType"].as_str(),
+                            sp["body"]["size"].as_i64()
+                        );
+                    }
+                }
+            }
+        }
+
+        let body = extract_gmail_body(payload);
+        let html_body = extract_gmail_raw_html(payload);
+
+        eprintln!(
+            "[gmail::get_message] extracted body length={} preview={:?}",
+            body.len(),
+            &body.chars().take(120).collect::<String>()
+        );
+
+        Ok(GmailMessage {
+            id: json["id"].as_str().unwrap_or("").to_string(),
+            from_email,
+            to_email,
+            subject,
+            body,
+            html_body,
+            sent_at,
+        })
+    }
+}
+
+/// Stub returned from list_messages (just IDs)
+#[derive(Debug)]
+pub struct GmailMessageStub {
+    pub id: String,
+    pub thread_id: String,
+}
+
+/// Full message returned from get_message
+#[derive(Debug)]
+pub struct GmailMessage {
+    pub id: String,
+    pub from_email: String,
+    pub to_email: String,
+    pub subject: String,
+    pub body: String,
+    pub html_body: Option<String>,
+    pub sent_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Extract bare email address from "Name <email@example.com>" format
+fn extract_email_address(header_value: &str) -> String {
+    if let Some(start) = header_value.find('<') {
+        if let Some(end) = header_value.find('>') {
+            return header_value[start + 1..end].trim().to_string();
+        }
+    }
+    header_value.trim().to_string()
+}
+
+/// Recursively extract body from Gmail message payload.
+/// Prefers text/plain; falls back to text/html (with tags stripped).
+fn extract_gmail_body(payload: &serde_json::Value) -> String {
+    extract_gmail_body_inner(payload, false)
+        .or_else(|| extract_gmail_body_inner(payload, true))
+        .unwrap_or_default()
+}
+
+/// Extract raw HTML body from Gmail message payload (no stripping).
+fn extract_gmail_raw_html(payload: &serde_json::Value) -> Option<String> {
+    let mime_type = payload["mimeType"].as_str().unwrap_or("");
+    if mime_type == "text/html" {
+        if let Some(data) = payload["body"]["data"].as_str() {
+            if let Ok(decoded) = BASE64_URL_SAFE_NO_PAD.decode(data) {
+                return Some(String::from_utf8_lossy(&decoded).to_string());
+            }
+        }
+    }
+
+    if let Some(parts) = payload["parts"].as_array() {
+        for part in parts {
+            if let Some(result) = extract_gmail_raw_html(part) {
+                return Some(result);
+            }
+        }
+    }
+    None
+}
+
+/// Inner recursive extractor.
+/// If `allow_html` is false, only returns text/plain content.
+/// If `allow_html` is true, returns text/html content (tags stripped).
+fn extract_gmail_body_inner(payload: &serde_json::Value, allow_html: bool) -> Option<String> {
+    let mime_type = payload["mimeType"].as_str().unwrap_or("");
+
+    let target_mime = if allow_html {
+        "text/html"
+    } else {
+        "text/plain"
+    };
+
+    if mime_type == target_mime {
+        if let Some(data) = payload["body"]["data"].as_str() {
+            if let Ok(decoded) = BASE64_URL_SAFE_NO_PAD.decode(data) {
+                let text = String::from_utf8_lossy(&decoded).to_string();
+                let result = if allow_html {
+                    strip_html_tags(&text)
+                } else {
+                    text
+                };
+                if !result.trim().is_empty() {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    // Recurse into parts
+    if let Some(parts) = payload["parts"].as_array() {
+        for part in parts {
+            if let Some(result) = extract_gmail_body_inner(part, allow_html) {
+                return Some(result);
+            }
+        }
+    }
+
+    None
+}
+
+/// Strip HTML tags and decode common HTML entities for readable plain text.
+fn strip_html_tags(html: &str) -> String {
+    // Remove <style> and <script> blocks entirely
+    let mut text = html.to_string();
+    for tag in &["style", "script"] {
+        while let Some(start) = text.find(&format!("<{}", tag)) {
+            if let Some(end) = text[start..].find(&format!("</{}>", tag)) {
+                text.replace_range(start..start + end + tag.len() + 3, "");
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Replace block-level tags with newlines
+    for tag in &[
+        "</p>", "<br>", "<br/>", "<br />", "</div>", "</li>", "</tr>",
+    ] {
+        text = text.replace(tag, "\n");
+    }
+
+    // Strip remaining tags
+    let mut result = String::new();
+    let mut in_tag = false;
+    for ch in text.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+
+    // Decode common HTML entities
+    let result = result
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ");
+
+    // Collapse excessive blank lines
+    let lines: Vec<&str> = result.lines().collect();
+    let mut collapsed = String::new();
+    let mut blank_count = 0usize;
+    for line in lines {
+        if line.trim().is_empty() {
+            blank_count += 1;
+            if blank_count <= 1 {
+                collapsed.push('\n');
+            }
+        } else {
+            blank_count = 0;
+            collapsed.push_str(line.trim());
+            collapsed.push('\n');
+        }
+    }
+
+    collapsed.trim().to_string()
 }
 
 fn extract_code_from_request(request_line: &str) -> Option<String> {

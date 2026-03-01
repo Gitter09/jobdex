@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import {
     Dialog,
     DialogContent,
@@ -7,7 +8,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useStatuses } from "@/hooks/use-statuses";
 import { cn } from "@/lib/utils";
 
@@ -130,9 +130,12 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
             if (parsed.email) setEmail(parsed.email);
             if (parsed.linkedin_url) setLinkedinUrl(parsed.linkedin_url);
             if (parsed.company_website) setCompanyWebsite(parsed.company_website);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Magic Paste failed:", err);
-            // Could show a toast here, but for now just log
+            toast.error("Magic Paste Failed", {
+                description: err.toString() || "Check your AI settings and connection.",
+                duration: 5000,
+            });
         } finally {
             setMagicPasteLoading(false);
         }

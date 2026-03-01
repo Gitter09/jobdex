@@ -16,28 +16,8 @@ fn extract_names_from_title_or_url(title: &str, url: &str) -> (String, String) {
         }
     }
 
-    // Fallback: Extract from URL slug (e.g., /in/harshit-singh-123)
-    if let Some(slug) = extract_linkedin_slug(url) {
-        // Remove trailing numbers (LinkedIn adds unique IDs)
-        let clean_slug: String = slug
-            .split('-')
-            .filter(|part| !part.chars().all(|c| c.is_numeric()))
-            .collect::<Vec<_>>()
-            .join("-");
-
-        let parts: Vec<&str> = clean_slug.split('-').collect();
-        if parts.len() >= 2 {
-            let first = capitalize(parts[0]);
-            let last = parts[1..]
-                .iter()
-                .map(|s| capitalize(s))
-                .collect::<Vec<_>>()
-                .join(" ");
-            return (first, last);
-        } else if parts.len() == 1 {
-            return (capitalize(parts[0]), String::new());
-        }
-    }
+    // Fallback: URL slug parsing REMOVED as per user request to avoid "Harshit Singh Finance" issues.
+    // relying on AI or Title only.
 
     ("Unknown".to_string(), "Contact".to_string())
 }
@@ -364,12 +344,22 @@ pub fn run() {
             scrape_clipboard,
             magic_paste,
             enrich_contact_cmd,
-            gmail_status,
+            get_email_accounts,
             gmail_connect,
-            gmail_disconnect,
-            send_email,
-            import_preview,
+            outlook_connect,
+            email_send,
+            delete_email_account,
+            email_schedule,
+            get_emails_for_contact,
+            draft_email_ai,
+            generate_subject_lines_ai,
+            save_api_key,
+            get_settings,
+            save_setting,
+            export_all_data,
+            clear_all_data,
             import_contacts,
+            analyze_import,
             delete_contacts_bulk,
             update_contacts_status_bulk,
             get_tags,
@@ -378,6 +368,8 @@ pub fn run() {
             delete_tag,
             assign_tag,
             unassign_tag,
+            check_email_credentials,
+            save_email_credentials,
             fix_orphan_contacts,
             draft_email_ai,
             generate_subject_lines_ai,
@@ -385,7 +377,12 @@ pub fn run() {
             get_settings,
             save_setting,
             export_all_data,
-            clear_all_data
+            clear_all_data,
+            sync_email_accounts,
+            sync_email_account,
+            reset_email_sync_state,
+            poll_email_tracking,
+            get_email_tracking
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -464,39 +461,154 @@ async fn delete_contact(db: tauri::State<'_, Db>, id: String) -> Result<(), Stri
     Ok(())
 }
 
+// Re-implement scrape_clipboard to use the same Configurable AI Engine as magic_paste
 #[tauri::command]
 async fn scrape_clipboard(db: tauri::State<'_, Db>) -> Result<String, String> {
-    let engine = outreach_core::EnrichmentEngine::new();
+    // 1. Get Settings & AI Config
+    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let provider_str = settings
+        .get("ai_provider")
+        .await
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "gemini".to_string());
+    let model = settings
+        .get("ai_model")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
+    let base_url = settings
+        .get("ai_base_url")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
 
-    // 1. Get URL from clipboard
+    let mut config = outreach_core::ai::AiConfig::default();
+    if provider_str == "ollama" {
+        config.provider = outreach_core::ai::AiProvider::Ollama;
+        config.ollama_model = model;
+        config.ollama_base_url = base_url;
+    } else {
+        config.provider = outreach_core::ai::AiProvider::OpenRouter;
+        config.openrouter_model = model;
+        config.openrouter_base_url = base_url;
+        let service = if provider_str == "gemini" {
+            "GEMINI_API_KEY"
+        } else {
+            "OPENROUTER_API_KEY"
+        };
+        // Retrieve key from SettingsManager
+        config.openrouter_api_key = settings
+            .get(service)
+            .await
+            .map_err(|e| e.to_string())?
+            .or(None);
+    }
+
+    // 2. Access Clipboard
+    let engine = outreach_core::EnrichmentEngine::new();
     let url = engine.get_clipboard_url().map_err(|e| e.to_string())?;
 
-    // 2. Fetch page metadata (title, raw HTML, optional description)
-    let (title, raw_html, _description) = engine
+    // 3. Fetch Page Data
+    let (title, raw_html, description) = engine
         .fetch_page_metadata(&url)
         .await
         .map_err(|e| e.to_string())?;
 
-    // 3. Try to generate hooks via Ollama (gracefully falls back if unavailable)
-    let hooks = engine.try_generate_hooks(&raw_html, None).await;
+    // 4. Build Prompt
+    // If it's a social profile, we prioritize the URL slug for the name
+    let is_social =
+        url.contains("linkedin.com") || url.contains("twitter.com") || url.contains("x.com");
+    let content_to_send = if is_social {
+        "Social profile detected. Prioritize the name from the URL if not in title.".to_string()
+    } else {
+        raw_html.chars().take(1000).collect::<String>()
+    };
 
-    // 4. Extract names - try from title first, fallback to URL slug
-    // We need to access the helper function. It's likely private in lib.rs or I need to implement it here?
-    // It was used in previous code. I will assume it exists in this file (lines 1-49).
-    // If not, I'll need to add it.
-    let (first_name, last_name) = extract_names_from_title_or_url(&title, &url);
+    let prompt = format!(
+        r#"Extract contact details from this page into JSON.
+If the name is not clearly in the text/title, infer it from the URL slug (e.g. john-doe -> John Doe).
 
-    // 5. Save to DB
+URL: {}
+Title: {}
+Snippet: {}
+
+JSON Format:
+{{
+  "first_name": "string",
+  "last_name": "string", 
+  "title": "string or null",
+  "company": "string or null",
+  "location": "string or null",
+  "email": "string or null",
+  "linkedin_url": "string or null",
+  "context": "1 sentence brief"
+}}
+
+Respond with ONLY the JSON object."#,
+        url, title, content_to_send
+    );
+
+    // 5. Call AI
+    println!("--- [Clipboard Intelligence] Debug Start ---");
+    println!("Provider: {}", provider_str);
+    println!(
+        "Base URL: {}",
+        if provider_str == "ollama" {
+            &config.ollama_base_url
+        } else {
+            &config.openrouter_base_url
+        }
+    );
+
+    let ai_client = outreach_core::AiClient::new(config);
+    let response = ai_client.generate(&prompt).await.map_err(|e| {
+        println!("--- [Clipboard Intelligence] Error: {} ---", e);
+        e.to_string()
+    })?;
+
+    println!("Raw AI Response: {}", response);
+    println!("--- [Clipboard Intelligence] Debug End ---");
+
+    // 6. Parse & Save
+    let parsed: serde_json::Value = serde_json::from_str(&response)
+        .or_else(|_| {
+            let json_start = response.find('{').unwrap_or(0);
+            let json_end = response.rfind('}').map(|i| i + 1).unwrap_or(response.len());
+            serde_json::from_str(&response[json_start..json_end])
+        })
+        .map_err(|e| format!("Failed to parse AI response: {}", e))?;
+
+    // If AI failed to extract names, fallback to Title parsing (but using the simplified logic we have, or just "Unknown")
+    let first_name = parsed["first_name"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Unknown")
+        .to_string();
+    let last_name = parsed["last_name"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Contact")
+        .to_string();
+    let hooks = parsed["context"].as_str().unwrap_or("").to_string();
+
     let pool = db.pool();
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO contacts (id, first_name, last_name, linkedin_url, intelligence_summary, status, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
+
+    sqlx::query("INSERT INTO contacts (id, first_name, last_name, linkedin_url, intelligence_summary, title, company, location, company_website, email, status, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&id)
         .bind(&first_name)
         .bind(&last_name)
         .bind(&url)
         .bind(&hooks)
+        .bind(parsed["title"].as_str())
+        .bind(parsed["company"].as_str())
+        .bind(parsed["location"].as_str())
+        .bind(parsed["company_website"].as_str())
+        .bind(parsed["email"].as_str())
         .bind("Enriched")
-        .bind("def-stat-001")
+        .bind("stat-new")
         .execute(pool)
         .await
         .map_err(|e: sqlx::Error| e.to_string())?;
@@ -520,7 +632,7 @@ struct ParsedContact {
 
 /// AI-powered Magic Paste: parses any clipboard text into contact fields
 #[tauri::command]
-async fn magic_paste() -> Result<ParsedContact, String> {
+async fn magic_paste(db: tauri::State<'_, Db>) -> Result<ParsedContact, String> {
     use arboard::Clipboard;
 
     // 1. Get clipboard text
@@ -531,48 +643,106 @@ async fn magic_paste() -> Result<ParsedContact, String> {
         return Err("Clipboard is empty".to_string());
     }
 
-    // 2. Build AI prompt for structured extraction
+    // 2. Load AI Settings
+    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let provider_str = settings
+        .get("ai_provider")
+        .await
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "gemini".to_string());
+    let model = settings
+        .get("ai_model")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
+    let base_url = settings
+        .get("ai_base_url")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
+
+    let mut config = outreach_core::ai::AiConfig::default();
+
+    // NOTE: Magic Paste uses a specific hardcoded prompt structure inside the function below,
+    // but we respect the provider/model from settings.
+
+    if provider_str == "ollama" {
+        config.provider = outreach_core::ai::AiProvider::Ollama;
+        config.ollama_model = model;
+        // Fix: Use the configured base URL instead of hardcoded localhost
+        config.ollama_base_url = base_url;
+    } else {
+        config.provider = outreach_core::ai::AiProvider::OpenRouter;
+        config.openrouter_model = model;
+        config.openrouter_base_url = base_url;
+
+        let service = if provider_str == "gemini" {
+            "GEMINI_API_KEY"
+        } else {
+            "OPENROUTER_API_KEY"
+        };
+        // Retrieve key from SettingsManager
+        config.openrouter_api_key = settings
+            .get(service)
+            .await
+            .map_err(|e| e.to_string())?
+            .or(None);
+    }
+
+    // Debug logging for user verification
+    println!("--- [Magic Paste] Debug Start ---");
+    println!("Provider: {}", provider_str);
+    println!("Model: {}", config.ollama_model);
+    println!(
+        "Base URL: {}",
+        if provider_str == "ollama" {
+            &config.ollama_base_url
+        } else {
+            &config.openrouter_base_url
+        }
+    );
+
+    // 3. Build AI prompt for structured extraction
     let prompt = format!(
-        r#"STRICT INSTRUCTIONS:
-Extract contact information from the provided text. 
-CRITICAL RULE: do NOT hallucinate. If a field (like email or company) is NOT explicitly present in the text, you MUST return null for that field. Do NOT guess or generate "example" data.
+        r#"Analyze this text/URL and extract contact info into JSON.
+CRITICAL: If it's a LinkedIn URL (like /in/john-doe), extract the Name from the link path if not in the text.
 
-Return ONLY valid, minified JSON.
-
-Fields:
-- first_name (required)
-- last_name (required)
-- title (optional)
-- company (optional)
-- location (optional, e.g. "San Francisco, CA")
-- company_website (optional)
-- email (optional)
-- linkedin_url (optional)
-- context (optional, 1 sentence summary)
-
-EXAMPLE 1:
-Input: "John Doe, Principal at Peak XV regarding Series A. linkedin.com/in/jdoe"
-Output: {{"first_name": "John", "last_name": "Doe", "title": "Principal", "company": "Peak XV", "location": null, "company_website": null, "email": null, "linkedin_url": "https://linkedin.com/in/jdoe", "context": "Principal at Peak XV regarding Series A"}}
-
-EXAMPLE 2:
-Input: "Head of IT at GreenLeaf Inc, San Francisco. www.greenleaf.com"
-Output: {{"first_name": "", "last_name": "", "title": "Head of IT", "company": "GreenLeaf Inc.", "location": "San Francisco", "company_website": "www.greenleaf.com", "email": null, "linkedin_url": null, "context": "Head of IT at GreenLeaf Inc"}}
-
-Input Text:
+Input:
 {}
 
-JSON:"#,
+JSON Template:
+{{
+  "first_name": "string",
+  "last_name": "string",
+  "title": "string or null",
+  "company": "string or null",
+  "location": "string or null",
+  "email": "string or null",
+  "linkedin_url": "string or null",
+  "context": "Short summary"
+}}
+
+Return JSON only."#,
         text.chars().take(2000).collect::<String>()
     );
 
-    // 3. Call Ollama (local-first for privacy)
-    let ai_client = outreach_core::AiClient::ollama_default();
-    let response = ai_client
-        .generate(&prompt)
-        .await
-        .map_err(|e| e.to_string())?;
+    println!("Input Text (First 100 chars): {:.100}", text);
 
-    // 4. Parse JSON response
+    // 4. Call AI Client
+    let ai_client = outreach_core::AiClient::new(config);
+    let start_time = std::time::Instant::now();
+    let response = ai_client.generate(&prompt).await.map_err(|e| {
+        println!("--- [Magic Paste] Error: {} ---", e);
+        e.to_string()
+    })?;
+
+    println!("Response Time: {:?}", start_time.elapsed());
+    println!("Raw AI Response: {}", response);
+    println!("--- [Magic Paste] Debug End ---");
+
+    // 5. Parse JSON response
     let parsed: serde_json::Value = serde_json::from_str(&response)
         .or_else(|_| {
             // Try to extract JSON from markdown code blocks
@@ -603,14 +773,73 @@ async fn enrich_contact_cmd(
     id: String,
     url: String,
 ) -> Result<String, String> {
+    // 1. Get Settings & AI Config
+    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let provider_str = settings
+        .get("ai_provider")
+        .await
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "gemini".to_string());
+    let model = settings
+        .get("ai_model")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
+    let base_url = settings
+        .get("ai_base_url")
+        .await
+        .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
+
+    println!("--- [Enrichment Debug] Start ---");
+    println!("Contact ID: {}", id);
+    println!("URL: {}", url);
+    println!("Provider: {}", provider_str);
+    println!("Model: {}", model);
+    println!("Base URL: {}", base_url);
+
+    let mut config = outreach_core::ai::AiConfig::default();
+    if provider_str == "ollama" {
+        config.provider = outreach_core::ai::AiProvider::Ollama;
+        config.ollama_model = model;
+        config.ollama_base_url = base_url;
+    } else {
+        config.provider = outreach_core::ai::AiProvider::OpenRouter;
+        config.openrouter_model = model;
+        config.openrouter_base_url = base_url;
+        let service = if provider_str == "gemini" {
+            "GEMINI_API_KEY"
+        } else {
+            "OPENROUTER_API_KEY"
+        };
+        // Retrieve key from SettingsManager
+        config.openrouter_api_key = settings
+            .get(service)
+            .await
+            .map_err(|e| e.to_string())?
+            .or(None);
+    }
+
+    println!("Has API Key: {}", config.openrouter_api_key.is_some());
+
     let engine = outreach_core::EnrichmentEngine::new();
     let (_, raw_html, _) = engine
         .fetch_page_metadata(&url)
         .await
         .map_err(|e| e.to_string())?;
 
-    // Default to Ollama for now, later we can pass config from frontend settings
-    let hooks = engine.try_generate_hooks(&raw_html, None).await;
+    println!("Fetched HTML Length: {}", raw_html.len());
+
+    let hooks = engine.try_generate_hooks(&raw_html, Some(config)).await;
+
+    println!("Generated Hooks Length: {}", hooks.len());
+    println!(
+        "Hooks Snippet: {}",
+        hooks.chars().take(100).collect::<String>()
+    );
+    println!("--- [Enrichment Debug] End ---");
 
     // Update DB
     sqlx::query("UPDATE contacts SET intelligence_summary = ? WHERE id = ?")
@@ -624,13 +853,15 @@ async fn enrich_contact_cmd(
 }
 
 #[tauri::command]
-fn gmail_status() -> Result<bool, String> {
-    let client = outreach_core::gmail::GmailClient::new();
-    Ok(client.is_connected())
+async fn get_email_accounts(
+    db: tauri::State<'_, Db>,
+) -> Result<Vec<outreach_core::models::EmailAccount>, String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service.list_accounts().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn gmail_connect() -> Result<String, String> {
+async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, String> {
     use std::thread;
 
     let client = outreach_core::gmail::GmailClient::new();
@@ -641,35 +872,222 @@ async fn gmail_connect() -> Result<String, String> {
     // Open browser
     open::that(&auth_url).map_err(|e| format!("Failed to open browser: {}", e))?;
 
-    // Wait for callback in a thread (blocking TcpListener)
+    // Wait for callback
     let code = thread::spawn(move || client.wait_for_callback())
         .join()
         .map_err(|_| "OAuth callback thread panicked".to_string())?
         .map_err(|e| e.to_string())?;
 
-    // Exchange code for tokens
+    // Exchange code
     let client = outreach_core::gmail::GmailClient::new();
-    client
+    let tokens = client
         .exchange_code(code, pkce_verifier)
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok("Connected successfully!".to_string())
+    // Get Profile (Email)
+    let email = client
+        .get_user_profile(&tokens.access_token)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Save to DB
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .register_account(
+            "gmail",
+            &email,
+            &tokens.access_token,
+            tokens.refresh_token.as_deref(),
+            tokens.expires_in,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(format!("Connected to Gmail: {}", email))
 }
 
 #[tauri::command]
-fn gmail_disconnect() -> Result<(), String> {
-    let client = outreach_core::gmail::GmailClient::new();
-    client.disconnect().map_err(|e| e.to_string())
+async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, String> {
+    use std::thread;
+
+    let client = outreach_core::outlook::OutlookClient::new();
+
+    let (auth_url, pkce_verifier) = client.get_auth_url().map_err(|e| e.to_string())?;
+
+    open::that(&auth_url).map_err(|e| format!("Failed to open browser: {}", e))?;
+
+    let code = thread::spawn(move || client.wait_for_callback())
+        .join()
+        .map_err(|_| "OAuth callback thread panicked".to_string())?
+        .map_err(|e| e.to_string())?;
+
+    let client = outreach_core::outlook::OutlookClient::new();
+    let tokens = client
+        .exchange_code(code, pkce_verifier)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let email = client
+        .get_user_profile(&tokens.access_token)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .register_account(
+            "outlook",
+            &email,
+            &tokens.access_token,
+            tokens.refresh_token.as_deref(),
+            tokens.expires_in,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(format!("Connected to Outlook: {}", email))
 }
 
 #[tauri::command]
-async fn send_email(to: String, subject: String, body: String) -> Result<String, String> {
-    let client = outreach_core::gmail::GmailClient::new();
-    client
-        .send_email(&to, &subject, &body)
+async fn email_send(
+    db: tauri::State<'_, Db>,
+    account_id: String,
+    to: String,
+    subject: String,
+    body: String,
+) -> Result<String, String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .send_email(&account_id, &to, &subject, &body)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn email_schedule(
+    db: tauri::State<'_, Db>,
+    account_id: String,
+    contact_id: String,
+    subject: String,
+    body: String,
+    scheduled_at: i64,
+) -> Result<String, String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .schedule_email(&account_id, &contact_id, &subject, &body, scheduled_at)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_emails_for_contact(
+    db: tauri::State<'_, Db>,
+    contact_id: String,
+) -> Result<Vec<outreach_core::models::EmailMessage>, String> {
+    // We need to resolve contact_id to email first to be accurate, but service handles it?
+    // Service query above was a bit hacky. Let's fix it here or there.
+    // Actually, in service I used subquery on contact_id. That works if contact has email.
+
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .get_emails_for_contact(&contact_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_email_account(db: tauri::State<'_, Db>, account_id: String) -> Result<(), String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .delete_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn sync_email_accounts(
+    db: tauri::State<'_, Db>,
+) -> Result<Vec<outreach_core::SyncResult>, String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service.sync_all_accounts().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn sync_email_account(
+    db: tauri::State<'_, Db>,
+    account_id: String,
+) -> Result<outreach_core::SyncResult, String> {
+    let service = outreach_core::EmailService::new(db.inner().clone());
+    service
+        .sync_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Reset last_synced_at to NULL for one or all accounts,
+/// forcing the next sync to re-fetch all messages from the provider.
+/// This is needed to backfill messages that were previously stored with empty bodies.
+#[tauri::command]
+async fn reset_email_sync_state(
+    db: tauri::State<'_, Db>,
+    account_id: Option<String>,
+) -> Result<(), String> {
+    let pool = db.pool();
+    match account_id {
+        Some(id) => {
+            sqlx::query("UPDATE email_accounts SET last_synced_at = NULL WHERE id = ?")
+                .bind(&id)
+                .execute(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        None => {
+            sqlx::query("UPDATE email_accounts SET last_synced_at = NULL")
+                .execute(pool)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn poll_email_tracking(db: tauri::State<'_, Db>) -> Result<usize, String> {
+    outreach_core::tracking::poll_tracking_events(db.inner())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct TrackingEventResponse {
+    pub event_type: String,
+    pub occurred_at: String,
+    pub link_url: Option<String>,
+}
+
+#[tauri::command]
+async fn get_email_tracking(
+    db: tauri::State<'_, Db>,
+    message_id: String,
+) -> Result<Vec<TrackingEventResponse>, String> {
+    let rows: Vec<(String, chrono::DateTime<chrono::Utc>, Option<String>)> = sqlx::query_as(
+        "SELECT event_type, occurred_at, link_url FROM email_tracking WHERE message_id = ? ORDER BY occurred_at DESC"
+    )
+    .bind(&message_id)
+    .fetch_all(db.pool())
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .map(
+            |(event_type, occurred_at, link_url)| TrackingEventResponse {
+                event_type,
+                occurred_at: occurred_at.to_rfc3339(),
+                link_url,
+            },
+        )
+        .collect())
 }
 
 #[tauri::command]
@@ -695,11 +1113,13 @@ async fn draft_email_ai(db: tauri::State<'_, Db>, contact_id: String) -> Result<
         .get("ai_model")
         .await
         .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
     let base_url = settings
         .get("ai_base_url")
         .await
         .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
     let custom_draft = settings
         .get("prompt_email_draft")
@@ -730,7 +1150,12 @@ async fn draft_email_ai(db: tauri::State<'_, Db>, contact_id: String) -> Result<
         } else {
             "OPENROUTER_API_KEY"
         };
-        config.openrouter_api_key = get_api_key(service).ok();
+        // Retrieve key from SettingsManager
+        config.openrouter_api_key = settings
+            .get(service)
+            .await
+            .map_err(|e| e.to_string())?
+            .or(None);
     }
 
     // Generate draft
@@ -767,11 +1192,13 @@ async fn generate_subject_lines_ai(
         .get("ai_model")
         .await
         .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
     let base_url = settings
         .get("ai_base_url")
         .await
         .map_err(|e| e.to_string())?
+        .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
     let custom_draft = settings
         .get("prompt_email_draft")
@@ -798,7 +1225,12 @@ async fn generate_subject_lines_ai(
         } else {
             "OPENROUTER_API_KEY"
         };
-        config.openrouter_api_key = get_api_key(service).ok();
+        // Retrieve key from SettingsManager
+        config.openrouter_api_key = settings
+            .get(service)
+            .await
+            .map_err(|e| e.to_string())?
+            .or(None);
     }
 
     let email_ai = outreach_core::EmailAI::new(config);
@@ -809,14 +1241,19 @@ async fn generate_subject_lines_ai(
 }
 
 #[tauri::command]
-async fn save_api_key(service: String, key: String) -> Result<(), String> {
-    let entry = keyring::Entry::new("PersonalCRM", &service).map_err(|e| e.to_string())?;
-    entry.set_password(&key).map_err(|e| e.to_string())
-}
-
-fn get_api_key(service: &str) -> Result<String, String> {
-    let entry = keyring::Entry::new("PersonalCRM", service).map_err(|e| e.to_string())?;
-    entry.get_password().map_err(|e| e.to_string())
+async fn save_api_key(
+    db: tauri::State<'_, Db>,
+    service: String,
+    key: String,
+) -> Result<(), String> {
+    println!("--- [DB Debug] Saving key for service: {} ---", service);
+    let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    manager
+        .set(&service, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+    println!("--- [DB Debug] Key saved successfully ---");
+    Ok(())
 }
 
 // ===== Settings Commands =====
@@ -900,35 +1337,216 @@ fn import_preview(file_path: String) -> Result<outreach_core::import::ImportPrev
     outreach_core::import::preview_file(&file_path).map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+struct ImportAnalysis {
+    total_detected: usize,
+    new_count: usize,
+    duplicate_count: usize,
+}
+
+#[derive(sqlx::FromRow)]
+struct ContactIdentity {
+    id: String,
+    email: Option<String>,
+    linkedin_url: Option<String>,
+    first_name: String,
+    last_name: String,
+    company: Option<String>,
+}
+
+#[tauri::command]
+async fn analyze_import(
+    db: tauri::State<'_, Db>,
+    file_path: String,
+    mapping: outreach_core::import::ColumnMapping,
+) -> Result<ImportAnalysis, String> {
+    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)
+        .map_err(|e| e.to_string())?;
+
+    // Fetch existing identifiers for comparison
+    let pool = db.pool();
+    let existing = sqlx::query_as::<sqlx::Sqlite, ContactIdentity>(
+        "SELECT id, email, linkedin_url, first_name, last_name, company FROM contacts",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut new_count = 0;
+    let mut duplicate_count = 0;
+
+    for candidate in &contacts {
+        let is_duplicate = existing.iter().any(|e| {
+            // 1. Email Match (Exact)
+            if let (Some(e1), Some(e2)) = (&e.email, &candidate.email) {
+                let e1_str: &str = e1;
+                if !e1_str.is_empty() && e1_str.eq_ignore_ascii_case(e2) {
+                    return true;
+                }
+            }
+
+            // 2. LinkedIn Match (Slug or Exact)
+            if let (Some(l1), Some(l2)) = (&e.linkedin_url, &candidate.linkedin_url) {
+                let l1_str: &str = l1;
+                if !l1_str.is_empty()
+                    && (l1 == l2 || extract_linkedin_slug(l1) == extract_linkedin_slug(l2))
+                {
+                    return true;
+                }
+            }
+
+            // 3. Name + Company Match (Fuzzy-ish fallback)
+            if e.first_name.eq_ignore_ascii_case(&candidate.first_name)
+                && e.last_name.eq_ignore_ascii_case(&candidate.last_name)
+            {
+                if let (Some(c1), Some(c2)) = (&e.company, &candidate.company) {
+                    let c1_str: &str = c1;
+                    if !c1_str.is_empty() && c1_str.eq_ignore_ascii_case(c2) {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        });
+
+        if is_duplicate {
+            duplicate_count += 1;
+        } else {
+            new_count += 1;
+        }
+    }
+
+    Ok(ImportAnalysis {
+        total_detected: contacts.len(),
+        new_count,
+        duplicate_count,
+    })
+}
+
 #[tauri::command]
 async fn import_contacts(
     db: tauri::State<'_, Db>,
     file_path: String,
     mapping: outreach_core::import::ColumnMapping,
+    mode: String, // "skip", "merge", "none"
 ) -> Result<usize, String> {
     let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)
         .map_err(|e| e.to_string())?;
 
     let pool = db.pool();
+
+    // Fetch existing for deduplication if mode is not "none"
+    let existing = if mode != "none" {
+        sqlx::query_as::<sqlx::Sqlite, ContactIdentity>(
+            "SELECT id, email, linkedin_url, first_name, last_name, company FROM contacts",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?
+    } else {
+        vec![]
+    };
+
     let mut count = 0;
 
     for contact in contacts {
-        let id = uuid::Uuid::new_v4().to_string();
-        let result = sqlx::query(
-            "INSERT INTO contacts (id, first_name, last_name, email, linkedin_url, status, status_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        )
-            .bind(&id)
-            .bind(&contact.first_name)
-            .bind(&contact.last_name)
-            .bind(&contact.email)
-            .bind(&contact.linkedin_url)
-            .bind("New")
-            .bind("stat-new")
-            .execute(pool)
-            .await;
+        let mut duplicate_id: Option<String> = None;
 
-        if result.is_ok() {
-            count += 1;
+        if mode != "none" {
+            // Find duplicate ID
+            duplicate_id = existing
+                .iter()
+                .find(|e| {
+                    // Same logic as analyze
+                    // 1. Email
+                    if let (Some(e1), Some(e2)) = (&e.email, &contact.email) {
+                        let e1_str: &str = e1;
+                        if !e1_str.is_empty() && e1_str.eq_ignore_ascii_case(e2) {
+                            return true;
+                        }
+                    }
+                    // 2. LinkedIn
+                    if let (Some(l1), Some(l2)) = (&e.linkedin_url, &contact.linkedin_url) {
+                        let l1_str: &str = l1;
+                        if !l1_str.is_empty()
+                            && (l1 == l2 || extract_linkedin_slug(l1) == extract_linkedin_slug(l2))
+                        {
+                            return true;
+                        }
+                    }
+                    // 3. Name + Company
+                    if e.first_name.eq_ignore_ascii_case(&contact.first_name)
+                        && e.last_name.eq_ignore_ascii_case(&contact.last_name)
+                    {
+                        if let (Some(c1), Some(c2)) = (&e.company, &contact.company) {
+                            let c1_str: &str = c1;
+                            if !c1_str.is_empty() && c1_str.eq_ignore_ascii_case(c2) {
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                })
+                .map(|e| e.id.clone());
+        }
+
+        if let Some(id) = duplicate_id {
+            if mode == "merge" {
+                // Merge Logic: Update fields only if they are missing in DB
+                // This is a comprehensive update query using COALESCE logic
+                // Since SQLite doesn't support complex updates easily in one go without loading,
+                // and we already loaded basic info, doing a specific update is safer.
+                // However, for simplicity and performance, we can just execute an update blindly for fields that are provided.
+                // A better approach for "Update" is usually "Overwrite" or "Fill Missing". The user asked for "Update".
+                // We'll implementing "Fill Missing" as it's safer.
+
+                // We need to know which fields are currently NULL in DB to fill them.
+                // The `existing` vec only has a few fields. Let's run a smart update.
+
+                let _ = sqlx::query(
+                    r#"
+                    UPDATE contacts SET 
+                        email = COALESCE(email, NULLIF(?, '')),
+                        linkedin_url = COALESCE(linkedin_url, NULLIF(?, '')),
+                        company = COALESCE(company, NULLIF(?, '')),
+                        title = COALESCE(title, NULLIF(?, ''))
+                    WHERE id = ?
+                    "#,
+                )
+                .bind(&contact.email)
+                .bind(&contact.linkedin_url)
+                .bind(&contact.company)
+                .bind(&contact.title)
+                .bind(&id)
+                .execute(pool)
+                .await;
+
+                // Count merge as "processed"
+                count += 1;
+            }
+            // If mode == "skip", do nothing
+        } else {
+            // Insert New
+            let id = uuid::Uuid::new_v4().to_string();
+            let result = sqlx::query(
+                "INSERT INTO contacts (id, first_name, last_name, email, linkedin_url, company, title, status, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+                .bind(&id)
+                .bind(&contact.first_name)
+                .bind(&contact.last_name)
+                .bind(&contact.email)
+                .bind(&contact.linkedin_url)
+                .bind(&contact.company)
+                .bind(&contact.title)
+                .bind("New")
+                .bind("stat-new")
+                .execute(pool)
+                .await;
+
+            if result.is_ok() {
+                count += 1;
+            }
         }
     }
 
@@ -1073,5 +1691,79 @@ async fn unassign_tag(
         .execute(pool)
         .await
         .map_err(|e: sqlx::Error| e.to_string())?;
+    Ok(())
+}
+
+// ===== Email Credential Commands =====
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct EmailCredentialStatus {
+    gmail_configured: bool,
+    outlook_configured: bool,
+}
+
+#[tauri::command]
+async fn check_email_credentials() -> Result<EmailCredentialStatus, String> {
+    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let config_dir = home.join(".outreachos");
+
+    let gmail_path = config_dir.join("credentials.json");
+    let outlook_path = config_dir.join("ms_credentials.json");
+
+    Ok(EmailCredentialStatus {
+        gmail_configured: gmail_path.exists(),
+        outlook_configured: outlook_path.exists(),
+    })
+}
+
+#[tauri::command]
+async fn save_email_credentials(
+    provider: String,
+    client_id: String,
+    client_secret: String,
+) -> Result<(), String> {
+    use std::fs;
+    use std::io::Write;
+
+    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let config_dir = home.join(".outreachos");
+
+    // Create directory if it doesn't exist
+    fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("Failed to create config directory: {}", e))?;
+
+    let (file_path, json_content) = match provider.as_str() {
+        "gmail" => {
+            let path = config_dir.join("credentials.json");
+            let content = serde_json::json!({
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret
+                }
+            });
+            (path, content)
+        }
+        "outlook" => {
+            let path = config_dir.join("ms_credentials.json");
+            let content = serde_json::json!({
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret
+                }
+            });
+            (path, content)
+        }
+        _ => return Err(format!("Unknown provider: {}", provider)),
+    };
+
+    let json_str = serde_json::to_string_pretty(&json_content)
+        .map_err(|e| format!("Failed to serialize credentials: {}", e))?;
+
+    let mut file = fs::File::create(&file_path)
+        .map_err(|e| format!("Failed to create credentials file: {}", e))?;
+
+    file.write_all(json_str.as_bytes())
+        .map_err(|e| format!("Failed to write credentials: {}", e))?;
+
     Ok(())
 }

@@ -25,6 +25,7 @@ pub enum AiProvider {
 pub struct AiConfig {
     pub provider: AiProvider,
     pub ollama_model: String,
+    pub ollama_base_url: String,
     pub openrouter_model: String,
     pub openrouter_base_url: String,
     pub openrouter_api_key: Option<String>,
@@ -37,6 +38,7 @@ impl Default for AiConfig {
         Self {
             provider: AiProvider::Ollama,
             ollama_model: "llama3.2".to_string(),
+            ollama_base_url: "http://localhost:11434".to_string(),
             // Gemini 2.0 Flash Experimental via OpenRouter (free tier)
             openrouter_model: "google/gemini-2.0-flash-exp:free".to_string(),
             openrouter_base_url: "https://openrouter.ai/api/v1".to_string(),
@@ -128,10 +130,13 @@ impl AiClient {
 
     /// Call local Ollama instance
     async fn call_ollama(&self, prompt: &str) -> Result<String> {
+        let base_url = self.config.ollama_base_url.trim_end_matches('/');
+        let url = format!("{}/api/generate", base_url);
+
         let response = self
             .client
-            .post("http://localhost:11434/api/generate")
-            .timeout(std::time::Duration::from_secs(60))
+            .post(&url)
+            .timeout(std::time::Duration::from_secs(120))
             .json(&json!({
                 "model": self.config.ollama_model,
                 "prompt": prompt,
@@ -164,10 +169,18 @@ impl AiClient {
             self.config.openrouter_base_url.trim_end_matches('/')
         );
 
+        println!("--- [AI Debug] Call OpenRouter ---");
+        println!("URL: {}", url);
+        println!("Model: {}", self.config.openrouter_model);
+        println!(
+            "API Key (first 4): {}",
+            &api_key[..std::cmp::min(4, api_key.len())]
+        );
+
         let response = self
             .client
             .post(&url)
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(120))
             .header("Authorization", format!("Bearer {}", api_key))
             // Required for OpenRouter to identify your app
             .header(
@@ -185,6 +198,8 @@ impl AiClient {
             .send()
             .await?;
 
+        println!("HTTP Status: {}", response.status());
+
         if response.status().is_success() {
             let body: OpenRouterResponse = response.json().await?;
 
@@ -199,6 +214,8 @@ impl AiClient {
         } else {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
+            println!("Error Body: {}", text);
+            println!("--- [AI Debug] End ---");
             Err(anyhow!("OpenRouter call failed: {} - {}", status, text))
         }
     }

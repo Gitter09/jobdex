@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+// Removed AISettingsTab import as we inline it due to shared state or missing file
+import { EmailSettingsTab } from "./email-settings-tab";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,7 +21,8 @@ import {
     Moon,
     Monitor,
     Trash2,
-    FileCode
+    FileCode,
+    Mail
 } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
@@ -30,7 +33,7 @@ interface SettingsDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
-type Tab = "ai" | "appearance" | "pipeline" | "data" | "prompts";
+type Tab = "ai" | "email" | "appearance" | "pipeline" | "data" | "prompts";
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [activeTab, setActiveTab] = useState<Tab>("ai");
@@ -82,60 +85,41 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         <div className="w-[200px] border-r h-full bg-muted/30 p-2 space-y-1">
             <h2 className="px-4 py-2 text-sm font-semibold text-muted-foreground mb-2">Settings</h2>
 
-            <button
-                onClick={() => setActiveTab("ai")}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border ${activeTab === "ai"
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
-                    }`}
-            >
-                <Brain className="h-4 w-4" />
-                Intelligence
-            </button>
+            {(["ai", "email", "appearance", "prompts", "pipeline", "data"] as Tab[]).map((tab) => {
+                const icons: Record<Tab, any> = {
+                    ai: Brain,
+                    email: Mail,
+                    appearance: Palette,
+                    prompts: FileCode,
+                    pipeline: LayoutTemplate,
+                    data: Database
+                };
+                const labels: Record<Tab, string> = {
+                    ai: "Intelligence",
+                    email: "Email Integration",
+                    appearance: "Appearance",
+                    prompts: "AI Prompts",
+                    pipeline: "Pipeline",
+                    data: "Data"
+                };
+                const Icon = icons[tab];
 
-            <button
-                onClick={() => setActiveTab("appearance")}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border ${activeTab === "appearance"
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
-                    }`}
-            >
-                <Palette className="h-4 w-4" />
-                Appearance
-            </button>
-
-            <button
-                onClick={() => setActiveTab("prompts")}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border ${activeTab === "prompts"
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
-                    }`}
-            >
-                <FileCode className="h-4 w-4" />
-                AI Prompts
-            </button>
-
-            <button
-                onClick={() => setActiveTab("pipeline")}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border ${activeTab === "pipeline"
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
-                    }`}
-            >
-                <LayoutTemplate className="h-4 w-4" />
-                Pipeline
-            </button>
-
-            <button
-                onClick={() => setActiveTab("data")}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border ${activeTab === "data"
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
-                    }`}
-            >
-                <Database className="h-4 w-4" />
-                Data
-            </button>
+                return (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border",
+                            activeTab === tab
+                                ? "bg-primary/10 text-primary border-primary/20"
+                                : "text-muted-foreground border-transparent hover:border-primary hover:text-primary hover:bg-transparent"
+                        )}
+                    >
+                        <Icon className="h-4 w-4" />
+                        {labels[tab]}
+                    </button>
+                );
+            })}
         </div>
     );
 
@@ -155,10 +139,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     {["gemini", "openrouter", "ollama"].map((provider) => (
                         <div
                             key={provider}
-                            className={`border rounded-md p-3 cursor-pointer transition-all ${aiProvider === provider
-                                ? "border-primary bg-primary/5 ring-1 ring-primary"
-                                : "hover:border-primary/50"
-                                }`}
+                            className={cn(
+                                "border rounded-md p-3 cursor-pointer transition-all",
+                                aiProvider === provider
+                                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                    : "hover:border-primary/50"
+                            )}
                             onClick={() => {
                                 setAiProvider(provider);
                                 handleSettingChange("ai_provider", provider);
@@ -467,6 +453,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const renderContent = () => {
         switch (activeTab) {
             case "ai": return renderAiContent();
+            case "email": return <EmailSettingsTab />;
             case "appearance": return renderAppearanceContent();
             case "prompts": return renderPromptsContent();
             case "pipeline": return <div className="p-4 text-muted-foreground">Pipeline configuration coming soon.</div>;

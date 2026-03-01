@@ -1,6 +1,7 @@
 use anyhow::Result;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 
+#[derive(Clone)]
 pub struct Db {
     pool: SqlitePool,
 }
@@ -95,5 +96,67 @@ pub mod models {
         pub name: String,
         pub color: String,
         pub created_at: DateTime<Utc>,
+    }
+
+    // Email CRM Models
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct EmailAccount {
+        pub id: String,
+        pub provider: String, // 'gmail', 'outlook'
+        pub email: String,
+        pub access_token: String,
+        pub refresh_token: Option<String>,
+        pub expires_at: Option<i64>,
+        pub created_at: DateTime<Utc>,
+        pub updated_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct EmailThread {
+        pub id: String,
+        pub contact_id: String,
+        pub account_id: String,
+        pub subject: Option<String>,
+        pub last_message_at: Option<DateTime<Utc>>,
+        pub created_at: DateTime<Utc>,
+        pub updated_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct EmailMessage {
+        pub id: String,
+        pub thread_id: String,
+        pub from_email: String,
+        pub to_email: String,
+        pub subject: Option<String>,
+        pub body: Option<String>,
+        pub html_body: Option<String>,
+        pub sent_at: Option<DateTime<Utc>>,
+        pub status: Option<String>, // 'received', 'sent', 'draft'
+        pub created_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct ScheduledEmail {
+        pub id: String,
+        pub contact_id: String,
+        pub account_id: String,
+        pub subject: String,
+        pub body: String,
+        pub scheduled_at: DateTime<Utc>,
+        pub status: String,
+        pub error_message: Option<String>,
+        pub created_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct EmailTracking {
+        pub id: String,
+        pub message_id: String,
+        pub event_type: String, // 'open', 'click'
+        pub occurred_at: DateTime<Utc>,
+        pub ip_address: Option<String>,
+        pub user_agent: Option<String>,
+        pub link_url: Option<String>,
     }
 }

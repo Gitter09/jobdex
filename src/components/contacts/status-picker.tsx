@@ -16,15 +16,7 @@ interface StatusPickerProps {
 }
 
 
-const COLORS = [
-    { label: "Blue", value: "#3b82f6" },
-    { label: "Green", value: "#22c55e" },
-    { label: "Purple", value: "#a855f7" },
-    { label: "Yellow", value: "#eab308" },
-    { label: "Orange", value: "#f97316" },
-    { label: "Pink", value: "#ec4899" },
-    { label: "Gray", value: "#64748b" },
-];
+
 
 export function StatusPicker({ currentStatusId, onStatusChange, className }: StatusPickerProps) {
     const { statuses } = useStatuses();

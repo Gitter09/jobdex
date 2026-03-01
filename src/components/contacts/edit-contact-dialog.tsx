@@ -18,9 +18,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useStatuses } from "@/hooks/use-statuses";
 import { Contact } from "@/types/crm";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface EditContactDialogProps {
     contact: Contact;
@@ -42,6 +52,7 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
     const [linkedinUrl, setLinkedinUrl] = useState(contact.linkedin_url || "");
     const [companyWebsite, setCompanyWebsite] = useState(contact.company_website || "");
     const [selectedStatusId, setSelectedStatusId] = useState(contact.status_id);
+    const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
 
     const { statuses } = useStatuses();
 
@@ -60,10 +71,13 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
         }
     }, [contact, open]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!firstName.trim() || !lastName.trim()) return;
+        setIsConfirmSaveOpen(true);
+    };
 
+    const handleConfirmSave = async () => {
         setLoading(true);
         try {
             await invoke("update_contact", {
@@ -85,6 +99,7 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
             console.error("Failed to update contact:", error);
         } finally {
             setLoading(false);
+            setIsConfirmSaveOpen(false);
         }
     };
 
@@ -210,6 +225,27 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                     </DialogFooter>
                 </form>
             </DialogContent>
+
+            <AlertDialog open={isConfirmSaveOpen} onOpenChange={setIsConfirmSaveOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-primary" />
+                            Confirm Changes
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to save the changes to <strong>{contact.first_name} {contact.last_name}</strong>?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmSave} disabled={loading}>
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Confirm & Save
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
     );
 }

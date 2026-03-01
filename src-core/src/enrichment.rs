@@ -31,7 +31,10 @@ impl EnrichmentEngine {
 
     pub async fn fetch_page_metadata(&self, url: &str) -> Result<(String, String, Option<String>)> {
         let response = self.client.get(url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.5")
+            .header("Referer", "https://www.google.com/")
             .send()
             .await?
             .text()
@@ -72,17 +75,12 @@ impl EnrichmentEngine {
         };
 
         let prompt = format!(
-            r#"Analyze the following social profile/website content and extract 3-5 specific 'Connection Hooks' or 'Icebreakers' for a cold email.
-            Focus on:
-            1. Recent career moves or promotions.
-            2. Shared interests or education.
-            3. Specific portfolio companies or deals mentioned.
-            4. Content they have written (blogs, tweets).
-            
-            Keep it concise (bullet points).
-            
-            Content: 
-            {}"#,
+            r#"Analyze this person's profile/content and suggest 3-4 natural "icebreakers" or talking points for a warm outreach email.
+Focus on recent career news, specific interests, or interesting deals they've mentioned. 
+Avoid generic corporate speak.
+
+Content: 
+{}"#,
             raw_content.chars().take(8000).collect::<String>()
         );
 

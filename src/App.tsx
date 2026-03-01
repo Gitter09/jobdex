@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { Toaster } from "sonner";
 import { Contact } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,6 @@ function Dashboard() {
   const { statuses, refreshStatuses } = useStatuses();
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
   const [loading, setLoading] = useState(true);
-  // const [sheetOpen, setSheetOpen] = useState(false); // No sheet anymore
 
   // Add Contact Dialog State
   const [addContactOpen, setAddContactOpen] = useState(false);
@@ -210,6 +210,25 @@ function Dashboard() {
         console.error("[App] Failed to fix orphans:", err);
       }
       fetchContacts();
+
+      // Sync email accounts on launch (fire-and-forget, non-blocking)
+      try {
+        const results = await invoke<Array<{
+          account_email: string;
+          provider: string;
+          synced_count: number;
+          token_expired: boolean;
+        }>>("sync_email_accounts");
+
+        const expired = results.filter((r) => r.token_expired).map((r) => r.account_email);
+        if (expired.length > 0) {
+          // Use dynamic import to avoid circular dependency with toast at module level
+          const { toast } = await import("sonner");
+          toast.error(`Email token expired for: ${expired.join(", ")}. Go to Settings → Email to reconnect.`);
+        }
+      } catch (err) {
+        console.error("[App] Email sync on launch failed:", err);
+      }
     };
     init();
   }, []);
@@ -558,6 +577,7 @@ function Dashboard() {
       />
       <ManageTagsDialog open={manageTagsOpen} onOpenChange={setManageTagsOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <Toaster />
     </div >
   );
 }

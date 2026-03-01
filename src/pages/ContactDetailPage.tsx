@@ -19,6 +19,18 @@ import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
 import { ManageTagsDialog } from "@/components/tags/manage-tags-dialog";
 import { useTags } from "@/hooks/use-tags";
 import { ComposeEmailDialog } from "@/components/email/compose-email-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmailHistoryTab } from "@/components/contact/email-history-tab";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function ContactDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -29,6 +41,9 @@ export function ContactDetailPage() {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isManageTagsOpen, setIsManageTagsOpen] = useState(false);
     const [isEmailOpen, setIsEmailOpen] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
     // const { statuses } = useStatuses(); // Not used for progress bar anymore
 
     const { tags: availableTags, assignTag, unassignTag } = useTags();
@@ -54,9 +69,16 @@ export function ContactDetailPage() {
 
     const handleEnrich = async () => {
         if (!contact) return;
+
+        const targetUrl = contact.linkedin_url || contact.company_website;
+        if (!targetUrl) {
+            console.error("No URL to enrich");
+            return;
+        }
+
         setEnriching(true);
         try {
-            await invoke("enrich_contact_cmd", { id: contact.id });
+            await invoke("enrich_contact_cmd", { id: contact.id, url: targetUrl });
             await fetchContact();
         } catch (error) {
             console.error("Enrichment failed:", error);
@@ -66,7 +88,7 @@ export function ContactDetailPage() {
     };
 
     const handleDelete = async () => {
-        if (!contact || !confirm("Are you sure you want to delete this contact?")) return;
+        if (!contact) return;
         try {
             await invoke("delete_contact", { id: contact.id });
             navigate("/");
@@ -83,7 +105,8 @@ export function ContactDetailPage() {
         if (!contact) return;
         const text = `${contact.first_name} ${contact.last_name}\n${contact.title || ""} ${contact.company ? "at " + contact.company : ""}\n${contact.email || ""}\n${contact.linkedin_url || ""}`;
         navigator.clipboard.writeText(text);
-        // Toast would go here
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     const getWebsiteUrl = (url: string) => {
@@ -143,23 +166,29 @@ export function ContactDetailPage() {
                                 <Mail className="h-4 w-4" />
                                 Compose email
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" title="Copy Info" onClick={handleCopy}>
-                                <Copy className="h-4 w-4" />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-9 w-9 transition-all duration-200", copied ? "text-green-500 bg-green-50/10" : "text-muted-foreground")}
+                                title="Copy Info"
+                                onClick={handleCopy}
+                            >
+                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                             </Button>
                             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" title="Refresh Data" onClick={handleEnrich} disabled={enriching}>
                                 {enriching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" title="More">
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground cursor-pointer" title="More">
                                         <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                                    <DropdownMenuItem onClick={() => setIsEditOpen(true)} className="cursor-pointer">
                                         <Pencil className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
+                                    <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-red-600 focus:text-red-600 cursor-pointer">
                                         <Trash2 className="mr-2 h-4 w-4" /> Delete
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -320,7 +349,13 @@ export function ContactDetailPage() {
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Summary Card */}
-                                <Card className="col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow">
+                                <Card
+                                    className={cn(
+                                        "col-span-2 md:col-span-1 shadow-sm transition-all duration-200",
+                                        contact.intelligence_summary && "hover:shadow-md cursor-pointer hover:bg-muted/30"
+                                    )}
+                                    onClick={() => contact.intelligence_summary && setIsSummaryExpanded(!isSummaryExpanded)}
+                                >
                                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">Summary</CardTitle>
                                         <Sparkles className="h-4 w-4 text-purple-500" />
@@ -328,7 +363,9 @@ export function ContactDetailPage() {
                                     <CardContent>
                                         <div className="text-sm leading-relaxed">
                                             {contact.intelligence_summary ? (
-                                                <p className="line-clamp-4">{contact.intelligence_summary}</p>
+                                                <p className={cn("whitespace-pre-wrap", !isSummaryExpanded && "line-clamp-4")}>
+                                                    {contact.intelligence_summary}
+                                                </p>
                                             ) : (
                                                 <div className="text-muted-foreground italic text-xs">
                                                     No AI summary available. Click "Refresh" to generate insights.
@@ -471,33 +508,57 @@ export function ContactDetailPage() {
                             </div>
                         </section>
 
-                        {/* Activity Section */}
+                        {/* Activity & History Section */}
                         <section>
-                            <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                                <div className="p-1 rounded bg-muted">
-                                    <Briefcase className="h-4 w-4 text-foreground" />
+                            <Tabs defaultValue="emails" className="w-full">
+                                <div className="flex items-center justify-between mb-6">
+                                    <TabsList>
+                                        <TabsTrigger value="emails" className="flex items-center gap-2">
+                                            <Mail className="h-4 w-4" />
+                                            Emails
+                                        </TabsTrigger>
+                                        <TabsTrigger value="activity" className="flex items-center gap-2">
+                                            <Briefcase className="h-4 w-4" />
+                                            Activity
+                                        </TabsTrigger>
+                                    </TabsList>
                                 </div>
-                                Activity
-                            </h2>
 
-                            <Card className="border shadow-sm">
-                                <div className="divide-y">
-                                    {/* Default Item */}
-                                    {/* In a real app we would map over activity logs here */}
-                                    <div className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors">
-                                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border shrink-0">
-                                            <Check className="h-4 w-4 text-muted-foreground" />
+                                <TabsContent value="activity" className="mt-0">
+                                    <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                                        <div className="p-1 rounded bg-muted">
+                                            <Briefcase className="h-4 w-4 text-foreground" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-foreground">
-                                                Contact created
-                                            </p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{new Date(contact.created_at).toLocaleDateString()}</p>
+                                        Activity
+                                    </h2>
+                                    <Card className="border shadow-sm">
+                                        <div className="divide-y">
+                                            {/* Default Item */}
+                                            {/* In a real app we would map over activity logs here */}
+                                            <div className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors">
+                                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border shrink-0">
+                                                    <Check className="h-4 w-4 text-muted-foreground" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-foreground">
+                                                        Contact created
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">{new Date(contact.created_at).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            {/* Mock items removed as per user request */}
                                         </div>
-                                    </div>
-                                    {/* Mock items removed as per user request */}
-                                </div>
-                            </Card>
+                                    </Card>
+                                </TabsContent>
+
+                                <TabsContent value="emails" className="mt-0">
+                                    <Card className="border shadow-sm">
+                                        <CardContent className="p-0">
+                                            <EmailHistoryTab contact={contact} />
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+                            </Tabs>
                         </section>
                     </div>
                 </div>
@@ -525,6 +586,23 @@ export function ContactDetailPage() {
                 open={isEmailOpen}
                 onOpenChange={setIsEmailOpen}
             />
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete <strong>{contact.first_name} {contact.last_name}</strong> and all their interaction history. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
+                            Delete Contact
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     );
 }
