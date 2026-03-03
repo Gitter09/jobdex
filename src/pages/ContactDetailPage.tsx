@@ -83,8 +83,10 @@ export function ContactDetailPage() {
         if (!contact) return;
         try {
             await invoke("update_contact", {
-                id: contact.id,
-                intelligenceSummary: summaryDraft
+                args: {
+                    id: contact.id,
+                    intelligenceSummary: summaryDraft
+                }
             });
             await fetchContact();
             setIsSummaryEditOpen(false);
@@ -460,7 +462,9 @@ export function ContactDetailPage() {
                                                     <StatusPicker
                                                         currentStatusId={contact.status_id}
                                                         onStatusChange={async (newId) => {
-                                                            await invoke("update_contact", { id: contact.id, statusId: newId });
+                                                            await invoke("update_contact", {
+                                                                args: { id: contact.id, statusId: newId }
+                                                            });
                                                             // Optimistic update
                                                             setContact(prev => prev ? { ...prev, status_id: newId } : null);
                                                         }}

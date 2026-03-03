@@ -81,16 +81,18 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
         setLoading(true);
         try {
             await invoke("update_contact", {
-                id: contact.id,
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                title: title.trim() || null,
-                company: company.trim() || null,
-                location: location.trim() || null,
-                companyWebsite: companyWebsite.trim() || null,
-                email: email.trim() || null,
-                linkedinUrl: linkedinUrl.trim() || null,
-                statusId: selectedStatusId,
+                args: {
+                    id: contact.id,
+                    firstName: firstName.trim(),
+                    lastName: lastName.trim(),
+                    title: title.trim() || null,
+                    company: company.trim() || null,
+                    location: location.trim() || null,
+                    companyWebsite: companyWebsite.trim() || null,
+                    email: email.trim() || null,
+                    linkedinUrl: linkedinUrl.trim() || null,
+                    statusId: selectedStatusId,
+                }
             });
 
             onContactUpdated();

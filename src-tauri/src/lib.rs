@@ -5,7 +5,7 @@ mod error;
 use error::AppError;
 // use std::fs; removed
 
-/// Extracts first and last name from page title or LinkedIn URL slug
+// Extracts first and last name from page title or LinkedIn URL slug
 // extract_names_from_title_or_url function removed as it's never used
 
 fn extract_linkedin_slug(url: &str) -> Option<&str> {
@@ -175,28 +175,26 @@ async fn delete_status(db: tauri::State<'_, Db>, id: String) -> Result<(), AppEr
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+pub struct AddContactArgs {
+    pub first_name: String,
+    pub last_name: String,
+    pub email: Option<String>,
+    pub linkedin_url: Option<String>,
+    pub status_id: Option<String>,
+    pub title: Option<String>,
+    pub company: Option<String>,
+    pub location: Option<String>,
+    pub company_website: Option<String>,
+}
+
 #[tauri::command]
-async fn add_contact(
-    db: tauri::State<'_, Db>,
-    first_name: String,
-    last_name: String,
-    email: Option<String>,
-    linkedin_url: Option<String>,
-    status_id: Option<String>,
-    title: Option<String>,
-    company: Option<String>,
-    location: Option<String>,
-    company_website: Option<String>,
-) -> Result<String, AppError> {
+async fn add_contact(db: tauri::State<'_, Db>, args: AddContactArgs) -> Result<String, AppError> {
     let pool = db.pool();
     let id = uuid::Uuid::new_v4().to_string();
 
     // Determine status_id and label
-    let (final_status_id, final_status_label) = if let Some(sid) = status_id {
-        // optionally fetch label to be safe, or just trust the ID and let label be null/outdated until join?
-        // Let's just default label to empty for now or fetch it if we want perfection.
-        // For simplicity: We will use the provided status_id. We won't fetch the label here to save a query
-        // because the 'status' column is legacy anyway.
+    let (final_status_id, final_status_label) = if let Some(sid) = args.status_id {
         (sid, "Custom")
     } else {
         ("stat-new".to_string(), "New")
@@ -204,41 +202,43 @@ async fn add_contact(
 
     sqlx::query("INSERT INTO contacts (id, first_name, last_name, email, linkedin_url, status, status_id, title, company, location, company_website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&id)
-        .bind(first_name)
-        .bind(last_name)
-        .bind(email)
-        .bind(linkedin_url)
+        .bind(args.first_name)
+        .bind(args.last_name)
+        .bind(args.email)
+        .bind(args.linkedin_url)
         .bind(final_status_label) // Legacy status field
         .bind(final_status_id)
-        .bind(title)
-        .bind(company)
-        .bind(location)
-        .bind(company_website)
+        .bind(args.title)
+        .bind(args.company)
+        .bind(args.location)
+        .bind(args.company_website)
         .execute(pool)
         .await
         .map_err(|e: sqlx::Error| e.to_string())?;
     Ok(id)
 }
 
+#[derive(serde::Deserialize)]
+pub struct UpdateContactArgs {
+    pub id: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub email: Option<String>,
+    pub linkedin_url: Option<String>,
+    pub status: Option<String>, // Legacy
+    pub status_id: Option<String>,
+    pub last_contacted_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub next_contact_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub cadence_stage: Option<i32>,
+    pub title: Option<String>,
+    pub company: Option<String>,
+    pub location: Option<String>,
+    pub company_website: Option<String>,
+    pub intelligence_summary: Option<String>,
+}
+
 #[tauri::command]
-async fn update_contact(
-    db: tauri::State<'_, Db>,
-    id: String,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    email: Option<String>,
-    linkedin_url: Option<String>,
-    status: Option<String>, // Legacy
-    status_id: Option<String>,
-    last_contacted_date: Option<chrono::DateTime<chrono::Utc>>,
-    next_contact_date: Option<chrono::DateTime<chrono::Utc>>,
-    cadence_stage: Option<i32>,
-    title: Option<String>,
-    company: Option<String>,
-    location: Option<String>,
-    company_website: Option<String>,
-    intelligence_summary: Option<String>,
-) -> Result<(), AppError> {
+async fn update_contact(db: tauri::State<'_, Db>, args: UpdateContactArgs) -> Result<(), AppError> {
     let pool = db.pool();
 
     sqlx::query(
@@ -262,21 +262,21 @@ async fn update_contact(
         WHERE id = ?
         "#,
     )
-    .bind(first_name)
-    .bind(last_name)
-    .bind(email)
-    .bind(linkedin_url)
-    .bind(status)
-    .bind(status_id)
-    .bind(last_contacted_date)
-    .bind(next_contact_date)
-    .bind(cadence_stage)
-    .bind(title)
-    .bind(company)
-    .bind(location)
-    .bind(company_website)
-    .bind(intelligence_summary)
-    .bind(id)
+    .bind(args.first_name)
+    .bind(args.last_name)
+    .bind(args.email)
+    .bind(args.linkedin_url)
+    .bind(args.status)
+    .bind(args.status_id)
+    .bind(args.last_contacted_date)
+    .bind(args.next_contact_date)
+    .bind(args.cadence_stage)
+    .bind(args.title)
+    .bind(args.company)
+    .bind(args.location)
+    .bind(args.company_website)
+    .bind(args.intelligence_summary)
+    .bind(args.id)
     .execute(pool)
     .await?;
     Ok(())

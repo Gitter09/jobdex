@@ -163,8 +163,10 @@ export function ContactsPage() {
 
         try {
             await invoke("update_contact", {
-                id: contactId,
-                statusId: newStatusId
+                args: {
+                    id: contactId,
+                    statusId: newStatusId
+                }
             });
             fetchContacts();
         } catch (err) {

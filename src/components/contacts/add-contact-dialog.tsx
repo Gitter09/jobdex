@@ -127,15 +127,17 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
             }
 
             await invoke("add_contact", {
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                title: title.trim() || null,
-                company: company.trim() || null,
-                location: location.trim() || null,
-                companyWebsite: companyWebsite.trim() || null,
-                email: email.trim() || null,
-                linkedinUrl: linkedinUrl.trim() || null,
-                statusId: statusId,
+                args: {
+                    firstName: firstName.trim(),
+                    lastName: lastName.trim(),
+                    title: title.trim() || null,
+                    company: company.trim() || null,
+                    location: location.trim() || null,
+                    companyWebsite: companyWebsite.trim() || null,
+                    email: email.trim() || null,
+                    linkedinUrl: linkedinUrl.trim() || null,
+                    statusId: statusId,
+                }
             });
 
             resetForm();
