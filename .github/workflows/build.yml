@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
   SQLX_SQLITE_USE_SQLCIPHER: "1"
+  # Enable sccache
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
 
 jobs:
   build:
@@ -34,10 +37,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          # Use platform-specific keys to prevent cache thrashing
+          key: ${{ matrix.platform }}-cargo
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
