@@ -51,6 +51,12 @@ pub struct OutlookClient {
     credentials_path: PathBuf,
 }
 
+impl Default for OutlookClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OutlookClient {
     pub fn new() -> Self {
         let credentials_path = dirs::home_dir()
@@ -110,19 +116,17 @@ impl OutlookClient {
         let listener = TcpListener::bind(format!("127.0.0.1:{}", REDIRECT_PORT))?;
         println!("Waiting for Outlook callback on port {}...", REDIRECT_PORT);
 
-        for stream in listener.incoming() {
-            if let Ok(mut stream) = stream {
-                let mut reader = BufReader::new(&stream);
-                let mut request_line = String::new();
-                reader.read_line(&mut request_line)?;
+        for mut stream in listener.incoming().flatten() {
+            let mut reader = BufReader::new(&stream);
+            let mut request_line = String::new();
+            reader.read_line(&mut request_line)?;
 
-                if let Some(code) = extract_code_from_request(&request_line) {
-                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+            if let Some(code) = extract_code_from_request(&request_line) {
+                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
                         <html><body><h1>✓ Outlook Connected!</h1>\
                         <p>You can close this window and return to OutreachOS.</p></body></html>";
-                    stream.write_all(response.as_bytes())?;
-                    return Ok(code);
-                }
+                stream.write_all(response.as_bytes())?;
+                return Ok(code);
             }
         }
         Err(anyhow!("Failed to receive OAuth callback"))

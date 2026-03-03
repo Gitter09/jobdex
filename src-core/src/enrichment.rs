@@ -7,6 +7,12 @@ pub struct EnrichmentEngine {
     client: Client,
 }
 
+impl Default for EnrichmentEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnrichmentEngine {
     pub fn new() -> Self {
         Self {

@@ -36,7 +36,7 @@ pub async fn poll_tracking_events(db: &Db) -> Result<usize> {
     // 2. Poll the portfolio server
     let client = reqwest::Client::new();
     let res = client
-        .get(&format!("{}/track/events", base_url))
+        .get(format!("{}/track/events", base_url))
         .query(&[("secret", &secret)])
         .send()
         .await?;

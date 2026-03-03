@@ -385,6 +385,10 @@ impl EmailService {
         };
 
         // 5. Process each message
+        // Pre-compile tracking regex outside the loop (clippy::regex_creation_in_loops)
+        let tracking_regex =
+            regex::Regex::new(r#"(?:/|%2F)track(?:/|%2F)open(?:/|%2F)([a-f0-9\-]{36})\.png"#).ok();
+
         for (provider_msg_id, from_email, to_email, subject, body, html_body, sent_at) in
             messages_result
         {
@@ -444,9 +448,7 @@ impl EmailService {
 
             let mut tracking_id: Option<String> = None;
             let combined_body = format!("{}\n{}", body, html_body.as_deref().unwrap_or(""));
-            if let Ok(re) =
-                regex::Regex::new(r#"(?:/|%2F)track(?:/|%2F)open(?:/|%2F)([a-f0-9\-]{36})\.png"#)
-            {
+            if let Some(re) = &tracking_regex {
                 if let Some(caps) = re.captures(&combined_body) {
                     tracking_id = Some(caps[1].to_string());
                 }

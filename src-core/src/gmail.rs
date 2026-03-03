@@ -50,6 +50,12 @@ pub struct GmailClient {
     credentials_path: PathBuf,
 }
 
+impl Default for GmailClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GmailClient {
     pub fn new() -> Self {
         let credentials_path = dirs::home_dir()
@@ -114,22 +120,20 @@ impl GmailClient {
 
         println!("Waiting for OAuth callback on port {}...", REDIRECT_PORT);
 
-        for stream in listener.incoming() {
-            if let Ok(mut stream) = stream {
-                let mut reader = BufReader::new(&stream);
-                let mut request_line = String::new();
-                reader.read_line(&mut request_line)?;
+        for mut stream in listener.incoming().flatten() {
+            let mut reader = BufReader::new(&stream);
+            let mut request_line = String::new();
+            reader.read_line(&mut request_line)?;
 
-                // Extract code from: GET /?code=XXX&scope=... HTTP/1.1
-                if let Some(code) = extract_code_from_request(&request_line) {
-                    // Send success response
-                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+            // Extract code from: GET /?code=XXX&scope=... HTTP/1.1
+            if let Some(code) = extract_code_from_request(&request_line) {
+                // Send success response
+                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
                         <html><body><h1>✓ Authorization Successful!</h1>\
                         <p>You can close this window and return to OutreachOS.</p></body></html>";
-                    stream.write_all(response.as_bytes())?;
+                stream.write_all(response.as_bytes())?;
 
-                    return Ok(code);
-                }
+                return Ok(code);
             }
         }
 
