@@ -84,7 +84,7 @@ export function ContactsPage() {
             (contact.email && contact.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
         const matchesStatus =
-            statusFilter === "all" || (contact.status_id || "def-stat-001") === statusFilter;
+            statusFilter === "all" || (contact.status_id || "stat-new") === statusFilter;
 
         const matchesTag =
             tagFilter === "all" || (contact.tags && contact.tags.some(t => t.id === tagFilter));

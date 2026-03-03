@@ -49,7 +49,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
     const [email, setEmail] = useState("");
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [companyWebsite, setCompanyWebsite] = useState("");
-    const [selectedStatusId, setSelectedStatusId] = useState(initialStatusId || "def-stat-001");
+    const [selectedStatusId, setSelectedStatusId] = useState(initialStatusId || "stat-new");
 
     // New status handling
     const [isCreatingNewStatus, setIsCreatingNewStatus] = useState(false);
@@ -73,7 +73,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
     // Sync status if initialStatusId changes (e.g. clicking different column 'New' buttons)
     useEffect(() => {
         if (open) {
-            setSelectedStatusId(initialStatusId || "def-stat-001");
+            setSelectedStatusId(initialStatusId || "stat-new");
             setIsCreatingNewStatus(false);
             setNewStatusLabel("");
             setSelectedColor("#3b82f6");
@@ -89,7 +89,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
         setEmail("");
         setLinkedinUrl("");
         setCompanyWebsite("");
-        setSelectedStatusId(initialStatusId || "def-stat-001");
+        setSelectedStatusId(initialStatusId || "stat-new");
         setIsCreatingNewStatus(false);
         setNewStatusLabel("");
         setSelectedColor("#3b82f6");

@@ -199,7 +199,7 @@ async fn add_contact(
         // because the 'status' column is legacy anyway.
         (sid, "Custom")
     } else {
-        ("def-stat-001".to_string(), "New")
+        ("stat-new".to_string(), "New")
     };
 
     sqlx::query("INSERT INTO contacts (id, first_name, last_name, email, linkedin_url, status, status_id, title, company, location, company_website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
