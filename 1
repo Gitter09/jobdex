@@ -1,0 +1,43 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+        Warn The bundle identifier "com.outreachos.app" set in `tauri.conf.json identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `bun run build`
+[0m[2m[35m$[0m [2m[1mtsc && vite build[0m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+   Compiling outreach-core v0.1.0 (/Users/harshitsingh/Library/CloudStorage/OneDrive-Personal/Work/VC Research/Personal_CRM/src-core)
+error[E0425]: cannot find value `total_rows` in this scope
+  --> src-core/src/import.rs:59:9
+   |
+59 |         total_rows += 1;
+   |         ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `total_rows` in this scope
+  --> src-core/src/import.rs:64:9
+   |
+64 |         total_rows,
+   |         ^^^^^^^^^^ not found in this scope
+
+error[E0560]: struct `ImportPreview` has no field named `sample_rows`
+   --> src-core/src/import.rs:101:9
+    |
+101 |         sample_rows,
+    |         ^^^^^^^^^^^ `ImportPreview` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+error[E0560]: struct `ImportPreview` has no field named `sample_rows`
+   --> src-core/src/import.rs:138:9
+    |
+138 |         sample_rows,
+    |         ^^^^^^^^^^^ `ImportPreview` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+Some errors have detailed explanations: E0425, E0560.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `outreach-core` (lib) due to 4 previous errors
+failed to build app: failed to build app
+       Error failed to build app: failed to build app

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { toast } from "sonner";
 import {
     Dialog,
     DialogContent,
@@ -19,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useStatuses } from "@/hooks/use-statuses";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +38,6 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
     const setOpen = isControlled ? setControlledOpen! : setInternalOpen;
 
     const [loading, setLoading] = useState(false);
-    const [magicPasteLoading, setMagicPasteLoading] = useState(false);
 
     // Form state
     const [firstName, setFirstName] = useState("");
@@ -105,41 +103,6 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
         }
     };
 
-    // Magic Paste: AI-powered clipboard parsing
-    const handleMagicPaste = async () => {
-        setMagicPasteLoading(true);
-        try {
-            const parsed = await invoke<{
-                first_name: string;
-                last_name: string;
-                title?: string;
-                company?: string;
-                location?: string;
-                company_website?: string;
-                email?: string;
-                linkedin_url?: string;
-                context?: string;
-            }>("magic_paste");
-
-            // Auto-fill the form with parsed data
-            if (parsed.first_name) setFirstName(parsed.first_name);
-            if (parsed.last_name) setLastName(parsed.last_name);
-            if (parsed.title) setTitle(parsed.title);
-            if (parsed.company) setCompany(parsed.company);
-            if (parsed.location) setLocation(parsed.location);
-            if (parsed.email) setEmail(parsed.email);
-            if (parsed.linkedin_url) setLinkedinUrl(parsed.linkedin_url);
-            if (parsed.company_website) setCompanyWebsite(parsed.company_website);
-        } catch (err: any) {
-            console.error("Magic Paste failed:", err);
-            toast.error("Magic Paste Failed", {
-                description: err.toString() || "Check your AI settings and connection.",
-                duration: 5000,
-            });
-        } finally {
-            setMagicPasteLoading(false);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -194,24 +157,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
             >
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <div className="flex items-center justify-between pr-8">
-                            <DialogTitle>New Contact</DialogTitle>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleMagicPaste}
-                                disabled={magicPasteLoading}
-                                className="gap-2"
-                            >
-                                {magicPasteLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="h-4 w-4" />
-                                )}
-                                Magic Paste
-                            </Button>
-                        </div>
+                        <DialogTitle>New Contact</DialogTitle>
                         <DialogDescription>
                             Add a new contact to your outreach pipeline.
                         </DialogDescription>

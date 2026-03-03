@@ -238,6 +238,7 @@ async fn update_contact(
     company: Option<String>,
     location: Option<String>,
     company_website: Option<String>,
+    intelligence_summary: Option<String>,
 ) -> Result<(), String> {
     let pool = db.pool();
 
@@ -257,6 +258,7 @@ async fn update_contact(
             company = COALESCE(?, company),
             location = COALESCE(?, location),
             company_website = COALESCE(?, company_website),
+            intelligence_summary = COALESCE(?, intelligence_summary),
             updated_at = CURRENT_TIMESTAMP 
         WHERE id = ?
         "#,
@@ -274,6 +276,7 @@ async fn update_contact(
     .bind(company)
     .bind(location)
     .bind(company_website)
+    .bind(intelligence_summary)
     .bind(id)
     .execute(pool)
     .await;
@@ -318,9 +321,6 @@ pub fn run() {
             add_contact,
             update_contact,
             delete_contact,
-            scrape_clipboard,
-            magic_paste,
-            enrich_contact_cmd,
             get_email_accounts,
             gmail_connect,
             outlook_connect,
@@ -328,8 +328,6 @@ pub fn run() {
             delete_email_account,
             email_schedule,
             get_emails_for_contact,
-            draft_email_ai,
-            generate_subject_lines_ai,
             save_api_key,
             get_settings,
             save_setting,
@@ -337,6 +335,7 @@ pub fn run() {
             clear_all_data,
             import_contacts,
             analyze_import,
+            get_import_headers,
             delete_contacts_bulk,
             update_contacts_status_bulk,
             get_tags,
@@ -348,13 +347,6 @@ pub fn run() {
             check_email_credentials,
             save_email_credentials,
             fix_orphan_contacts,
-            draft_email_ai,
-            generate_subject_lines_ai,
-            save_api_key,
-            get_settings,
-            save_setting,
-            export_all_data,
-            clear_all_data,
             sync_email_accounts,
             sync_email_account,
             reset_email_sync_state,
@@ -1309,7 +1301,10 @@ async fn save_setting(db: tauri::State<'_, Db>, key: String, value: String) -> R
 
 // ===== Import Commands =====
 
-// import_preview function removed as it's never used
+#[tauri::command]
+fn get_import_headers(file_path: String) -> Result<outreach_core::import::ImportPreview, String> {
+    outreach_core::import::preview_file(&file_path).map_err(|e| e.to_string())
+}
 
 #[derive(serde::Serialize)]
 struct ImportAnalysis {

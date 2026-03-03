@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useEmailAI } from "@/hooks/use-email-ai";
-import {
-    Command,
-    CommandGroup,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
 import {
     Popover,
     PopoverContent,
@@ -31,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Send, Loader2, Sparkles, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Mail, Send, Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { Contact } from "@/types/crm";
 import { format } from "date-fns";
 
@@ -79,14 +72,9 @@ export function ComposeEmailDialog({
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>("");
 
-    // Scheduling
     const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
     const [isScheduling, setIsScheduling] = useState(false);
 
-    // AI State
-    const { draftEmail, generateSubjectLines, drafting, generatingSubjects } = useEmailAI();
-    const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
-    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
     useEffect(() => {
         const fetchAccounts = async () => {
@@ -216,51 +204,13 @@ export function ComposeEmailDialog({
 
                         <div className="grid grid-cols-4 gap-4 items-start">
                             <Label htmlFor="subject" className="text-right pt-2">Subject</Label>
-                            <div className="col-span-3 flex gap-2">
+                            <div className="col-span-3">
                                 <Input
                                     id="subject"
                                     value={subject}
                                     onChange={(e) => setSubject(e.target.value)}
                                     placeholder="Subject line..."
                                 />
-                                <Popover open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            disabled={generatingSubjects || !contact}
-                                            onClick={async () => {
-                                                if (contact) {
-                                                    const lines = await generateSubjectLines(contact.id);
-                                                    setSubjectSuggestions(lines);
-                                                    setSuggestionsOpen(true);
-                                                }
-                                            }}
-                                        >
-                                            {generatingSubjects ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-600" />}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-0" align="end">
-                                        <Command>
-                                            <CommandList>
-                                                <CommandGroup heading="AI Suggestions">
-                                                    {subjectSuggestions.map((suggestion) => (
-                                                        <CommandItem
-                                                            key={suggestion}
-                                                            onSelect={() => {
-                                                                setSubject(suggestion);
-                                                                setSuggestionsOpen(false);
-                                                            }}
-                                                        >
-                                                            <Sparkles className="mr-2 h-3 w-3" />
-                                                            {suggestion}
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
                             </div>
                         </div>
 
@@ -273,21 +223,6 @@ export function ComposeEmailDialog({
                                             {t.name}
                                         </Button>
                                     ))}
-                                    <Button
-                                        variant="ghost"
-                                        size="xs"
-                                        className="text-purple-600"
-                                        disabled={drafting || !contact}
-                                        onClick={async () => {
-                                            if (contact) {
-                                                const draft = await draftEmail(contact.id);
-                                                setBody(draft);
-                                            }
-                                        }}
-                                    >
-                                        {drafting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                                        Draft with AI
-                                    </Button>
                                 </div>
                             </div>
                             <Textarea
@@ -305,7 +240,7 @@ export function ComposeEmailDialog({
                     <Popover open={isScheduling} onOpenChange={setIsScheduling}>
                         <PopoverTrigger asChild>
                             <Button variant={scheduledDate ? "secondary" : "ghost"} size="sm">
-                                <Clock className="h-4 w-4 mr-2" />
+                                <CalendarIcon className="h-4 w-4 mr-2" />
                                 {scheduledDate ? format(scheduledDate, "MMM d, h:mm a") : "Schedule Send"}
                             </Button>
                         </PopoverTrigger>

@@ -28,7 +28,6 @@ interface ImportDialogProps {
 
 interface ImportPreview {
     headers: string[];
-    sample_rows: string[][];
     total_rows: number;
 }
 
@@ -79,7 +78,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
             setImportResult(null);
 
             try {
-                const result = await invoke<ImportPreview>("import_preview", { filePath: selected });
+                const result = await invoke<ImportPreview>("get_import_headers", { filePath: selected });
                 setPreview(result);
 
                 // Auto-detect column mappings
@@ -104,7 +103,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
                 });
                 setMapping(autoMapping);
             } catch (err) {
-                alert(`Failed to preview file: ${err}`);
+                alert(`Failed to load file: ${err}`);
             } finally {
                 setLoading(false);
             }
@@ -309,7 +308,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
                                     Analyzing...
                                 </>
                             ) : (
-                                "Analyze & Preview"
+                                "Check for Duplicates"
                             )}
                         </Button>
                     </DialogFooter>

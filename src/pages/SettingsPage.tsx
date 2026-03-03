@@ -1,34 +1,26 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { EmailSettingsTab } from "@/components/settings/email-settings-tab";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
-    Key,
-    Save,
     CheckCircle2,
-    Loader2,
     Sun,
     Moon,
     Monitor,
     Trash2,
-    Brain,
     Database,
 } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 
-type SettingsTab = "ai" | "email" | "appearance" | "prompts" | "pipeline" | "data";
+type SettingsTab = "email" | "appearance" | "pipeline" | "data";
 
 const tabTitles: Record<SettingsTab, string> = {
-    ai: "Intelligence",
     email: "Email Integration",
     appearance: "Appearance",
-    prompts: "AI Prompts",
     pipeline: "Pipeline",
     data: "Data",
 };
@@ -36,159 +28,29 @@ const tabTitles: Record<SettingsTab, string> = {
 export function SettingsPage() {
     const { tab } = useParams<{ tab?: string }>();
     const navigate = useNavigate();
-    const activeTab = (tab as SettingsTab) || "ai";
+    const activeTab = (tab as SettingsTab) || "appearance";
 
     const { settings, loading, updateSetting } = useSettings();
-    const [apiKey, setApiKey] = useState("");
-    const [savingKey, setSavingKey] = useState(false);
-    const [keySaved, setKeySaved] = useState(false);
-
-    // AI Form State
-    const [aiProvider, setAiProvider] = useState("gemini");
-    const [aiModel, setAiModel] = useState("");
-    const [aiBaseUrl, setAiBaseUrl] = useState("");
 
     // Redirect /settings to /settings/ai
     useEffect(() => {
         if (!tab) {
-            navigate("/settings/ai", { replace: true });
+            navigate("/settings/appearance", { replace: true });
         }
     }, [tab, navigate]);
 
     // Sync from settings hook
     useEffect(() => {
         if (!loading) {
-            setAiProvider(settings["ai_provider"] || "gemini");
-            setAiModel(settings["ai_model"] || "google/gemini-2.0-flash-exp:free");
-            setAiBaseUrl(settings["ai_base_url"] || "https://openrouter.ai/api/v1");
+            // Placeholder for future manual settings sync
         }
     }, [settings, loading]);
 
-    const handleSaveKey = async () => {
-        if (!apiKey) return;
-        setSavingKey(true);
-        try {
-            let serviceName = "OPENROUTER_API_KEY";
-            if (aiProvider === "gemini") serviceName = "GEMINI_API_KEY";
-            else if (aiProvider === "ollama") serviceName = "OLLAMA_API_KEY";
-
-            await invoke("save_api_key", { service: serviceName, key: apiKey });
-            setKeySaved(true);
-            setTimeout(() => setKeySaved(false), 2000);
-            setApiKey("");
-        } catch (err) {
-            console.error("Failed to save key:", err);
-            alert("Failed to save API key");
-        } finally {
-            setSavingKey(false);
-        }
-    };
 
     const handleSettingChange = (key: string, value: string) => {
         updateSetting(key, value);
     };
 
-    const renderAiContent = () => (
-        <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-medium">Artificial Intelligence</h3>
-                <p className="text-sm text-muted-foreground">Configure your LLM provider and model preferences.</p>
-            </div>
-
-            <Separator />
-
-            {/* Provider Selection */}
-            <div className="space-y-3">
-                <Label>AI Provider</Label>
-                <div className="grid grid-cols-3 gap-2">
-                    {["gemini", "openrouter", "ollama"].map((provider) => (
-                        <div
-                            key={provider}
-                            className={cn(
-                                "border rounded-md p-3 cursor-pointer transition-all",
-                                aiProvider === provider
-                                    ? "border-primary bg-primary/5 ring-1 ring-primary"
-                                    : "hover:border-primary/50"
-                            )}
-                            onClick={() => {
-                                setAiProvider(provider);
-                                handleSettingChange("ai_provider", provider);
-                            }}
-                        >
-                            <div className="font-medium capitalize">{provider}</div>
-                            <div className="text-xs text-muted-foreground">
-                                {provider === "gemini" ? "Native Google API" :
-                                    provider === "openrouter" ? "Model Aggregator" : "Local Inference"}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Connection Settings */}
-            <div className="space-y-4 border p-4 rounded-md bg-muted/10">
-                <h4 className="text-sm font-medium flex items-center gap-2 text-primary">
-                    <Key className="h-4 w-4" />
-                    Connection Details
-                </h4>
-
-                {/* API Key */}
-                {aiProvider !== "ollama" && (
-                    <div className="space-y-2">
-                        <Label htmlFor="apiKey">API Key</Label>
-                        <div className="flex gap-2">
-                            <Input
-                                id="apiKey"
-                                type="password"
-                                placeholder={`Enter ${aiProvider === "openrouter" ? "OpenRouter" : "Gemini"} key...`}
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                            />
-                            <Button onClick={handleSaveKey} disabled={!apiKey || savingKey}>
-                                {savingKey ? <Loader2 className="h-4 w-4 animate-spin" /> :
-                                    keySaved ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Save className="h-4 w-4" />}
-                            </Button>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">
-                            Keys are stored securely in your system's keychain.
-                        </p>
-                    </div>
-                )}
-
-                {/* Dynamic Model Configuration */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="model">Model ID</Label>
-                        <Input
-                            id="model"
-                            value={aiModel}
-                            onChange={(e) => {
-                                setAiModel(e.target.value);
-                                handleSettingChange("ai_model", e.target.value);
-                            }}
-                            placeholder="e.g. google/gemini-2.0-flash-exp:free"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                            Specific model identifier string.
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="baseUrl">Base URL</Label>
-                        <Input
-                            id="baseUrl"
-                            value={aiBaseUrl}
-                            onChange={(e) => {
-                                setAiBaseUrl(e.target.value);
-                                handleSettingChange("ai_base_url", e.target.value);
-                            }}
-                            placeholder="https://openrouter.ai/api/v1"
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 
     const renderAppearanceContent = () => (
         <div className="space-y-8">
@@ -357,69 +219,25 @@ export function SettingsPage() {
             </div>
 
             <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-3">
-                <Brain className="h-5 w-5 text-blue-500 shrink-0" />
+                <Database className="h-5 w-5 text-blue-500 shrink-0" />
                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Privacy Note</p>
                     <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-normal">
-                        Your data is stored locally in an SQLite database. OutreachOS does not upload your contacts to any server except when explicitly using AI enrichment features.
+                        Your data is stored locally in an SQLite database. OutreachOS does not upload your contacts to any server.
                     </p>
                 </div>
             </div>
         </div>
     );
 
-    const renderPromptsContent = () => (
-        <div className="space-y-8">
-            <div>
-                <h3 className="text-lg font-medium">AI Customization</h3>
-                <p className="text-sm text-muted-foreground">Fine-tune the behavior of the AI engine by editing system prompts.</p>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Email Drafting Template</Label>
-                    <p className="text-[11px] text-muted-foreground italic mb-2">Available variables: {"{{first_name}}"}, {"{{company}}"}, {"{{summary}}"}, {"{{intel}}"}</p>
-                    <Textarea
-                        rows={6}
-                        value={settings["prompt_email_draft"] || ""}
-                        onChange={(e) => handleSettingChange("prompt_email_draft", e.target.value)}
-                        placeholder="Default prompt used if left empty..."
-                        className="font-mono text-xs"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Subject Line Template</Label>
-                    <p className="text-[11px] text-muted-foreground italic mb-2">Available variables: {"{{first_name}}"}, {"{{company}}"}</p>
-                    <Textarea
-                        rows={4}
-                        value={settings["prompt_subject_line"] || ""}
-                        onChange={(e) => handleSettingChange("prompt_subject_line", e.target.value)}
-                        placeholder="Default prompt used if left empty..."
-                        className="font-mono text-xs"
-                    />
-                </div>
-
-                <div className="p-3 rounded bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                    <p className="text-[10px] text-amber-700 dark:text-amber-400">
-                        <strong>Warning:</strong> Modifying these prompts can significantly change the quality of AI output. Ensure you keep the variable placeholders intact.
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
 
     const renderContent = () => {
         switch (activeTab) {
-            case "ai": return renderAiContent();
             case "email": return <EmailSettingsTab />;
             case "appearance": return renderAppearanceContent();
-            case "prompts": return renderPromptsContent();
             case "pipeline": return <div className="p-4 text-muted-foreground">Pipeline configuration coming soon.</div>;
             case "data": return renderDataContent();
-            default: return renderAiContent();
+            default: return renderAppearanceContent();
         }
     };
 

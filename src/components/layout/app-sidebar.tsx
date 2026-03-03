@@ -12,10 +12,8 @@ import {
     PanelLeftClose,
     PanelLeft,
     ArrowLeft,
-    Brain,
     Palette,
     Database,
-    FileCode,
     LayoutTemplate,
 } from "lucide-react";
 import {
@@ -44,10 +42,8 @@ const mainNavItems: NavItem[] = [
 ];
 
 const settingsSubItems: NavItem[] = [
-    { label: "Intelligence", icon: Brain, path: "/settings/ai" },
     { label: "Email Integration", icon: Mail, path: "/settings/email" },
     { label: "Appearance", icon: Palette, path: "/settings/appearance" },
-    { label: "AI Prompts", icon: FileCode, path: "/settings/prompts" },
     { label: "Pipeline", icon: LayoutTemplate, path: "/settings/pipeline" },
     { label: "Data", icon: Database, path: "/settings/data" },
 ];

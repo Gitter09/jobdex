@@ -6,7 +6,6 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportPreview {
     pub headers: Vec<String>,
-    pub sample_rows: Vec<Vec<String>>,
     pub total_rows: usize,
 }
 
@@ -55,21 +54,14 @@ fn preview_csv(path: &Path) -> Result<ImportPreview> {
 
     let headers: Vec<String> = reader.headers()?.iter().map(|h| h.to_string()).collect();
 
-    let mut sample_rows: Vec<Vec<String>> = Vec::new();
     let mut total_rows = 0;
-
     for result in reader.records() {
-        let record = result?;
+        let _ = result?;
         total_rows += 1;
-
-        if sample_rows.len() < 5 {
-            sample_rows.push(record.iter().map(|s| s.to_string()).collect());
-        }
     }
 
     Ok(ImportPreview {
         headers,
-        sample_rows,
         total_rows,
     })
 }
@@ -95,19 +87,14 @@ fn preview_xlsx(path: &Path) -> Result<ImportPreview> {
         .map(|cell| cell.to_string())
         .collect();
 
-    let mut sample_rows: Vec<Vec<String>> = Vec::new();
     let mut total_rows = 0;
 
-    for row in rows_iter {
+    for _ in rows_iter {
         total_rows += 1;
-        if sample_rows.len() < 5 {
-            sample_rows.push(row.iter().map(|cell| cell.to_string()).collect());
-        }
     }
 
     Ok(ImportPreview {
         headers,
-        sample_rows,
         total_rows,
     })
 }
@@ -132,19 +119,14 @@ fn preview_xls(path: &Path) -> Result<ImportPreview> {
         .map(|cell| cell.to_string())
         .collect();
 
-    let mut sample_rows: Vec<Vec<String>> = Vec::new();
     let mut total_rows = 0;
 
-    for row in rows_iter {
+    for _ in rows_iter {
         total_rows += 1;
-        if sample_rows.len() < 5 {
-            sample_rows.push(row.iter().map(|cell| cell.to_string()).collect());
-        }
     }
 
     Ok(ImportPreview {
         headers,
-        sample_rows,
         total_rows,
     })
 }

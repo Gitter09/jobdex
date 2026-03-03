@@ -1,32 +1,43 @@
-# Personal CRM
+OutreachOS is a modern personal CRM built with Tauri, React, and Rust. Designed for professionals who want to manage their relationships with precision and privacy, without the noise of automated AI generation.
 
-AI-powered personal CRM built with Tauri, React, and Rust for managing your professional relationships.
+## ✨ Features (v0.1)
 
-## Features
+- 📋 **Contact Management**: Modern interface for tracking professional relationships, titles, and companies.
+- 📝 **Manual Summaries**: Dedicated space to capture key notes and context for every contact.
+- 📧 **Outreach Infrastructure**: Full-stack support for email open and link click tracking.
+- 📬 **Email Scheduling**: Compose and schedule emails for optimal timing.
+- 📥 **Two-Step Import**: Excel/XLSX import with simplified mapping and duplicate checking.
+- 🔐 **Privacy First**: Local SQLite database ensuring your data stays on your machine.
+- 🌓 **Premium UI**: Sleek, collapsible sidebar layout with smooth transitions and dark mode support.
 
-- 🎯 **Smart Contact Management**: AI-powered contact enrichment and insights
-- 📧 **Gmail Integration**: Send emails directly from the app
-- 📊 **Kanban Pipeline**: Visual sales/outreach pipeline
-- 🏷️ **Tags & Organization**: Flexible tagging system
-- 📥 **Import/Export**: CSV import with intelligent field mapping
-- 🤖 **AI Enrichment**: Automatic contact enrichment using LLMs
-- 📋 **Magic Paste**: Intelligent clipboard scraping for LinkedIn profiles
+## 🛠 Tech Stack
 
-## Tech Stack
-
+- **Core**: Rust (Tauri 2.0)
 - **Frontend**: React + TypeScript + Vite
-- **Backend**: Rust (Tauri 2.0)
-- **Database**: SQLite (via sqlx)
-- **UI**: shadcn/ui + Tailwind CSS
-- **Package Manager**: Bun
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Database**: SQLite (sqlx)
+- **Runtime**: Bun
 
-## Prerequisites
+## 🚀 Roadmap
 
-- [Bun](https://bun.sh/) (latest)
-- [Rust](https://rustup.rs/) (stable toolchain)
-- macOS, Windows, or Linux
+### Phase 2: Engagement & Intelligence
+- [ ] **Email Sync**: Real-time sync for Gmail and Outlook conversations.
+- [ ] **Robust Scraping**: Search fallback for enrichment when direct scraping is blocked.
+- [ ] **AI Drafting**: Context-aware email drafting based on contact history.
 
-## Development
+### Phase 3: Scaling & Polish
+- [ ] **Unified Error Handling**: Comprehensive toast notifications and error states.
+- [ ] **Team Support**: Multi-user collaboration features.
+- [ ] **Mobile App**: Tauri-based mobile client.
+
+## 📦 Installation (Coming Soon)
+
+We are currently setting up automated builds. Soon, you will be able to download pre-compiled binaries for:
+-  macOS (.dmg)
+- 🪟 Windows (.exe)
+- 🐧 Linux (.AppImage)
+
+## 🏗 Development
 
 ```bash
 # Install dependencies
@@ -37,25 +48,6 @@ bun run tauri dev
 
 # Build for production
 bun run tauri build
-```
-
-## Project Structure
-
-```
-├── src/                    # React frontend
-├── src-tauri/             # Tauri Rust backend
-├── src-core/              # Core Rust logic (database, models)
-└── .github/workflows/     # CI/CD pipelines
-```
-
-## Building
-
-The app is automatically built for macOS, Windows, and Linux via GitHub Actions on every push to `main`.
-
-To create a release:
-```bash
-git tag v1.0.0
-git push origin v1.0.0
 ```
 
 ## License

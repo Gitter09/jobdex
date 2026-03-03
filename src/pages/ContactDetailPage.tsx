@@ -31,19 +31,29 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export function ContactDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [contact, setContact] = useState<Contact | null>(null);
     const [loading, setLoading] = useState(true);
-    const [enriching, setEnriching] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isManageTagsOpen, setIsManageTagsOpen] = useState(false);
     const [isEmailOpen, setIsEmailOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+    const [isSummaryEditOpen, setIsSummaryEditOpen] = useState(false);
+    const [summaryDraft, setSummaryDraft] = useState("");
     // const { statuses } = useStatuses(); // Not used for progress bar anymore
 
     const { tags: availableTags, assignTag, unassignTag } = useTags();
@@ -67,23 +77,17 @@ export function ContactDetailPage() {
         fetchContact();
     }, [id]);
 
-    const handleEnrich = async () => {
+    const handleSaveSummary = async () => {
         if (!contact) return;
-
-        const targetUrl = contact.linkedin_url || contact.company_website;
-        if (!targetUrl) {
-            console.error("No URL to enrich");
-            return;
-        }
-
-        setEnriching(true);
         try {
-            await invoke("enrich_contact_cmd", { id: contact.id, url: targetUrl });
+            await invoke("update_contact", {
+                id: contact.id,
+                intelligenceSummary: summaryDraft
+            });
             await fetchContact();
+            setIsSummaryEditOpen(false);
         } catch (error) {
-            console.error("Enrichment failed:", error);
-        } finally {
-            setEnriching(false);
+            console.error("Failed to save summary:", error);
         }
     };
 
@@ -174,9 +178,6 @@ export function ContactDetailPage() {
                                 onClick={handleCopy}
                             >
                                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" title="Refresh Data" onClick={handleEnrich} disabled={enriching}>
-                                {enriching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -354,21 +355,32 @@ export function ContactDetailPage() {
                                         "col-span-2 md:col-span-1 shadow-sm transition-all duration-200",
                                         contact.intelligence_summary && "hover:shadow-md cursor-pointer hover:bg-muted/30"
                                     )}
-                                    onClick={() => contact.intelligence_summary && setIsSummaryExpanded(!isSummaryExpanded)}
                                 >
                                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">Summary</CardTitle>
-                                        <Sparkles className="h-4 w-4 text-purple-500" />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSummaryDraft(contact.intelligence_summary || "");
+                                                setIsSummaryEditOpen(true);
+                                            }}
+                                        >
+                                            <Pencil className="h-3 w-3" />
+                                            Update
+                                        </Button>
                                     </CardHeader>
-                                    <CardContent>
+                                    <CardContent onClick={() => contact.intelligence_summary && setIsSummaryExpanded(!isSummaryExpanded)}>
                                         <div className="text-sm leading-relaxed">
                                             {contact.intelligence_summary ? (
-                                                <p className={cn("whitespace-pre-wrap", !isSummaryExpanded && "line-clamp-4")}>
+                                                <p className={cn("whitespace-pre-wrap text-muted-foreground/90", !isSummaryExpanded && "line-clamp-4")}>
                                                     {contact.intelligence_summary}
                                                 </p>
                                             ) : (
                                                 <div className="text-muted-foreground italic text-xs">
-                                                    No AI summary available. Click "Refresh" to generate insights.
+                                                    No summary available. Click "Update" to add focused insights for this contact.
                                                 </div>
                                             )}
                                         </div>
@@ -603,6 +615,34 @@ export function ContactDetailPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Summary Edit Dialog */}
+            <Dialog open={isSummaryEditOpen} onOpenChange={setIsSummaryEditOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Contact Summary</DialogTitle>
+                        <DialogDescription>
+                            Add key context or focused insights for <strong>{contact.first_name}</strong>.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Textarea
+                            placeholder="Type a summary..."
+                            className="min-h-[200px] resize-none focus-visible:ring-primary/30"
+                            value={summaryDraft}
+                            onChange={(e) => setSummaryDraft(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsSummaryEditOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveSummary}>
+                            Save Summary
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }
