@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useStatuses } from "@/hooks/use-statuses";
+import { useErrors } from "@/hooks/use-errors";
 import { cn } from "@/lib/utils";
 
 interface AddContactDialogProps {
@@ -67,6 +68,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
     ];
 
     const { statuses, addStatus } = useStatuses();
+    const { handleError } = useErrors();
 
     // Sync status if initialStatusId changes (e.g. clicking different column 'New' buttons)
     useEffect(() => {
@@ -140,7 +142,7 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
             setOpen(false);
             onContactAdded();
         } catch (error) {
-            console.error("Failed to add contact:", error);
+            handleError(error, "Failed to add contact");
         } finally {
             setLoading(false);
         }

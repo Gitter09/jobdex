@@ -13,6 +13,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useErrors } from "@/hooks/use-errors";
 import {
     Dialog,
     DialogContent,
@@ -63,6 +64,7 @@ export function ComposeEmailDialog({
     open,
     onOpenChange,
 }: ComposeEmailDialogProps) {
+    const { handleError } = useErrors();
     const [to, setTo] = useState("");
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
@@ -102,11 +104,11 @@ export function ComposeEmailDialog({
 
     const handleSend = async () => {
         if (!selectedAccount) {
-            toast.error("Please connect an email account first in Settings.");
+            handleError("Please connect an email account first in Settings.");
             return;
         }
         if (!to || !subject || !body) {
-            toast.error("Please fill in all fields");
+            handleError("Please fill in all fields");
             return;
         }
 
@@ -114,7 +116,7 @@ export function ComposeEmailDialog({
         try {
             if (scheduledDate) {
                 if (!contact?.id) {
-                    toast.error("Scheduling requires a contact context currently.");
+                    handleError("Scheduling requires a contact context currently.");
                     setSending(false);
                     return;
                 }
@@ -142,7 +144,7 @@ export function ComposeEmailDialog({
             setScheduledDate(undefined);
             setIsScheduling(false);
         } catch (err) {
-            toast.error(`Failed to send: ${err}`);
+            handleError(err, "Failed to send email");
         } finally {
             setSending(false);
         }

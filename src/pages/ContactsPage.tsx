@@ -42,10 +42,11 @@ import { useStatuses } from "@/hooks/use-statuses";
 import { getColorHex } from "@/lib/utils";
 import { ManageTagsDialog } from "@/components/tags/manage-tags-dialog";
 import { useTags } from "@/hooks/use-tags";
-import { toast } from "sonner";
+import { useErrors } from "@/hooks/use-errors";
 
 export function ContactsPage() {
     const navigate = useNavigate();
+    const { handleError } = useErrors();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const { statuses, refreshStatuses } = useStatuses();
     const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
@@ -132,8 +133,7 @@ export function ContactsPage() {
             setDeleteDialogOpen(false);
             fetchContacts();
         } catch (error) {
-            console.error("Failed to delete contacts:", error);
-            alert(`Failed to delete: ${error}`);
+            handleError(error, "Failed to delete contacts");
         } finally {
             setIsDeleting(false);
         }
@@ -151,7 +151,7 @@ export function ContactsPage() {
             await refreshStatuses();
             setLoading(false);
         } catch (error) {
-            console.error("Failed to fetch contacts/statuses:", error);
+            handleError(error, "Failed to fetch contacts");
             setLoading(false);
         }
     }
@@ -168,8 +168,7 @@ export function ContactsPage() {
             });
             fetchContacts();
         } catch (err) {
-            console.error("Failed to move contact", err);
-            alert("Failed to update status");
+            handleError(err, "Failed to update status");
             fetchContacts();
         }
     };
@@ -198,7 +197,7 @@ export function ContactsPage() {
 
                 const expired = results.filter((r) => r.token_expired).map((r) => r.account_email);
                 if (expired.length > 0) {
-                    toast.error(`Email token expired for: ${expired.join(", ")}. Go to Settings → Email to reconnect.`);
+                    handleError(`Email token expired for: ${expired.join(", ")}. Go to Settings → Email to reconnect.`);
                 }
             } catch (err) {
                 console.error("[App] Email sync on launch failed:", err);

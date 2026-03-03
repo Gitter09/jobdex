@@ -1,5 +1,8 @@
 use outreach_core::Db;
 use tauri::Manager;
+
+mod error;
+use error::AppError;
 // use std::fs; removed
 
 /// Extracts first and last name from page title or LinkedIn URL slug
@@ -30,7 +33,7 @@ struct ContactWithTags {
 }
 
 #[tauri::command]
-async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, String> {
+async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, AppError> {
     let pool = db.pool();
 
     // 1. Fetch Contacts
@@ -102,7 +105,7 @@ async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, 
 #[tauri::command]
 async fn get_statuses(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::models::Status>, String> {
+) -> Result<Vec<outreach_core::models::Status>, AppError> {
     let pool = db.pool();
     let statuses = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Status>(
         "SELECT * FROM statuses ORDER BY position ASC",
@@ -118,7 +121,7 @@ async fn create_status(
     db: tauri::State<'_, Db>,
     label: String,
     color: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let pool = db.pool();
     let id = uuid::Uuid::new_v4().to_string();
     // automated position at end
@@ -127,8 +130,7 @@ async fn create_status(
         .bind(label)
         .bind(color)
         .execute(pool)
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
+        .await?;
     Ok(id)
 }
 
@@ -138,7 +140,7 @@ async fn update_status(
     id: String,
     label: String,
     color: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pool = db.pool();
     sqlx::query(
         "UPDATE statuses SET label = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -147,32 +149,29 @@ async fn update_status(
     .bind(color)
     .bind(id)
     .execute(pool)
-    .await
-    .map_err(|e: sqlx::Error| e.to_string())?;
+    .await?;
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_status(db: tauri::State<'_, Db>, id: String) -> Result<(), String> {
+async fn delete_status(db: tauri::State<'_, Db>, id: String) -> Result<(), AppError> {
     let pool = db.pool();
     // fallback contacts to default? or set null?
     // SQLite FK might restrict. For now, let's just delete and let contacts contain orphaned status_id (bad practice) or set null.
     // Better: set status_id to null for contacts using this status.
-    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    let mut tx = pool.begin().await?;
 
     sqlx::query("UPDATE contacts SET status_id = NULL WHERE status_id = ?")
         .bind(&id)
         .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
     sqlx::query("DELETE FROM statuses WHERE id = ?")
         .bind(&id)
         .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -188,7 +187,7 @@ async fn add_contact(
     company: Option<String>,
     location: Option<String>,
     company_website: Option<String>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let pool = db.pool();
     let id = uuid::Uuid::new_v4().to_string();
 
@@ -239,10 +238,10 @@ async fn update_contact(
     location: Option<String>,
     company_website: Option<String>,
     intelligence_summary: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pool = db.pool();
 
-    let result = sqlx::query(
+    sqlx::query(
         r#"
         UPDATE contacts SET 
             first_name = COALESCE(?, first_name), 
@@ -279,9 +278,7 @@ async fn update_contact(
     .bind(intelligence_summary)
     .bind(id)
     .execute(pool)
-    .await;
-
-    result.map_err(|e: sqlx::Error| e.to_string())?;
+    .await?;
     Ok(())
 }
 
@@ -358,7 +355,7 @@ pub fn run() {
 }
 
 #[tauri::command]
-async fn fix_orphan_contacts(db: tauri::State<'_, Db>) -> Result<String, String> {
+async fn fix_orphan_contacts(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     let pool = db.pool();
 
     // Ensure statuses exist
@@ -430,407 +427,21 @@ async fn delete_contact(db: tauri::State<'_, Db>, id: String) -> Result<(), Stri
     Ok(())
 }
 
-// Re-implement scrape_clipboard to use the same Configurable AI Engine as magic_paste
-#[tauri::command]
-async fn scrape_clipboard(db: tauri::State<'_, Db>) -> Result<String, String> {
-    // 1. Get Settings & AI Config
-    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    let provider_str = settings
-        .get("ai_provider")
-        .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "gemini".to_string());
-    let model = settings
-        .get("ai_model")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
-    let base_url = settings
-        .get("ai_base_url")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-
-    let mut config = outreach_core::ai::AiConfig::default();
-    if provider_str == "ollama" {
-        config.provider = outreach_core::ai::AiProvider::Ollama;
-        config.ollama_model = model;
-        config.ollama_base_url = base_url;
-    } else {
-        config.provider = outreach_core::ai::AiProvider::OpenRouter;
-        config.openrouter_model = model;
-        config.openrouter_base_url = base_url;
-        let service = if provider_str == "gemini" {
-            "GEMINI_API_KEY"
-        } else {
-            "OPENROUTER_API_KEY"
-        };
-        // Retrieve key from SettingsManager
-        config.openrouter_api_key = settings
-            .get(service)
-            .await
-            .map_err(|e| e.to_string())?
-            .or(None);
-    }
-
-    // 2. Access Clipboard
-    let engine = outreach_core::EnrichmentEngine::new();
-    let url = engine.get_clipboard_url().map_err(|e| e.to_string())?;
-
-    // 3. Fetch Page Data
-    let (title, raw_html, _description) = engine
-        .fetch_page_metadata(&url)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // 4. Build Prompt
-    // If it's a social profile, we prioritize the URL slug for the name
-    let is_social =
-        url.contains("linkedin.com") || url.contains("twitter.com") || url.contains("x.com");
-    let content_to_send = if is_social {
-        "Social profile detected. Prioritize the name from the URL if not in title.".to_string()
-    } else {
-        raw_html.chars().take(1000).collect::<String>()
-    };
-
-    let prompt = format!(
-        r#"Extract contact details from this page into JSON.
-If the name is not clearly in the text/title, infer it from the URL slug (e.g. john-doe -> John Doe).
-
-URL: {}
-Title: {}
-Snippet: {}
-
-JSON Format:
-{{
-  "first_name": "string",
-  "last_name": "string", 
-  "title": "string or null",
-  "company": "string or null",
-  "location": "string or null",
-  "email": "string or null",
-  "linkedin_url": "string or null",
-  "context": "1 sentence brief"
-}}
-
-Respond with ONLY the JSON object."#,
-        url, title, content_to_send
-    );
-
-    // 5. Call AI
-    println!("--- [Clipboard Intelligence] Debug Start ---");
-    println!("Provider: {}", provider_str);
-    println!(
-        "Base URL: {}",
-        if provider_str == "ollama" {
-            &config.ollama_base_url
-        } else {
-            &config.openrouter_base_url
-        }
-    );
-
-    let ai_client = outreach_core::AiClient::new(config);
-    let response = ai_client.generate(&prompt).await.map_err(|e| {
-        println!("--- [Clipboard Intelligence] Error: {} ---", e);
-        e.to_string()
-    })?;
-
-    println!("Raw AI Response: {}", response);
-    println!("--- [Clipboard Intelligence] Debug End ---");
-
-    // 6. Parse & Save
-    let parsed: serde_json::Value = serde_json::from_str(&response)
-        .or_else(|_| {
-            let json_start = response.find('{').unwrap_or(0);
-            let json_end = response.rfind('}').map(|i| i + 1).unwrap_or(response.len());
-            serde_json::from_str(&response[json_start..json_end])
-        })
-        .map_err(|e| format!("Failed to parse AI response: {}", e))?;
-
-    // If AI failed to extract names, fallback to Title parsing (but using the simplified logic we have, or just "Unknown")
-    let first_name = parsed["first_name"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("Unknown")
-        .to_string();
-    let last_name = parsed["last_name"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("Contact")
-        .to_string();
-    let hooks = parsed["context"].as_str().unwrap_or("").to_string();
-
-    let pool = db.pool();
-    let id = uuid::Uuid::new_v4().to_string();
-
-    sqlx::query("INSERT INTO contacts (id, first_name, last_name, linkedin_url, intelligence_summary, title, company, location, company_website, email, status, status_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(&id)
-        .bind(&first_name)
-        .bind(&last_name)
-        .bind(&url)
-        .bind(&hooks)
-        .bind(parsed["title"].as_str())
-        .bind(parsed["company"].as_str())
-        .bind(parsed["location"].as_str())
-        .bind(parsed["company_website"].as_str())
-        .bind(parsed["email"].as_str())
-        .bind("Enriched")
-        .bind("stat-new")
-        .execute(pool)
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
-
-    Ok(id)
-}
-
-/// Parsed contact data from clipboard
-#[derive(serde::Serialize)]
-struct ParsedContact {
-    first_name: String,
-    last_name: String,
-    title: Option<String>,
-    company: Option<String>,
-    location: Option<String>,
-    company_website: Option<String>,
-    email: Option<String>,
-    linkedin_url: Option<String>,
-    context: Option<String>,
-}
-
-/// AI-powered Magic Paste: parses any clipboard text into contact fields
-#[tauri::command]
-async fn magic_paste(db: tauri::State<'_, Db>) -> Result<ParsedContact, String> {
-    use arboard::Clipboard;
-
-    // 1. Get clipboard text
-    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
-    let text = clipboard.get_text().map_err(|e| e.to_string())?;
-
-    if text.trim().is_empty() {
-        return Err("Clipboard is empty".to_string());
-    }
-
-    // 2. Load AI Settings
-    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    let provider_str = settings
-        .get("ai_provider")
-        .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "gemini".to_string());
-    let model = settings
-        .get("ai_model")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
-    let base_url = settings
-        .get("ai_base_url")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-
-    let mut config = outreach_core::ai::AiConfig::default();
-
-    // NOTE: Magic Paste uses a specific hardcoded prompt structure inside the function below,
-    // but we respect the provider/model from settings.
-
-    if provider_str == "ollama" {
-        config.provider = outreach_core::ai::AiProvider::Ollama;
-        config.ollama_model = model;
-        // Fix: Use the configured base URL instead of hardcoded localhost
-        config.ollama_base_url = base_url;
-    } else {
-        config.provider = outreach_core::ai::AiProvider::OpenRouter;
-        config.openrouter_model = model;
-        config.openrouter_base_url = base_url;
-
-        let service = if provider_str == "gemini" {
-            "GEMINI_API_KEY"
-        } else {
-            "OPENROUTER_API_KEY"
-        };
-        // Retrieve key from SettingsManager
-        config.openrouter_api_key = settings
-            .get(service)
-            .await
-            .map_err(|e| e.to_string())?
-            .or(None);
-    }
-
-    // Debug logging for user verification
-    println!("--- [Magic Paste] Debug Start ---");
-    println!("Provider: {}", provider_str);
-    println!("Model: {}", config.ollama_model);
-    println!(
-        "Base URL: {}",
-        if provider_str == "ollama" {
-            &config.ollama_base_url
-        } else {
-            &config.openrouter_base_url
-        }
-    );
-
-    // 3. Build AI prompt for structured extraction
-    let prompt = format!(
-        r#"Analyze this text/URL and extract contact info into JSON.
-CRITICAL: If it's a LinkedIn URL (like /in/john-doe), extract the Name from the link path if not in the text.
-
-Input:
-{}
-
-JSON Template:
-{{
-  "first_name": "string",
-  "last_name": "string",
-  "title": "string or null",
-  "company": "string or null",
-  "location": "string or null",
-  "email": "string or null",
-  "linkedin_url": "string or null",
-  "context": "Short summary"
-}}
-
-Return JSON only."#,
-        text.chars().take(2000).collect::<String>()
-    );
-
-    println!("Input Text (First 100 chars): {:.100}", text);
-
-    // 4. Call AI Client
-    let ai_client = outreach_core::AiClient::new(config);
-    let start_time = std::time::Instant::now();
-    let response = ai_client.generate(&prompt).await.map_err(|e| {
-        println!("--- [Magic Paste] Error: {} ---", e);
-        e.to_string()
-    })?;
-
-    println!("Response Time: {:?}", start_time.elapsed());
-    println!("Raw AI Response: {}", response);
-    println!("--- [Magic Paste] Debug End ---");
-
-    // 5. Parse JSON response
-    let parsed: serde_json::Value = serde_json::from_str(&response)
-        .or_else(|_| {
-            // Try to extract JSON from markdown code blocks
-            let json_start = response.find('{').unwrap_or(0);
-            let json_end = response.rfind('}').map(|i| i + 1).unwrap_or(response.len());
-            serde_json::from_str(&response[json_start..json_end])
-        })
-        .map_err(|e| format!("Failed to parse AI response: {}. Raw: {}", e, response))?;
-
-    Ok(ParsedContact {
-        first_name: parsed["first_name"].as_str().unwrap_or("").to_string(),
-        last_name: parsed["last_name"].as_str().unwrap_or("").to_string(),
-        title: parsed["title"].as_str().map(|s| s.to_string()),
-        company: parsed["company"].as_str().map(|s| s.to_string()),
-        location: parsed["location"].as_str().map(|s| s.to_string()),
-        company_website: parsed["company_website"].as_str().map(|s| s.to_string()),
-        email: parsed["email"].as_str().map(|s| s.to_string()),
-        linkedin_url: parsed["linkedin_url"].as_str().map(|s| s.to_string()),
-        context: parsed["context"].as_str().map(|s| s.to_string()),
-    })
-}
-
 // ===== Gmail Commands =====
-
-#[tauri::command]
-async fn enrich_contact_cmd(
-    db: tauri::State<'_, Db>,
-    id: String,
-    url: String,
-) -> Result<String, String> {
-    // 1. Get Settings & AI Config
-    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    let provider_str = settings
-        .get("ai_provider")
-        .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "gemini".to_string());
-    let model = settings
-        .get("ai_model")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
-    let base_url = settings
-        .get("ai_base_url")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-
-    println!("--- [Enrichment Debug] Start ---");
-    println!("Contact ID: {}", id);
-    println!("URL: {}", url);
-    println!("Provider: {}", provider_str);
-    println!("Model: {}", model);
-    println!("Base URL: {}", base_url);
-
-    let mut config = outreach_core::ai::AiConfig::default();
-    if provider_str == "ollama" {
-        config.provider = outreach_core::ai::AiProvider::Ollama;
-        config.ollama_model = model;
-        config.ollama_base_url = base_url;
-    } else {
-        config.provider = outreach_core::ai::AiProvider::OpenRouter;
-        config.openrouter_model = model;
-        config.openrouter_base_url = base_url;
-        let service = if provider_str == "gemini" {
-            "GEMINI_API_KEY"
-        } else {
-            "OPENROUTER_API_KEY"
-        };
-        // Retrieve key from SettingsManager
-        config.openrouter_api_key = settings
-            .get(service)
-            .await
-            .map_err(|e| e.to_string())?
-            .or(None);
-    }
-
-    println!("Has API Key: {}", config.openrouter_api_key.is_some());
-
-    let engine = outreach_core::EnrichmentEngine::new();
-    let (_, raw_html, _) = engine
-        .fetch_page_metadata(&url)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    println!("Fetched HTML Length: {}", raw_html.len());
-
-    let hooks = engine.try_generate_hooks(&raw_html, Some(config)).await;
-
-    println!("Generated Hooks Length: {}", hooks.len());
-    println!(
-        "Hooks Snippet: {}",
-        hooks.chars().take(100).collect::<String>()
-    );
-    println!("--- [Enrichment Debug] End ---");
-
-    // Update DB
-    sqlx::query("UPDATE contacts SET intelligence_summary = ? WHERE id = ?")
-        .bind(&hooks)
-        .bind(&id)
-        .execute(db.pool())
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
-
-    Ok(hooks)
-}
 
 #[tauri::command]
 async fn get_email_accounts(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::models::EmailAccount>, String> {
+) -> Result<Vec<outreach_core::models::EmailAccount>, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
-    service.list_accounts().await.map_err(|e| e.to_string())
+    service
+        .list_accounts()
+        .await
+        .map_err(|e| AppError::from(e.to_string()))
 }
 
 #[tauri::command]
-async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, String> {
+async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     use std::thread;
 
     let client = outreach_core::gmail::GmailClient::new();
@@ -877,7 +488,7 @@ async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, String> {
+async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     use std::thread;
 
     let client = outreach_core::outlook::OutlookClient::new();
@@ -924,12 +535,12 @@ async fn email_send(
     to: String,
     subject: String,
     body: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
     service
         .send_email(&account_id, &to, &subject, &body)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string().into())
 }
 
 #[tauri::command]
@@ -940,57 +551,59 @@ async fn email_schedule(
     subject: String,
     body: String,
     scheduled_at: i64,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
     service
         .schedule_email(&account_id, &contact_id, &subject, &body, scheduled_at)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string().into())
 }
 
 #[tauri::command]
 async fn get_emails_for_contact(
     db: tauri::State<'_, Db>,
     contact_id: String,
-) -> Result<Vec<outreach_core::models::EmailMessage>, String> {
-    // We need to resolve contact_id to email first to be accurate, but service handles it?
-    // Service query above was a bit hacky. Let's fix it here or there.
-    // Actually, in service I used subquery on contact_id. That works if contact has email.
-
+) -> Result<Vec<outreach_core::models::EmailMessage>, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
     service
         .get_emails_for_contact(&contact_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string().into())
 }
 
 #[tauri::command]
-async fn delete_email_account(db: tauri::State<'_, Db>, account_id: String) -> Result<(), String> {
+async fn delete_email_account(
+    db: tauri::State<'_, Db>,
+    account_id: String,
+) -> Result<(), AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
     service
         .delete_account(&account_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::from(e.to_string()))
 }
 
 #[tauri::command]
 async fn sync_email_accounts(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::SyncResult>, String> {
+) -> Result<Vec<outreach_core::SyncResult>, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
-    service.sync_all_accounts().await.map_err(|e| e.to_string())
+    service
+        .sync_all_accounts()
+        .await
+        .map_err(|e| e.to_string().into())
 }
 
 #[tauri::command]
 async fn sync_email_account(
     db: tauri::State<'_, Db>,
     account_id: String,
-) -> Result<outreach_core::SyncResult, String> {
+) -> Result<outreach_core::SyncResult, AppError> {
     let service = outreach_core::EmailService::new(db.inner().clone());
     service
         .sync_account(&account_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::from(e.to_string()))
 }
 
 /// Reset last_synced_at to NULL for one or all accounts,
@@ -1000,31 +613,29 @@ async fn sync_email_account(
 async fn reset_email_sync_state(
     db: tauri::State<'_, Db>,
     account_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pool = db.pool();
     match account_id {
         Some(id) => {
             sqlx::query("UPDATE email_accounts SET last_synced_at = NULL WHERE id = ?")
                 .bind(&id)
                 .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
+                .await?;
         }
         None => {
             sqlx::query("UPDATE email_accounts SET last_synced_at = NULL")
                 .execute(pool)
-                .await
-                .map_err(|e| e.to_string())?;
+                .await?;
         }
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn poll_email_tracking(db: tauri::State<'_, Db>) -> Result<usize, String> {
+async fn poll_email_tracking(db: tauri::State<'_, Db>) -> Result<usize, AppError> {
     outreach_core::tracking::poll_tracking_events(db.inner())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string().into())
 }
 
 #[derive(serde::Serialize)]
@@ -1038,7 +649,7 @@ pub struct TrackingEventResponse {
 async fn get_email_tracking(
     db: tauri::State<'_, Db>,
     message_id: String,
-) -> Result<Vec<TrackingEventResponse>, String> {
+) -> Result<Vec<TrackingEventResponse>, AppError> {
     let rows: Vec<(String, chrono::DateTime<chrono::Utc>, Option<String>)> = sqlx::query_as(
         "SELECT event_type, occurred_at, link_url FROM email_tracking WHERE message_id = ? ORDER BY occurred_at DESC"
     )
@@ -1060,161 +671,11 @@ async fn get_email_tracking(
 }
 
 #[tauri::command]
-async fn draft_email_ai(db: tauri::State<'_, Db>, contact_id: String) -> Result<String, String> {
-    let pool = db.pool();
-    let contact = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
-        "SELECT * FROM contacts WHERE id = ?",
-    )
-    .bind(&contact_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Contact not found")?;
-
-    // Get settings
-    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    let provider_str = settings
-        .get("ai_provider")
-        .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "gemini".to_string());
-    let model = settings
-        .get("ai_model")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
-    let base_url = settings
-        .get("ai_base_url")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-    let custom_draft = settings
-        .get("prompt_email_draft")
-        .await
-        .map_err(|e| e.to_string())?;
-    let custom_subject = settings
-        .get("prompt_subject_line")
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Determine config
-    let mut config = outreach_core::ai::AiConfig::default();
-    config.custom_draft_prompt = custom_draft;
-    config.custom_subject_prompt = custom_subject;
-
-    if provider_str == "ollama" {
-        config.provider = outreach_core::ai::AiProvider::Ollama;
-        config.ollama_model = model; // Reuse model field for ollama model name
-    } else {
-        // OpenRouter or Gemini
-        config.provider = outreach_core::ai::AiProvider::OpenRouter;
-        config.openrouter_model = model;
-        config.openrouter_base_url = base_url;
-
-        // Get API key
-        let service = if provider_str == "gemini" {
-            "GEMINI_API_KEY"
-        } else {
-            "OPENROUTER_API_KEY"
-        };
-        // Retrieve key from SettingsManager
-        config.openrouter_api_key = settings
-            .get(service)
-            .await
-            .map_err(|e| e.to_string())?
-            .or(None);
-    }
-
-    // Generate draft
-    let email_ai = outreach_core::EmailAI::new(config);
-    email_ai
-        .draft_email(&contact)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn generate_subject_lines_ai(
-    db: tauri::State<'_, Db>,
-    contact_id: String,
-) -> Result<Vec<String>, String> {
-    let pool = db.pool();
-    let contact = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
-        "SELECT * FROM contacts WHERE id = ?",
-    )
-    .bind(&contact_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Contact not found")?;
-
-    // Get settings
-    let settings = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    let provider_str = settings
-        .get("ai_provider")
-        .await
-        .map_err(|e| e.to_string())?
-        .unwrap_or_else(|| "gemini".to_string());
-    let model = settings
-        .get("ai_model")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "google/gemini-2.0-flash-exp:free".to_string());
-    let base_url = settings
-        .get("ai_base_url")
-        .await
-        .map_err(|e| e.to_string())?
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| "https://openrouter.ai/api/v1".to_string());
-    let custom_draft = settings
-        .get("prompt_email_draft")
-        .await
-        .map_err(|e| e.to_string())?;
-    let custom_subject = settings
-        .get("prompt_subject_line")
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut config = outreach_core::ai::AiConfig::default();
-    config.custom_draft_prompt = custom_draft;
-    config.custom_subject_prompt = custom_subject;
-
-    if provider_str == "ollama" {
-        config.provider = outreach_core::ai::AiProvider::Ollama;
-        config.ollama_model = model;
-    } else {
-        config.provider = outreach_core::ai::AiProvider::OpenRouter;
-        config.openrouter_model = model;
-        config.openrouter_base_url = base_url;
-        let service = if provider_str == "gemini" {
-            "GEMINI_API_KEY"
-        } else {
-            "OPENROUTER_API_KEY"
-        };
-        // Retrieve key from SettingsManager
-        config.openrouter_api_key = settings
-            .get(service)
-            .await
-            .map_err(|e| e.to_string())?
-            .or(None);
-    }
-
-    let email_ai = outreach_core::EmailAI::new(config);
-    email_ai
-        .generate_subject_lines(&contact)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn save_api_key(
     db: tauri::State<'_, Db>,
     service: String,
     key: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     println!("--- [DB Debug] Saving key for service: {} ---", service);
     let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
     manager
@@ -1230,57 +691,48 @@ async fn save_api_key(
 #[tauri::command]
 async fn get_settings(
     db: tauri::State<'_, Db>,
-) -> Result<std::collections::HashMap<String, String>, String> {
+) -> Result<std::collections::HashMap<String, String>, AppError> {
     let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    manager.get_all().await.map_err(|e| e.to_string())
+    manager.get_all().await.map_err(|e| e.to_string().into())
 }
 
 #[tauri::command]
-async fn clear_all_data(db: tauri::State<'_, Db>) -> Result<(), String> {
+async fn clear_all_data(db: tauri::State<'_, Db>) -> Result<(), AppError> {
     let pool = db.pool();
-    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    let mut tx = pool.begin().await?;
 
     sqlx::query("DELETE FROM contacts")
         .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
     sqlx::query("DELETE FROM statuses")
         .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
-    sqlx::query("DELETE FROM tags")
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
+    sqlx::query("DELETE FROM tags").execute(&mut *tx).await?;
     sqlx::query("DELETE FROM contact_tags")
         .execute(&mut *tx)
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     Ok(())
 }
 
 #[tauri::command]
-async fn export_all_data(db: tauri::State<'_, Db>) -> Result<String, String> {
+async fn export_all_data(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     let pool = db.pool();
 
     let contacts =
         sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>("SELECT * FROM contacts")
             .fetch_all(pool)
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
 
     let statuses =
         sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Status>("SELECT * FROM statuses")
             .fetch_all(pool)
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
 
     let settings_map = outreach_core::settings::SettingsManager::new(pool.clone())
         .get_all()
-        .await
-        .map_err(|e| e.to_string())?;
+        .await?;
 
     let export = serde_json::json!({
         "version": "1.0",
@@ -1290,20 +742,27 @@ async fn export_all_data(db: tauri::State<'_, Db>) -> Result<String, String> {
         "settings": settings_map
     });
 
-    serde_json::to_string_pretty(&export).map_err(|e| e.to_string())
+    Ok(serde_json::to_string_pretty(&export)?)
 }
 
 #[tauri::command]
-async fn save_setting(db: tauri::State<'_, Db>, key: String, value: String) -> Result<(), String> {
+async fn save_setting(
+    db: tauri::State<'_, Db>,
+    key: String,
+    value: String,
+) -> Result<(), AppError> {
     let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
-    manager.set(&key, &value).await.map_err(|e| e.to_string())
+    manager
+        .set(&key, &value)
+        .await
+        .map_err(|e| e.to_string().into())
 }
 
 // ===== Import Commands =====
 
 #[tauri::command]
-fn get_import_headers(file_path: String) -> Result<outreach_core::import::ImportPreview, String> {
-    outreach_core::import::preview_file(&file_path).map_err(|e| e.to_string())
+fn get_import_headers(file_path: String) -> Result<outreach_core::import::ImportPreview, AppError> {
+    outreach_core::import::preview_file(&file_path).map_err(|e| e.to_string().into())
 }
 
 #[derive(serde::Serialize)]
@@ -1328,9 +787,8 @@ async fn analyze_import(
     db: tauri::State<'_, Db>,
     file_path: String,
     mapping: outreach_core::import::ColumnMapping,
-) -> Result<ImportAnalysis, String> {
-    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)
-        .map_err(|e| e.to_string())?;
+) -> Result<ImportAnalysis, AppError> {
+    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)?;
 
     // Fetch existing identifiers for comparison
     let pool = db.pool();
@@ -1338,8 +796,7 @@ async fn analyze_import(
         "SELECT id, email, linkedin_url, first_name, last_name, company FROM contacts",
     )
     .fetch_all(pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
 
     let mut new_count = 0;
     let mut duplicate_count = 0;
@@ -1399,9 +856,8 @@ async fn import_contacts(
     file_path: String,
     mapping: outreach_core::import::ColumnMapping,
     mode: String, // "skip", "merge", "none"
-) -> Result<usize, String> {
-    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)
-        .map_err(|e| e.to_string())?;
+) -> Result<usize, AppError> {
+    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)?;
 
     let pool = db.pool();
 
@@ -1548,9 +1004,9 @@ async fn update_contacts_status_bulk(
     db: tauri::State<'_, Db>,
     ids: Vec<String>,
     status_id: String,
-) -> Result<u64, String> {
+) -> Result<u64, AppError> {
     let pool = db.pool();
-    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    let mut tx = pool.begin().await?;
 
     let mut affected_count = 0;
     // We can assume status_id is valid for now, or fetch label if we wanted to sync legacy column
@@ -1561,26 +1017,24 @@ async fn update_contacts_status_bulk(
             .bind(&status_id)
             .bind(id)
             .execute(&mut *tx)
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
         affected_count += result.rows_affected();
     }
 
-    tx.commit().await.map_err(|e| e.to_string())?;
+    tx.commit().await?;
     Ok(affected_count)
 }
 
 // ===== Tag Commands =====
 
 #[tauri::command]
-async fn get_tags(db: tauri::State<'_, Db>) -> Result<Vec<outreach_core::models::Tag>, String> {
+async fn get_tags(db: tauri::State<'_, Db>) -> Result<Vec<outreach_core::models::Tag>, AppError> {
     let pool = db.pool();
     let tags = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Tag>(
         "SELECT * FROM tags ORDER BY name ASC",
     )
     .fetch_all(pool)
-    .await
-    .map_err(|e: sqlx::Error| e.to_string())?;
+    .await?;
     Ok(tags)
 }
 
@@ -1636,14 +1090,13 @@ async fn assign_tag(
     db: tauri::State<'_, Db>,
     contact_id: String,
     tag_id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pool = db.pool();
     sqlx::query("INSERT OR IGNORE INTO contact_tags (contact_id, tag_id) VALUES (?, ?)")
         .bind(contact_id)
         .bind(tag_id)
         .execute(pool)
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
+        .await?;
     Ok(())
 }
 
@@ -1652,14 +1105,13 @@ async fn unassign_tag(
     db: tauri::State<'_, Db>,
     contact_id: String,
     tag_id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let pool = db.pool();
     sqlx::query("DELETE FROM contact_tags WHERE contact_id = ? AND tag_id = ?")
         .bind(contact_id)
         .bind(tag_id)
         .execute(pool)
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
+        .await?;
     Ok(())
 }
 
@@ -1672,8 +1124,9 @@ struct EmailCredentialStatus {
 }
 
 #[tauri::command]
-async fn check_email_credentials() -> Result<EmailCredentialStatus, String> {
-    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+async fn check_email_credentials() -> Result<EmailCredentialStatus, AppError> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| AppError::Internal("Could not determine home directory".into()))?;
     let config_dir = home.join(".outreachos");
 
     let gmail_path = config_dir.join("credentials.json");
@@ -1690,16 +1143,16 @@ async fn save_email_credentials(
     provider: String,
     client_id: String,
     client_secret: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     use std::fs;
     use std::io::Write;
 
-    let home = dirs::home_dir().ok_or("Could not determine home directory")?;
+    let home = dirs::home_dir()
+        .ok_or_else(|| AppError::Internal("Could not determine home directory".into()))?;
     let config_dir = home.join(".outreachos");
 
     // Create directory if it doesn't exist
-    fs::create_dir_all(&config_dir)
-        .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    fs::create_dir_all(&config_dir)?;
 
     let (file_path, json_content) = match provider.as_str() {
         "gmail" => {
@@ -1722,17 +1175,19 @@ async fn save_email_credentials(
             });
             (path, content)
         }
-        _ => return Err(format!("Unknown provider: {}", provider)),
+        _ => {
+            return Err(AppError::Validation(format!(
+                "Unknown provider: {}",
+                provider
+            )))
+        }
     };
 
-    let json_str = serde_json::to_string_pretty(&json_content)
-        .map_err(|e| format!("Failed to serialize credentials: {}", e))?;
+    let json_str = serde_json::to_string_pretty(&json_content)?;
 
-    let mut file = fs::File::create(&file_path)
-        .map_err(|e| format!("Failed to create credentials file: {}", e))?;
+    let mut file = fs::File::create(&file_path)?;
 
-    file.write_all(json_str.as_bytes())
-        .map_err(|e| format!("Failed to write credentials: {}", e))?;
+    file.write_all(json_str.as_bytes())?;
 
     Ok(())
 }

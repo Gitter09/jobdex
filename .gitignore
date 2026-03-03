@@ -38,6 +38,3 @@ src-tauri/storage/
 
 # Archived docs
 _archive/
-
-# Other
-.gitignore

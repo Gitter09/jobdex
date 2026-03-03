@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { useErrors } from "@/hooks/use-errors";
 
 interface EmailAccount {
     id: string;
@@ -41,6 +42,7 @@ interface SyncResult {
 
 export function EmailSettingsTab() {
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+    const { handleError } = useErrors();
     const [loading, setLoading] = useState(false);
     const [connecting, setConnecting] = useState<"gmail" | "outlook" | null>(null);
 
@@ -62,7 +64,7 @@ export function EmailSettingsTab() {
             const data = await invoke<EmailAccount[]>("get_email_accounts");
             setAccounts(data);
         } catch (e) {
-            toast.error(`Failed to fetch email accounts: ${e}`);
+            handleError(e, "Failed to fetch email accounts");
         } finally {
             setLoading(false);
         }
@@ -97,7 +99,7 @@ export function EmailSettingsTab() {
 
     const handleSaveCredentials = async () => {
         if (!setupProvider || !clientId.trim() || !clientSecret.trim()) {
-            toast.error("Please fill in all fields");
+            handleError("Please fill in all fields");
             return;
         }
 
@@ -114,7 +116,7 @@ export function EmailSettingsTab() {
             setClientSecret("");
             checkCredentials();
         } catch (error) {
-            toast.error("Failed to save credentials: " + error);
+            handleError(error, "Failed to save credentials");
         } finally {
             setSaving(false);
         }
@@ -137,7 +139,7 @@ export function EmailSettingsTab() {
             toast.success(result);
             fetchAccounts();
         } catch (e) {
-            toast.error(`Failed to connect ${provider}: ` + e);
+            handleError(e, `Failed to connect ${provider}`);
         } finally {
             setConnecting(null);
         }
@@ -150,7 +152,7 @@ export function EmailSettingsTab() {
             await invoke("save_setting", { key: "tracking_secret", value: trackingSecret });
             toast.success("Tracking configuration saved");
         } catch (e) {
-            toast.error(`Failed to save tracking config: ${e}`);
+            handleError(e, "Failed to save tracking config");
         } finally {
             setSavingTracking(false);
         }
@@ -162,7 +164,7 @@ export function EmailSettingsTab() {
             const count: number = await invoke("poll_email_tracking");
             toast.success(`Polled tracking events. Imported ${count} new events.`);
         } catch (e) {
-            toast.error(`Failed to poll tracking events: ${e}`);
+            handleError(e, "Failed to poll tracking events");
         } finally {
             setPollingTracking(false);
         }
@@ -174,7 +176,7 @@ export function EmailSettingsTab() {
             toast.success("Account disconnected");
             setAccounts(accounts.filter((a) => a.id !== id));
         } catch (error) {
-            toast.error("Failed to disconnect account: " + error);
+            handleError(error, "Failed to disconnect account");
         }
     };
 
@@ -199,7 +201,7 @@ export function EmailSettingsTab() {
                 fetchAccounts();
             }
         } catch (error) {
-            toast.error(`Full re-sync failed for ${accountEmail}: ` + error);
+            handleError(error, `Full re-sync failed for ${accountEmail}`);
         } finally {
             setSyncing(null);
         }
@@ -223,7 +225,7 @@ export function EmailSettingsTab() {
                 fetchAccounts();
             }
         } catch (error) {
-            toast.error(`Sync failed for ${accountEmail}: ` + error);
+            handleError(error, `Sync failed for ${accountEmail}`);
         } finally {
             setSyncing(null);
         }
@@ -251,12 +253,12 @@ export function EmailSettingsTab() {
             }
 
             if (expired.length > 0) {
-                toast.error(`Token expired for: ${expired.join(", ")}. Please reconnect those accounts.`);
+                handleError(`Token expired for: ${expired.join(", ")}. Please reconnect those accounts.`);
             }
 
             fetchAccounts();
         } catch (error) {
-            toast.error("Sync failed: " + error);
+            handleError(error, "Sync failed");
         } finally {
             setSyncing(null);
         }

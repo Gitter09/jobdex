@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, Loader2, CheckCircle } from "lucide-react";
+import { useErrors } from "@/hooks/use-errors";
 
 interface ImportDialogProps {
     open: boolean;
@@ -47,6 +48,7 @@ interface ColumnMapping {
 }
 
 export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDialogProps) {
+    const { handleError } = useErrors();
     const [filePath, setFilePath] = useState<string | null>(null);
     const [preview, setPreview] = useState<ImportPreview | null>(null);
     const [loading, setLoading] = useState(false);
@@ -103,7 +105,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
                 });
                 setMapping(autoMapping);
             } catch (err) {
-                alert(`Failed to load file: ${err}`);
+                handleError(err, "Failed to load file");
             } finally {
                 setLoading(false);
             }
@@ -120,7 +122,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
             });
             setAnalysis(result);
         } catch (err) {
-            alert(`Analysis failed: ${err}`);
+            handleError(err, "Analysis failed");
         } finally {
             setAnalyzing(false);
         }
@@ -139,7 +141,7 @@ export function ImportDialog({ open, onOpenChange, onImportComplete }: ImportDia
             setImportResult(count);
             onImportComplete?.();
         } catch (err) {
-            alert(`Import failed: ${err}`);
+            handleError(err, "Import failed");
         } finally {
             setImporting(false);
         }

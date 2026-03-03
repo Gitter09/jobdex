@@ -9,26 +9,29 @@ import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { TemplatesPage } from "@/pages/TemplatesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { ErrorBoundary } from "@/components/error-boundary/ErrorBoundary";
 import "./index.css";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/contacts" element={<ContactsPage />} />
-          <Route path="/contact/:id" element={<ContactDetailPage />} />
-          <Route path="/emails" element={<EmailsPage />} />
-          <Route path="/notes" element={<NotesPage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/templates" element={<TemplatesPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/:tab" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-      <Toaster />
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/contact/:id" element={<ContactDetailPage />} />
+            <Route path="/emails" element={<EmailsPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/:tab" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+        <Toaster />
+      </Router>
+    </ErrorBoundary>
   );
 }
 
