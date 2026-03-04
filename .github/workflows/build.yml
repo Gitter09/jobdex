@@ -3,8 +3,19 @@ name: Build and Test
 on:
   push:
     branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'release_notes/**'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'release_notes/**'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,9 +26,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - platform: macos-latest
+            os: self-hosted
+            name: macos
+          - platform: ubuntu-22.04
+            os: ubuntu-latest
+            name: linux
+          - platform: windows-latest
+            os: windows-latest
+            name: windows
 
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
