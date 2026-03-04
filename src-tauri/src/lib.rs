@@ -176,6 +176,7 @@ async fn delete_status(db: tauri::State<'_, Db>, id: String) -> Result<(), AppEr
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AddContactArgs {
     pub first_name: String,
     pub last_name: String,
