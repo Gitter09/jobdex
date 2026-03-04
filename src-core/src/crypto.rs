@@ -5,28 +5,94 @@ use aes_gcm::{
 use anyhow::{anyhow, Context, Result};
 use base64::prelude::*;
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 const KEYRING_SERVICE: &str = "com.outreachos.app";
 const KEYRING_USER: &str = "encryption-key";
 const KEYRING_DB_KEY_USER: &str = "db-encryption-key";
+const MASTER_SECRET_USER: &str = "master-secret";
 const NONCE_SIZE: usize = 12; // AES-GCM standard nonce size
+
+#[derive(Serialize, Deserialize, Default)]
+struct MasterSecret {
+    db_key: Option<String>,
+    encryption_key: Option<String>,
+    #[serde(default)]
+    credentials: HashMap<String, String>,
+    #[serde(default)]
+    secrets: HashMap<String, String>,
+}
+
+fn get_master_secret() -> Result<MasterSecret> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, MASTER_SECRET_USER)
+        .context("Failed to create keyring entry for master secret")?;
+
+    match entry.get_password() {
+        Ok(json_str) => {
+            let secret: MasterSecret = serde_json::from_str(&json_str).unwrap_or_default();
+            Ok(secret)
+        }
+        Err(_) => {
+            // No master secret exists yet. Attempt to migrate from legacy standalone entries.
+            let mut secret = MasterSecret::default();
+
+            if let Ok(old_entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_DB_KEY_USER) {
+                if let Ok(val) = old_entry.get_password() {
+                    secret.db_key = Some(val);
+                }
+            }
+            if let Ok(old_entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER) {
+                if let Ok(val) = old_entry.get_password() {
+                    secret.encryption_key = Some(val);
+                }
+            }
+            for provider in &["gmail", "outlook"] {
+                for field in &["client_id", "client_secret"] {
+                    let old_service = format!("{}.{}", KEYRING_SERVICE, provider);
+                    if let Ok(old_entry) = keyring::Entry::new(&old_service, field) {
+                        if let Ok(val) = old_entry.get_password() {
+                            secret
+                                .credentials
+                                .insert(format!("{}.{}", provider, field), val);
+                        }
+                    }
+                }
+            }
+
+            // Save the newly migrated (or empty) master secret
+            save_master_secret(&secret)?;
+            Ok(secret)
+        }
+    }
+}
+
+fn save_master_secret(secret: &MasterSecret) -> Result<()> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, MASTER_SECRET_USER)
+        .context("Failed to create keyring entry for master secret")?;
+    let json_str = serde_json::to_string(secret)?;
+    entry
+        .set_password(&json_str)
+        .context("Failed to save master secret to OS keychain")?;
+    Ok(())
+}
 
 /// Retrieves (or creates) a 256-bit database encryption key from the OS keychain.
 /// Stored as a 64-char lowercase hex string for use with SQLCipher PRAGMA key.
 pub fn get_or_create_db_key() -> Result<String> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_DB_KEY_USER)
-        .context("Failed to create keyring entry for DB key")?;
+    let mut ms = get_master_secret()?;
 
-    match entry.get_password() {
-        Ok(hex_key) if hex_key.len() == 64 => Ok(hex_key),
+    match ms.db_key {
+        Some(hex_key) if hex_key.len() == 64 => Ok(hex_key),
         _ => {
             // Generate a new 256-bit random key
             let mut key_bytes = [0u8; 32];
             OsRng.fill_bytes(&mut key_bytes);
             let hex_key = hex::encode(key_bytes);
-            entry
-                .set_password(&hex_key)
-                .context("Failed to store DB encryption key in OS keychain")?;
+
+            ms.db_key = Some(hex_key.clone());
+            save_master_secret(&ms)?;
+
             Ok(hex_key)
         }
     }
@@ -35,39 +101,37 @@ pub fn get_or_create_db_key() -> Result<String> {
 /// Retrieves the 256-bit encryption key from the OS keychain.
 /// If no key exists, generates a cryptographically random one and stores it.
 fn get_or_create_key() -> Result<[u8; 32]> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
-        .context("Failed to create keyring entry")?;
+    let mut ms = get_master_secret()?;
 
-    // Try to retrieve existing key
-    match entry.get_password() {
-        Ok(stored) => {
-            let decoded = BASE64_STANDARD
-                .decode(stored.as_bytes())
-                .context("Failed to decode encryption key from keychain")?;
-            if decoded.len() != 32 {
-                return Err(anyhow!(
-                    "Stored encryption key has invalid length: {}",
-                    decoded.len()
-                ));
-            }
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&decoded);
-            Ok(key)
-        }
-        Err(_) => {
+    let key_str = match ms.encryption_key {
+        Some(stored) => stored,
+        None => {
             // Generate a new random key
             let mut key = [0u8; 32];
             OsRng.fill_bytes(&mut key);
-
-            // Store in keychain as base64
             let encoded = BASE64_STANDARD.encode(key);
-            entry
-                .set_password(&encoded)
-                .context("Failed to store encryption key in OS keychain")?;
 
-            Ok(key)
+            ms.encryption_key = Some(encoded.clone());
+            save_master_secret(&ms)?;
+
+            encoded
         }
+    };
+
+    let decoded = BASE64_STANDARD
+        .decode(key_str.as_bytes())
+        .context("Failed to decode encryption key from keychain")?;
+
+    if decoded.len() != 32 {
+        return Err(anyhow!(
+            "Stored encryption key has invalid length: {}",
+            decoded.len()
+        ));
     }
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&decoded);
+    Ok(key)
 }
 
 /// Encrypts with an explicit 32-byte key (used internally and in tests).
@@ -145,30 +209,27 @@ pub fn decrypt_or_passthrough(value: &str) -> String {
 // Keychain Credential Helpers
 // ============================
 
-/// Stores an OAuth app credential (client_id or client_secret) in the OS keychain.
-/// Uses a service scoped to provider + field, e.g. "com.outreachos.gmail.client_id".
+/// Stores an OAuth app credential (client_id or client_secret) in the consolidated OS keychain entry.
 pub fn store_credential(provider: &str, field: &str, value: &str) -> Result<()> {
-    let service = format!("{}.{}", KEYRING_SERVICE, provider);
-    let entry = keyring::Entry::new(&service, field)
-        .context("Failed to create keyring entry for credential")?;
-    entry
-        .set_password(value)
-        .context("Failed to store credential in OS keychain")?;
-    Ok(())
+    let mut ms = get_master_secret()?;
+    ms.credentials
+        .insert(format!("{}.{}", provider, field), value.to_string());
+    save_master_secret(&ms)
 }
 
-/// Retrieves an OAuth app credential from the OS keychain.
+/// Retrieves an OAuth app credential from the consolidated OS keychain entry.
 pub fn get_credential(provider: &str, field: &str) -> Result<String> {
-    let service = format!("{}.{}", KEYRING_SERVICE, provider);
-    let entry = keyring::Entry::new(&service, field)
-        .context("Failed to create keyring entry for credential")?;
-    entry.get_password().map_err(|_| {
-        anyhow!(
-            "Credential '{}' not found for provider '{}'",
-            field,
-            provider
-        )
-    })
+    let ms = get_master_secret()?;
+    ms.credentials
+        .get(&format!("{}.{}", provider, field))
+        .cloned()
+        .ok_or_else(|| {
+            anyhow!(
+                "Credential '{}' not found for provider '{}'",
+                field,
+                provider
+            )
+        })
 }
 
 /// Checks whether OAuth app credentials exist in the keychain for a given provider.
@@ -177,23 +238,20 @@ pub fn has_credentials(provider: &str) -> bool {
         && get_credential(provider, "client_secret").is_ok()
 }
 
-/// Stores a named secret (e.g. tracking_secret) in the OS keychain.
+/// Stores a named secret in the consolidated OS keychain entry.
 pub fn store_secret(name: &str, value: &str) -> Result<()> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, name)
-        .context("Failed to create keyring entry for secret")?;
-    entry
-        .set_password(value)
-        .context("Failed to store secret in OS keychain")?;
-    Ok(())
+    let mut ms = get_master_secret()?;
+    ms.secrets.insert(name.to_string(), value.to_string());
+    save_master_secret(&ms)
 }
 
-/// Retrieves a named secret from the OS keychain.
+/// Retrieves a named secret from the consolidated OS keychain entry.
 pub fn get_secret(name: &str) -> Result<String> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, name)
-        .context("Failed to create keyring entry for secret")?;
-    entry
-        .get_password()
-        .map_err(|_| anyhow!("Secret '{}' not found in keychain", name))
+    let ms = get_master_secret()?;
+    ms.secrets
+        .get(name)
+        .cloned()
+        .ok_or_else(|| anyhow!("Secret '{}' not found in keychain", name))
 }
 
 // ===== App Lock Screen PIN Logic =====

@@ -35,6 +35,18 @@ impl Db {
             }
         };
 
+        // Cleanup orphaned migrations and tracking schema from the database history.
+        // This resolves panics caused by deleting or modifying migrations that were already applied.
+        let _ = sqlx::query("DROP TABLE IF EXISTS email_tracking")
+            .execute(&pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE email_messages DROP COLUMN tracking_id")
+            .execute(&pool)
+            .await;
+        let _ = sqlx::query("DELETE FROM _sqlx_migrations WHERE version IN (20260217000000, 20260302000000, 20260304210000)")
+            .execute(&pool)
+            .await;
+
         // Run migrations
         sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -233,16 +245,5 @@ pub mod models {
         pub status: String,
         pub error_message: Option<String>,
         pub created_at: DateTime<Utc>,
-    }
-
-    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
-    pub struct EmailTracking {
-        pub id: String,
-        pub message_id: String,
-        pub event_type: String, // 'open', 'click'
-        pub occurred_at: DateTime<Utc>,
-        pub ip_address: Option<String>,
-        pub user_agent: Option<String>,
-        pub link_url: Option<String>,
     }
 }
