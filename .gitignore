@@ -39,3 +39,6 @@ src-tauri/storage/
 # Archived docs
 _archive/
 agent.md
+
+# Release notes (local only)
+release_notes/
