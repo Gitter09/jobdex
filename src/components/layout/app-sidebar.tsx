@@ -43,11 +43,11 @@ const mainNavItems: NavItem[] = [
 ];
 
 const settingsSubItems: NavItem[] = [
-    { label: "Email Integration", icon: Mail, path: "/settings/email" },
     { label: "Appearance", icon: Palette, path: "/settings/appearance" },
+    { label: "Email Integration", icon: Mail, path: "/settings/email" },
     { label: "Pipeline", icon: LayoutTemplate, path: "/settings/pipeline" },
-    { label: "Data", icon: Database, path: "/settings/data" },
     { label: "Security", icon: Shield, path: "/settings/security" },
+    { label: "Data", icon: Database, path: "/settings/data" },
 ];
 
 export function AppSidebar() {
