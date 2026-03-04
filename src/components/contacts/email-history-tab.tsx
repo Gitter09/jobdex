@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Contact } from "@/types/crm";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, ArrowUpRight, ArrowDownLeft, Calendar, Eye, MousePointerClick } from "lucide-react";
+import { Loader2, Mail, ArrowUpRight, ArrowDownLeft, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,11 +16,7 @@ interface EmailMessage {
     status: string;
 }
 
-interface TrackingEvent {
-    event_type: string;
-    occurred_at: string;
-    link_url: string | null;
-}
+
 
 interface EmailHistoryTabProps {
     contact: Contact;
@@ -28,18 +24,6 @@ interface EmailHistoryTabProps {
 
 function EmailMessageItem({ email, contact }: { email: EmailMessage, contact: Contact }) {
     const isOutbound = email.from_email !== contact.email;
-    const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([]);
-
-    useEffect(() => {
-        if (isOutbound) {
-            invoke<TrackingEvent[]>("get_email_tracking", { messageId: email.id })
-                .then(setTrackingEvents)
-                .catch(console.error);
-        }
-    }, [email.id, isOutbound]);
-
-    const openEvent = trackingEvents.find(e => e.event_type === "open");
-    const clickEvents = trackingEvents.filter(e => e.event_type === "click");
 
     return (
         <div className="flex gap-4 group">
@@ -58,19 +42,8 @@ function EmailMessageItem({ email, contact }: { email: EmailMessage, contact: Co
                     <span>{isOutbound ? `To: ${email.to_email}` : `From: ${email.from_email}`}</span>
                     <div className="flex items-center gap-1.5">
                         {email.status === 'scheduled' && <Badge variant="outline" className="text-[10px] h-5">Scheduled</Badge>}
-                        {openEvent && (
-                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded-sm" title={`Opened at ${new Date(openEvent.occurred_at).toLocaleString()}`}>
-                                <Eye className="w-3 h-3" />
-                                <span>Opened</span>
-                            </div>
-                        )}
-                        {clickEvents.length > 0 && (
-                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-sm" title={`${clickEvents.length} clicks`}>
-                                <MousePointerClick className="w-3 h-3" />
-                                <span>{clickEvents.length} clicked</span>
-                            </div>
-                        )}
                     </div>
+
                 </div>
                 <div className="text-xs text-muted-foreground mt-3 font-mono bg-muted/30 p-3 rounded-md border border-muted/20 leading-relaxed max-h-[120px] overflow-hidden">
                     {email.body || "(No Body Content)"}

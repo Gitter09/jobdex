@@ -218,55 +218,15 @@ impl EmailService {
     ) -> Result<String> {
         let account = self.get_account(account_id).await?;
 
-        // 1. Check if tracking is configured
-        let tracking_base_url: Option<(String,)> =
-            sqlx::query_as("SELECT value FROM settings WHERE key = 'tracking_base_url'")
-                .fetch_optional(self.db.pool())
-                .await?;
-
-        let mut final_body = body.to_string();
-        if let Some((url,)) = tracking_base_url {
-            let base = url.trim().trim_end_matches('/');
-            if !base.is_empty() {
-                let tracking_id = uuid::Uuid::new_v4().to_string();
-
-                // Rewrite links
-                if let Ok(re) = regex::Regex::new(r#"href="(https?://[^"]+)""#) {
-                    final_body = re
-                        .replace_all(&final_body, |caps: &regex::Captures| {
-                            let original_url = &caps[1];
-                            let encoded_url = urlencoding::encode(original_url);
-                            format!(
-                                "href=\"{}/track/click/{}?url={}\"",
-                                base, tracking_id, encoded_url
-                            )
-                        })
-                        .to_string();
-                }
-
-                // Inject tracking pixel at the end or before </body>
-                let pixel = format!(
-                    "<img src=\"{}/track/open/{}.png\" width=\"1\" height=\"1\" border=\"0\" />",
-                    base, tracking_id
-                );
-
-                if final_body.contains("</body>") {
-                    final_body = final_body.replace("</body>", &format!("{}</body>", pixel));
-                } else {
-                    final_body.push_str(&pixel);
-                }
-            }
-        }
-
         let message_id = match account.provider.as_str() {
             "gmail" => {
                 self.gmail
-                    .send_email(&account.access_token, to, subject, &final_body)
+                    .send_email(&account.access_token, to, subject, body)
                     .await?
             }
             "outlook" => {
                 self.outlook
-                    .send_email(&account.access_token, to, subject, &final_body)
+                    .send_email(&account.access_token, to, subject, body)
                     .await?
             }
             _ => return Err(anyhow!("Unknown provider")),
@@ -405,9 +365,6 @@ impl EmailService {
         };
 
         // 5. Process each message
-        // Pre-compile tracking regex outside the loop (clippy::regex_creation_in_loops)
-        let tracking_regex =
-            regex::Regex::new(r#"(?:/|%2F)track(?:/|%2F)open(?:/|%2F)([a-f0-9\-]{36})\.png"#).ok();
 
         for (provider_msg_id, from_email, to_email, subject, body, html_body, sent_at) in
             messages_result
@@ -466,14 +423,6 @@ impl EmailService {
                 tid
             };
 
-            let mut tracking_id: Option<String> = None;
-            let combined_body = format!("{}\n{}", body, html_body.as_deref().unwrap_or(""));
-            if let Some(re) = &tracking_regex {
-                if let Some(caps) = re.captures(&combined_body) {
-                    tracking_id = Some(caps[1].to_string());
-                }
-            }
-
             // 7. Upsert message:
             //    - INSERT OR IGNORE to avoid duplicates
             //    - Then UPDATE body/subject if the existing row has an empty body
@@ -481,8 +430,8 @@ impl EmailService {
             let msg_id = uuid::Uuid::new_v4().to_string();
             let insert_result = sqlx::query(
                 "INSERT OR IGNORE INTO email_messages \
-                 (id, thread_id, from_email, to_email, subject, body, html_body, tracking_id, sent_at, status, provider_message_id, created_at) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+                 (id, thread_id, from_email, to_email, subject, body, html_body, sent_at, status, provider_message_id, created_at) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
             )
             .bind(&msg_id)
             .bind(&thread_id)
@@ -491,7 +440,6 @@ impl EmailService {
             .bind(&subject)
             .bind(&body)
             .bind(&html_body)
-            .bind(&tracking_id)
             .bind(sent_at)
             .bind(status)
             .bind(&provider_msg_id)
@@ -504,13 +452,12 @@ impl EmailService {
                 // Row already existed — backfill body if it was previously empty
                 if !body.is_empty() {
                     let update_result = sqlx::query(
-                        "UPDATE email_messages SET body = ?, subject = ?, html_body = COALESCE(html_body, ?), tracking_id = COALESCE(tracking_id, ?) \
+                        "UPDATE email_messages SET body = ?, subject = ?, html_body = COALESCE(html_body, ?) \
                          WHERE provider_message_id = ? AND (body IS NULL OR body = '')",
                     )
                     .bind(&body)
                     .bind(&subject)
                     .bind(&html_body)
-                    .bind(&tracking_id)
                     .bind(&provider_msg_id)
                     .execute(self.db.pool())
                     .await?;

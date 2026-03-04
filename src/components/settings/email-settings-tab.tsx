@@ -45,12 +45,6 @@ export function EmailSettingsTab() {
     const { handleError } = useErrors();
     const [loading, setLoading] = useState(false);
     const [connecting, setConnecting] = useState<"gmail" | "outlook" | null>(null);
-
-    // Tracking Config States
-    const [trackingBaseUrl, setTrackingBaseUrl] = useState("");
-    const [trackingSecret, setTrackingSecret] = useState("");
-    const [savingTracking, setSavingTracking] = useState(false);
-    const [pollingTracking, setPollingTracking] = useState(false);
     const [credentialStatus, setCredentialStatus] = useState<CredentialStatus | null>(null);
     const [setupProvider, setSetupProvider] = useState<"gmail" | "outlook" | null>(null);
     const [clientId, setClientId] = useState("");
@@ -70,17 +64,6 @@ export function EmailSettingsTab() {
         }
     };
 
-    async function fetchTrackingConfig() {
-        try {
-            const settings = await invoke<Record<string, string>>("get_settings");
-            if (settings) {
-                setTrackingBaseUrl(settings.tracking_base_url || "");
-                setTrackingSecret(settings.tracking_secret || "");
-            }
-        } catch (e) {
-            console.error("Failed to fetch tracking config:", e);
-        }
-    }
 
     const checkCredentials = async () => {
         try {
@@ -94,7 +77,6 @@ export function EmailSettingsTab() {
     useEffect(() => {
         fetchAccounts();
         checkCredentials();
-        fetchTrackingConfig();
     }, []);
 
     const handleSaveCredentials = async () => {
@@ -145,30 +127,7 @@ export function EmailSettingsTab() {
         }
     };
 
-    async function handleSaveTracking() {
-        setSavingTracking(true);
-        try {
-            await invoke("save_setting", { key: "tracking_base_url", value: trackingBaseUrl });
-            await invoke("save_setting", { key: "tracking_secret", value: trackingSecret });
-            toast.success("Tracking configuration saved");
-        } catch (e) {
-            handleError(e, "Failed to save tracking config");
-        } finally {
-            setSavingTracking(false);
-        }
-    }
 
-    async function handlePollTracking() {
-        setPollingTracking(true);
-        try {
-            const count: number = await invoke("poll_email_tracking");
-            toast.success(`Polled tracking events. Imported ${count} new events.`);
-        } catch (e) {
-            handleError(e, "Failed to poll tracking events");
-        } finally {
-            setPollingTracking(false);
-        }
-    }
 
     const handleDelete = async (id: string) => {
         try {
@@ -273,12 +232,15 @@ export function EmailSettingsTab() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-medium">Email Accounts</h3>
-                <p className="text-sm text-muted-foreground">
-                    Connect your email accounts to track conversations and schedule emails.
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-medium">Email & Tracking</h3>
+                    <p className="text-sm text-muted-foreground">
+                        Connect accounts and track engagement automatically via our secure relay.
+                    </p>
+                </div>
             </div>
+
 
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
@@ -450,73 +412,6 @@ export function EmailSettingsTab() {
                 )}
             </div>
 
-            <div className="pt-6 border-t mt-6">
-                <div>
-                    <h3 className="text-lg font-medium">Tracking Configuration</h3>
-                    <p className="text-sm text-muted-foreground pb-4">
-                        Configure your portfolio server endpoints to track email opens and link clicks.
-                    </p>
-                </div>
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-base">Portfolio Server Config</CardTitle>
-                                <CardDescription>
-                                    Enter the base URL and shared secret for your tracking endpoints.
-                                </CardDescription>
-                            </div>
-                            {trackingBaseUrl && trackingSecret && (
-                                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 shrink-0">
-                                    Configured ✓
-                                </Badge>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Base URL</Label>
-                            <Input
-                                placeholder="https://yourportfolio.com"
-                                value={trackingBaseUrl}
-                                onChange={(e) => setTrackingBaseUrl(e.target.value)}
-                            />
-                            {trackingBaseUrl && (
-                                <p className="text-xs text-muted-foreground">Currently set to: <span className="font-mono text-foreground">{trackingBaseUrl}</span></p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Shared Secret</Label>
-                            <Input
-                                type="password"
-                                placeholder="Enter your shared secret"
-                                value={trackingSecret}
-                                onChange={(e) => setTrackingSecret(e.target.value)}
-                            />
-                            {trackingSecret && (
-                                <p className="text-xs text-muted-foreground">Secret is saved ({trackingSecret.length} characters)</p>
-                            )}
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                            <Button
-                                onClick={handleSaveTracking}
-                                disabled={savingTracking}
-                            >
-                                {savingTracking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                Save Config
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={handlePollTracking}
-                                disabled={pollingTracking || !trackingBaseUrl || !trackingSecret}
-                            >
-                                {pollingTracking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                                Poll Events Now
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
 
             {/* Credential Setup Dialog */}
             <Dialog open={setupProvider !== null} onOpenChange={(open) => !open && setSetupProvider(null)}>

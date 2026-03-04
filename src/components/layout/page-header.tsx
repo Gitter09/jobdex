@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { TopCommandBar } from "./top-command-bar";
 import { cn } from "@/lib/utils";
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import { Button } from "@/components/ui/button";
 
 interface PageHeaderProps {
     title?: string;
@@ -44,8 +46,28 @@ export function PageHeader({
                 {shouldShowSearch && onSearchClick && (
                     <TopCommandBar onClick={onSearchClick} className="w-64 hidden md:flex" />
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                     {children}
+                    <div className="flex items-center gap-2">
+                        <SignedOut>
+                            <SignInButton mode="modal">
+                                <Button variant="ghost" size="sm">Sign In</Button>
+                            </SignInButton>
+                            <SignUpButton mode="modal">
+                                <Button size="sm">Sign Up</Button>
+                            </SignUpButton>
+                        </SignedOut>
+                        <SignedIn>
+                            <UserButton
+                                afterSignOutUrl="/"
+                                appearance={{
+                                    elements: {
+                                        userButtonAvatarBox: "h-8 w-8"
+                                    }
+                                }}
+                            />
+                        </SignedIn>
+                    </div>
                 </div>
             </div>
         </header>

@@ -122,7 +122,7 @@ export function KanbanBoard({ contacts, statuses, onContactMove, onContactClick,
                     <KanbanColumn
                         key={status.id}
                         status={status}
-                        contacts={contacts.filter(c => (c.status_id || "stat-new") === status.id)}
+                        contacts={contacts.filter(c => c.status_id === status.id)}
                         onCardClick={onContactClick}
                         onAddContact={onAddContact}
                         onEdit={onEditStatus}

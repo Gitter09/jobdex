@@ -29,6 +29,7 @@ import { Mail, Send, Loader2, Calendar as CalendarIcon } from "lucide-react";
 import { Contact } from "@/types/crm";
 import { format } from "date-fns";
 
+
 interface ComposeEmailDialogProps {
     contact: Contact | null;
     open: boolean;
@@ -101,6 +102,8 @@ export function ComposeEmailDialog({
             setTo(contact.email);
         }
     }, [contact]);
+
+
 
     const handleSend = async () => {
         if (!selectedAccount) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { Contact } from "@/types/crm";
+import { useErrors } from "@/hooks/use-errors";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mail, Calendar, MapPin, Building, Loader2, Sparkles, Briefcase, Copy, RotateCw, MoreHorizontal, Send, Check, Pencil, Trash2, Tag as TagIcon, Plus, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,17 +60,17 @@ export function ContactDetailPage() {
     // const { statuses } = useStatuses(); // Not used for progress bar anymore
 
     const { tags: availableTags, assignTag, unassignTag } = useTags();
+    const { handleError } = useErrors();
 
     // Fetch Contact
     const fetchContact = async () => {
         if (!id) return;
         try {
-            // TODO: Add get_contact_by_id command for performance later
-            const contacts = await invoke<Contact[]>("get_contacts");
-            const found = contacts.find(c => c.id === id);
-            setContact(found || null);
+            // ContactWithTags uses #[serde(flatten)], so all Contact fields + tags are at root
+            const result = await invoke<Contact & { tags: Contact['tags'] }>("get_contact_by_id", { id });
+            setContact(result);
         } catch (err) {
-            console.error("Failed to fetch contact:", err);
+            handleError(err, "Failed to load contact");
         } finally {
             setLoading(false);
         }
@@ -91,7 +92,7 @@ export function ContactDetailPage() {
             await fetchContact();
             setIsSummaryEditOpen(false);
         } catch (error) {
-            console.error("Failed to save summary:", error);
+            handleError(error, "Failed to save summary");
         }
     };
 

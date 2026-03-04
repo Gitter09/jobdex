@@ -3,12 +3,8 @@ use tauri::Manager;
 
 mod error;
 use error::AppError;
-// use std::fs; removed
 
-// Extracts first and last name from page title or LinkedIn URL slug
-// extract_names_from_title_or_url function removed as it's never used
-
-fn extract_linkedin_slug(url: &str) -> Option<&str> {
+pub fn extract_linkedin_slug(url: &str) -> Option<&str> {
     // Match /in/username or /pub/username patterns
     url.split("/in/")
         .nth(1)
@@ -16,8 +12,6 @@ fn extract_linkedin_slug(url: &str) -> Option<&str> {
         .map(|s| s.split('/').next().unwrap_or(s))
         .map(|s| s.split('?').next().unwrap_or(s))
 }
-
-// capitalise function removed as it's never used
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -100,6 +94,46 @@ async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, 
         .collect();
 
     Ok(result)
+}
+
+#[tauri::command]
+async fn get_contact_by_id(
+    db: tauri::State<'_, Db>,
+    id: String,
+) -> Result<ContactWithTags, AppError> {
+    let pool = db.pool();
+
+    let contact = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
+        r#"
+        SELECT 
+            c.*, 
+            s.label as status_label, 
+            s.color as status_color 
+        FROM contacts c 
+        LEFT JOIN statuses s ON c.status_id = s.id
+        WHERE c.id = ?
+        "#,
+    )
+    .bind(&id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e: sqlx::Error| e.to_string())?
+    .ok_or_else(|| AppError::Validation(format!("Contact '{}' not found", id)))?;
+
+    let tags = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Tag>(
+        r#"
+        SELECT t.*
+        FROM tags t
+        JOIN contact_tags ct ON t.id = ct.tag_id
+        WHERE ct.contact_id = ?
+        "#,
+    )
+    .bind(&id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e: sqlx::Error| e.to_string())?;
+
+    Ok(ContactWithTags { contact, tags })
 }
 
 #[tauri::command]
@@ -252,6 +286,7 @@ async fn add_contact(db: tauri::State<'_, Db>, args: AddContactArgs) -> Result<S
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateContactArgs {
     pub id: String,
     pub first_name: Option<String>,
@@ -273,6 +308,20 @@ pub struct UpdateContactArgs {
 #[tauri::command]
 async fn update_contact(db: tauri::State<'_, Db>, args: UpdateContactArgs) -> Result<(), AppError> {
     let pool = db.pool();
+
+    // If status_id is provided, look up the label to keep legacy 'status' field in sync
+    let mut resolved_status_label = args.status;
+    if let Some(ref sid) = args.status_id {
+        if let Some(label) =
+            sqlx::query_scalar::<_, String>("SELECT label FROM statuses WHERE id = ?")
+                .bind(sid)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e: sqlx::Error| e.to_string())?
+        {
+            resolved_status_label = Some(label);
+        }
+    }
 
     sqlx::query(
         r#"
@@ -299,7 +348,7 @@ async fn update_contact(db: tauri::State<'_, Db>, args: UpdateContactArgs) -> Re
     .bind(args.last_name)
     .bind(args.email)
     .bind(args.linkedin_url)
-    .bind(args.status)
+    .bind(resolved_status_label)
     .bind(args.status_id)
     .bind(args.last_contacted_date)
     .bind(args.next_contact_date)
@@ -377,11 +426,10 @@ pub fn run() {
             check_email_credentials,
             save_email_credentials,
             fix_orphan_contacts,
+            get_contact_by_id,
             sync_email_accounts,
             sync_email_account,
             reset_email_sync_state,
-            poll_email_tracking,
-            get_email_tracking,
             set_lock_pin,
             verify_lock_pin,
             has_lock_pin,
@@ -691,45 +739,6 @@ async fn reset_email_sync_state(
 }
 
 #[tauri::command]
-async fn poll_email_tracking(db: tauri::State<'_, Db>) -> Result<usize, AppError> {
-    outreach_core::tracking::poll_tracking_events(db.inner())
-        .await
-        .map_err(|e| e.to_string().into())
-}
-
-#[derive(serde::Serialize)]
-pub struct TrackingEventResponse {
-    pub event_type: String,
-    pub occurred_at: String,
-    pub link_url: Option<String>,
-}
-
-#[tauri::command]
-async fn get_email_tracking(
-    db: tauri::State<'_, Db>,
-    message_id: String,
-) -> Result<Vec<TrackingEventResponse>, AppError> {
-    let rows: Vec<(String, chrono::DateTime<chrono::Utc>, Option<String>)> = sqlx::query_as(
-        "SELECT event_type, occurred_at, link_url FROM email_tracking WHERE message_id = ? ORDER BY occurred_at DESC"
-    )
-    .bind(&message_id)
-    .fetch_all(db.pool())
-    .await
-    .map_err(|e| e.to_string())?;
-
-    Ok(rows
-        .into_iter()
-        .map(
-            |(event_type, occurred_at, link_url)| TrackingEventResponse {
-                event_type,
-                occurred_at: occurred_at.to_rfc3339(),
-                link_url,
-            },
-        )
-        .collect())
-}
-
-#[tauri::command]
 async fn save_api_key(
     db: tauri::State<'_, Db>,
     service: String,
@@ -811,8 +820,8 @@ async fn save_setting(
     value: String,
 ) -> Result<(), AppError> {
     // Intercept sensitive keys and store them in OS keychain
-    if key == "tracking_secret" {
-        outreach_core::crypto::store_secret("tracking_secret", &value)
+    if key == "outlook_client_id" {
+        outreach_core::crypto::store_secret("outlook_client_id", &value)
             .map_err(|e| AppError::Internal(e.to_string()))?;
         return Ok(());
     }
