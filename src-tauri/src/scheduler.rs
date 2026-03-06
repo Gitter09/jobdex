@@ -32,6 +32,7 @@ pub fn start_email_scheduler(app_handle: AppHandle, db: Db) {
 
             if let Err(e) = check_and_send_scheduled_emails(&app_handle, &db, &email_service).await
             {
+                #[cfg(debug_assertions)]
                 eprintln!("Error in scheduled email loop: {}", e);
             }
         }
@@ -73,10 +74,12 @@ async fn check_and_send_scheduled_emails(
         })
         .collect();
 
+    #[cfg(debug_assertions)]
     if pending_emails.is_empty() {
         return Ok(());
     }
 
+    #[cfg(debug_assertions)]
     println!(
         "Found {} scheduled emails ready to send",
         pending_emails.len()
@@ -86,6 +89,7 @@ async fn check_and_send_scheduled_emails(
         let to_email = match email.to_email {
             Some(e) if !e.trim().is_empty() => e,
             _ => {
+                #[cfg(debug_assertions)]
                 eprintln!(
                     "Skipping scheduled email {} because contact has no email",
                     email.schedule_id
@@ -106,6 +110,7 @@ async fn check_and_send_scheduled_emails(
         {
             Ok(_message_id) => {
                 // 3. Mark as sent
+                #[cfg(debug_assertions)]
                 println!("Successfully sent scheduled email {}", email.schedule_id);
                 let _ = sqlx::query("UPDATE scheduled_emails SET status = 'sent' WHERE id = ?")
                     .bind(&email.schedule_id)
@@ -116,6 +121,7 @@ async fn check_and_send_scheduled_emails(
                 // 4. Handle failure
                 // We leave it as 'pending' so it can retry later, but emit an event to notify the user.
                 let error_msg = e.to_string();
+                #[cfg(debug_assertions)]
                 eprintln!(
                     "Failed to send scheduled email {}: {}",
                     email.schedule_id, error_msg

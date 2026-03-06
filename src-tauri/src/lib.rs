@@ -372,6 +372,14 @@ pub fn run() {
     dotenvy::from_filename(".env.local").ok();
     dotenvy::from_filename("../.env.local").ok();
 
+    // Also try to find it in the current directory or parent directories
+    if let Ok(cwd) = std::env::current_dir() {
+        let _ = dotenvy::from_path(cwd.join(".env.local"));
+        if let Some(parent) = cwd.parent() {
+            let _ = dotenvy::from_path(parent.join(".env.local"));
+        }
+    }
+
     let clerk_key = std::env::var("VITE_CLERK_PUBLISHABLE_KEY")
         .or_else(|_| std::env::var("CLERK_PUBLISHABLE_KEY"))
         .unwrap_or_else(|_| {
@@ -380,6 +388,7 @@ pub fn run() {
                 .to_string()
         });
 
+    #[cfg(debug_assertions)]
     println!(
         "[Clerk] Initializing with key: {}...",
         if clerk_key.is_empty() {
@@ -388,6 +397,15 @@ pub fn run() {
             &clerk_key[..10]
         }
     );
+
+    if clerk_key.is_empty() {
+        eprintln!(
+            "[OutreachOS] FATAL: Clerk publishable key is missing.\n\
+             Ensure VITE_CLERK_PUBLISHABLE_KEY is set in .env.local and rebuild the app.\n\
+             The key must be available at compile time for production builds."
+        );
+        std::process::exit(1);
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -402,22 +420,26 @@ pub fn run() {
         )
         .setup(|app| {
             let app_handle = app.handle();
+            #[cfg(debug_assertions)]
             println!("[Boot] Starting OutreachOS production diagnostics...");
 
             let app_dir = app_handle
                 .path()
                 .app_data_dir()
                 .map_err(|e| {
+                    #[cfg(debug_assertions)]
                     eprintln!("[Boot Error] Failed to get app data dir: {}", e);
                     e
                 })
                 .expect("failed to get app data dir");
 
+            #[cfg(debug_assertions)]
             println!("[Boot] App Data Dir: {:?}", app_dir);
 
             // Ensure directory exists
             std::fs::create_dir_all(&app_dir)
                 .map_err(|e| {
+                    #[cfg(debug_assertions)]
                     eprintln!("[Boot Error] Failed to create app data dir: {}", e);
                     e
                 })
@@ -425,24 +447,30 @@ pub fn run() {
 
             let db_path = app_dir.join("outreach.db");
             let db_path_str = db_path.to_str().expect("invalid path");
+            #[cfg(debug_assertions)]
             println!("[Boot] Database Path: {}", db_path_str);
 
             let db = tauri::async_runtime::block_on(async {
+                #[cfg(debug_assertions)]
                 println!("[Boot] Initializing Core Database...");
                 let result = Db::new(db_path_str)
                     .await
                     .map_err(|e| {
+                        #[cfg(debug_assertions)]
                         eprintln!("[Boot Error] Database initialization failed: {:?}", e);
                         e
                     })
                     .expect("failed to init core");
+                #[cfg(debug_assertions)]
                 println!("[Boot] Core Database Initialized.");
                 result
             });
 
+            #[cfg(debug_assertions)]
             println!("[Boot] Starting Email Scheduler...");
             scheduler::start_email_scheduler(app_handle.clone(), db.clone());
 
+            #[cfg(debug_assertions)]
             println!("[Boot] Setup complete, managing state.");
             app.manage(db);
             Ok(())
