@@ -18,8 +18,14 @@ const GOOGLE_SCOPES: &[&str] = &[
 
 // Centralized OAuth Defaults
 // To be replaced with actual Client ID/Secret from Google Cloud Console
-const DEFAULT_GMAIL_CLIENT_ID: &str = "PLACEHOLDER_GMAIL_CLIENT_ID";
-const DEFAULT_GMAIL_CLIENT_SECRET: &str = "PLACEHOLDER_GMAIL_CLIENT_SECRET";
+const DEFAULT_GMAIL_CLIENT_ID: &str = match option_env!("GMAIL_CLIENT_ID") {
+    Some(id) => id,
+    None => "PLACEHOLDER_GMAIL_CLIENT_ID",
+};
+const DEFAULT_GMAIL_CLIENT_SECRET: &str = match option_env!("GMAIL_CLIENT_SECRET") {
+    Some(secret) => secret,
+    None => "PLACEHOLDER_GMAIL_CLIENT_SECRET",
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OAuthTokenResponse {
@@ -119,17 +125,25 @@ impl GmailClient {
             if let Some((code, state)) = extract_code_and_state_from_request(&request_line) {
                 // Validate CSRF state token
                 if state != *expected_csrf.secret() {
-                    let response = "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\n\r\n\
-                        <html><body><h1>✗ CSRF validation failed</h1>\
-                        <p>The OAuth callback state does not match. Please try again.</p></body></html>";
+                    let html = crate::oauth_html::get_error_html(
+                        "The OAuth callback state does not match. Please try again.",
+                    );
+                    let response = format!(
+                        "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
+                        html.len(),
+                        html
+                    );
                     stream.write_all(response.as_bytes())?;
                     return Err(anyhow!("OAuth CSRF token mismatch — possible attack"));
                 }
 
                 // Send success response
-                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
-                        <html><body><h1>✓ Authorization Successful!</h1>\
-                        <p>You can close this window and return to OutreachOS.</p></body></html>";
+                let html = crate::oauth_html::get_success_html("Google");
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
+                    html.len(),
+                    html
+                );
                 stream.write_all(response.as_bytes())?;
 
                 return Ok(code);

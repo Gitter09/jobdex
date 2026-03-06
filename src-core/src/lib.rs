@@ -3,6 +3,7 @@ pub mod db;
 pub mod email_service;
 pub mod gmail;
 pub mod import;
+pub mod oauth_html;
 pub mod outlook;
 pub mod settings;
 

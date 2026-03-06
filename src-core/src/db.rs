@@ -245,4 +245,14 @@ pub mod models {
         pub error_message: Option<String>,
         pub created_at: DateTime<Utc>,
     }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    pub struct EmailTemplate {
+        pub id: String,
+        pub name: String,
+        pub subject: Option<String>,
+        pub body: Option<String>,
+        pub created_at: DateTime<Utc>,
+        pub updated_at: DateTime<Utc>,
+    }
 }

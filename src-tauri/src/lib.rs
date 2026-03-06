@@ -518,7 +518,11 @@ pub fn run() {
             set_lock_pin,
             verify_lock_pin,
             has_lock_pin,
-            remove_lock_pin
+            has_lock_pin,
+            remove_lock_pin,
+            get_email_templates,
+            upsert_email_template,
+            delete_email_template
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1287,6 +1291,63 @@ async fn unassign_tag(
     sqlx::query("DELETE FROM contact_tags WHERE contact_id = ? AND tag_id = ?")
         .bind(contact_id)
         .bind(tag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+// ===== Email Template Commands =====
+
+#[tauri::command]
+async fn get_email_templates(
+    db: tauri::State<'_, Db>,
+) -> Result<Vec<outreach_core::models::EmailTemplate>, AppError> {
+    let pool = db.pool();
+    let templates = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::EmailTemplate>(
+        "SELECT id, name, subject, body, created_at, updated_at FROM email_templates ORDER BY name ASC",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(templates)
+}
+
+#[tauri::command]
+async fn upsert_email_template(
+    db: tauri::State<'_, Db>,
+    id: Option<String>,
+    name: String,
+    subject: Option<String>,
+    body: Option<String>,
+) -> Result<String, AppError> {
+    let pool = db.pool();
+    let template_id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+    sqlx::query(
+        r#"
+        INSERT INTO email_templates (id, name, subject, body, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET 
+            name = excluded.name,
+            subject = excluded.subject,
+            body = excluded.body,
+            updated_at = CURRENT_TIMESTAMP
+        "#,
+    )
+    .bind(&template_id)
+    .bind(name)
+    .bind(subject)
+    .bind(body)
+    .execute(pool)
+    .await?;
+
+    Ok(template_id)
+}
+
+#[tauri::command]
+async fn delete_email_template(db: tauri::State<'_, Db>, id: String) -> Result<(), AppError> {
+    let pool = db.pool();
+    sqlx::query("DELETE FROM email_templates WHERE id = ?")
+        .bind(id)
         .execute(pool)
         .await?;
     Ok(())

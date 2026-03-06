@@ -25,8 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Mail, Send, Loader2, Calendar as CalendarIcon } from "lucide-react";
-import { Contact } from "@/types/crm";
+import { Mail, Send, Loader2, Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Contact, EmailTemplate } from "@/types/crm";
 import { format } from "date-fns";
 
 
@@ -41,24 +41,6 @@ interface EmailAccount {
     email: string;
     provider: string;
 }
-
-const TEMPLATES = [
-    {
-        name: "VC Intro",
-        subject: "Quick intro - [Your Background]",
-        body: `Hi {{first_name}},\n\nI came across your profile and was impressed by [specific observation].\n\nI'm reaching out because [brief value prop]. I'd love to learn more about [their work/company].\n\nWould you be open to a brief call next week?\n\nBest,\n[Your Name]`,
-    },
-    {
-        name: "Job Application",
-        subject: "Application - [Position] at [Company]",
-        body: `Hi {{first_name}},\n\nI'm excited to apply for the [Position] role at [Company].\n\nMy background in [relevant experience] aligns well with what you're looking for. [Specific achievement].\n\nI've attached my resume for your review. I'd welcome the opportunity to discuss how I can contribute to your team.\n\nBest regards,\n[Your Name]`,
-    },
-    {
-        name: "Follow Up",
-        subject: "Following up on our conversation",
-        body: `Hi {{first_name}},\n\nI wanted to follow up on [previous context].\n\n[Additional value/question].\n\nLooking forward to hearing from you.\n\nBest,\n[Your Name]`,
-    },
-];
 
 export function ComposeEmailDialog({
     contact,
@@ -75,24 +57,32 @@ export function ComposeEmailDialog({
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>("");
 
+    // Templates
+    const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+
     const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
     const [isScheduling, setIsScheduling] = useState(false);
 
 
     useEffect(() => {
-        const fetchAccounts = async () => {
+        const fetchData = async () => {
             try {
-                const accts = await invoke<EmailAccount[]>("get_email_accounts");
+                const [accts, tpl] = await Promise.all([
+                    invoke<EmailAccount[]>("get_email_accounts"),
+                    invoke<EmailTemplate[]>("get_email_templates")
+                ]);
+
                 setAccounts(accts);
                 if (accts.length > 0 && !selectedAccount) {
                     setSelectedAccount(accts[0].id);
                 }
+                setTemplates(tpl);
             } catch (err) {
-                console.error("Failed to fetch accounts:", err);
+                console.error("Failed to fetch data:", err);
             }
         };
         if (open) {
-            fetchAccounts();
+            fetchData();
         }
     }, [open]);
 
@@ -153,10 +143,29 @@ export function ComposeEmailDialog({
         }
     };
 
-    const applyTemplate = (template: typeof TEMPLATES[0]) => {
-        const firstName = contact?.first_name || "there";
-        setSubject(template.subject);
-        setBody(template.body.replace(/\{\{first_name\}\}/g, firstName));
+    const applyTemplate = (template: EmailTemplate) => {
+        if (!contact) return;
+
+        const variables: Record<string, string> = {
+            "first_name": contact.first_name || "",
+            "last_name": contact.last_name || "",
+            "company": contact.company || "",
+            "title": contact.title || "",
+            "location": contact.location || "",
+        };
+
+        let newSubject = template.subject || "";
+        let newBody = template.body || "";
+
+        Object.entries(variables).forEach(([key, value]) => {
+            const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+            newSubject = newSubject.replace(regex, value);
+            newBody = newBody.replace(regex, value);
+        });
+
+        setSubject(newSubject);
+        setBody(newBody);
+        toast.info(`Applied template: ${template.name}`);
     };
 
     return (
@@ -207,6 +216,36 @@ export function ComposeEmailDialog({
                             />
                         </div>
 
+                        <div className="grid grid-cols-4 gap-4 items-center">
+                            <Label className="text-right">Template</Label>
+                            <div className="col-span-3">
+                                <Select onValueChange={(id) => {
+                                    const tpl = templates.find(t => t.id === id);
+                                    if (tpl) applyTemplate(tpl);
+                                }}>
+                                    <SelectTrigger>
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                            <SelectValue placeholder="Select a template..." />
+                                        </div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {templates.length === 0 ? (
+                                            <div className="p-2 text-sm text-muted-foreground text-center">
+                                                No templates created yet
+                                            </div>
+                                        ) : (
+                                            templates.map(tpl => (
+                                                <SelectItem key={tpl.id} value={tpl.id}>
+                                                    {tpl.name}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-4 gap-4 items-start">
                             <Label htmlFor="subject" className="text-right pt-2">Subject</Label>
                             <div className="col-span-3">
@@ -220,16 +259,7 @@ export function ComposeEmailDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <Label>Message Body</Label>
-                                <div className="flex gap-2">
-                                    {TEMPLATES.map(t => (
-                                        <Button key={t.name} variant="ghost" size="xs" onClick={() => applyTemplate(t)}>
-                                            {t.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
+                            <Label>Message Body</Label>
                             <Textarea
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
