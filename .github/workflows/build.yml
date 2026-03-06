@@ -89,7 +89,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          mkdir dist
+          mkdir -p dist
           cp target/release/bundle/nsis/*.exe dist/
 
       - name: Upload Artifacts (Windows)

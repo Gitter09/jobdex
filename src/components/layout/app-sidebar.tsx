@@ -5,8 +5,6 @@ import {
     LayoutDashboard,
     Users,
     Mail,
-    StickyNote,
-    CheckSquare,
     FileText,
     Settings,
     Shield,
@@ -35,9 +33,6 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Contacts", icon: Users, path: "/contacts" },
-    { label: "Emails", icon: Mail, path: "/emails" },
-    { label: "Notes", icon: StickyNote, path: "/notes" },
-    { label: "Tasks", icon: CheckSquare, path: "/tasks" },
     { label: "Templates", icon: FileText, path: "/templates" },
 ];
 
