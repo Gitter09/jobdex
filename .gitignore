@@ -50,7 +50,6 @@ release_notes/
 .playwright-mcp
 
 # AI IDE artifacts — never commit these
-skills-lock.json
 .antigravity/
 .cursor/
 .windsurf/

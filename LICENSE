@@ -1,21 +1,121 @@
-MIT License
+Copyright (c) 2026 OutreachOS. All Rights Reserved.
 
-Copyright (c) 2026 Gitter09
+OUTREACHOS PROPRIETARY LICENSE
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software and all associated source code, documentation, assets, and related
+materials (collectively, the "Software") are the exclusive property of the copyright
+holder. By accessing, downloading, cloning, or otherwise obtaining a copy of this
+Software, you agree to be bound by the terms of this license.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+────────────────────────────────────────────────────────────────────────────────
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. GRANT OF LICENSE
+
+   No license, express or implied, is granted to any person or entity under this
+   agreement except as explicitly stated herein.
+
+   Subject to the terms and conditions of this license, the copyright holder grants
+   you a limited, non-exclusive, non-transferable, non-sublicensable, revocable
+   right to:
+
+   (a) View and read the source code solely for personal, non-commercial,
+       educational reference purposes; and
+
+   (b) Fork or clone the repository solely for the purpose of submitting
+       contributions back to the original project via pull request, subject to
+       Section 4 (Contributions).
+
+2. RESTRICTIONS
+
+   Unless you have received prior written permission from the copyright holder,
+   you may NOT:
+
+   (a) Use the Software, in whole or in part, for any commercial purpose,
+       including but not limited to: selling, licensing, sublicensing, renting,
+       leasing, or otherwise monetizing the Software or any derivative thereof;
+
+   (b) Distribute, publish, or otherwise make the Software available to any
+       third party in source or compiled form;
+
+   (c) Modify, adapt, translate, reverse engineer, decompile, disassemble, or
+       create derivative works based on the Software;
+
+   (d) Remove, alter, or obscure any proprietary notices, labels, or markings
+       contained in or on the Software;
+
+   (e) Use the Software's name, branding, or associated trademarks to endorse
+       or promote any product or service without prior written consent;
+
+   (f) Host, deploy, or operate the Software or any portion thereof as a
+       service for third parties (including as SaaS, PaaS, or any hosted
+       offering); or
+
+   (g) Use the Software in any manner that violates applicable law or
+       regulation.
+
+3. OWNERSHIP
+
+   The copyright holder retains all right, title, and interest in and to the
+   Software, including all intellectual property rights therein. Nothing in this
+   license transfers or conveys any ownership rights to you.
+
+4. CONTRIBUTIONS
+
+   Any contribution (including pull requests, patches, suggestions, or feedback)
+   you submit to this project is made voluntarily and shall be deemed assigned to
+   the copyright holder in its entirety. By submitting a contribution, you:
+
+   (a) Represent that you are the original author of the contribution and have
+       the right to grant such assignment; and
+
+   (b) Irrevocably assign all right, title, and interest in the contribution —
+       including all intellectual property rights — to the copyright holder,
+       without any obligation of compensation, attribution, or acknowledgment.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. THE COPYRIGHT
+   HOLDER DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, UNINTERRUPTED,
+   OR FREE OF HARMFUL COMPONENTS.
+
+6. LIMITATION OF LIABILITY
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+   EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING BUT NOT LIMITED TO LOSS OF
+   DATA, LOSS OF PROFITS, BUSINESS INTERRUPTION, OR PROCUREMENT OF SUBSTITUTE
+   GOODS OR SERVICES) ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THIS
+   LICENSE, HOWEVER CAUSED AND ON WHATEVER THEORY OF LIABILITY, WHETHER IN
+   CONTRACT, STRICT LIABILITY, OR TORT, EVEN IF ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGES.
+
+7. TERMINATION
+
+   This license is effective until terminated. Any breach of its terms will
+   automatically and immediately terminate your rights under this license without
+   notice. Upon termination, you must destroy all copies of the Software in your
+   possession or control. Sections 3, 5, 6, and 8 shall survive termination.
+
+8. GOVERNING LAW
+
+   This license shall be governed by and construed in accordance with the laws of
+   the jurisdiction in which the copyright holder is domiciled, without regard to
+   its conflict of law provisions. Any dispute arising under this license shall be
+   subject to the exclusive jurisdiction of the courts of that jurisdiction.
+
+9. ENTIRE AGREEMENT
+
+   This license constitutes the entire agreement between you and the copyright
+   holder with respect to the Software and supersedes all prior or contemporaneous
+   understandings, agreements, representations, and warranties, whether written or
+   oral, regarding the Software.
+
+────────────────────────────────────────────────────────────────────────────────
+
+For licensing inquiries, commercial use requests, or permissions beyond the scope
+of this license, contact the copyright holder directly via the repository listed
+at: https://github.com/Gitter09/outreach-os
+
+ALL RIGHTS RESERVED.
