@@ -4,7 +4,7 @@
 ════════════════════════════════════════════════════ */
 
 /* ── FONTS ── */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,800&family=Epilogue:wght@300;400;500;600&display=swap');
 
 /* ── TOKENS ── */
 :root {
@@ -49,7 +49,7 @@ html {
 body {
   background: var(--bg-void);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Epilogue', sans-serif;
   font-size: 16px;
   line-height: 1.6;
   overflow-x: hidden;
@@ -102,29 +102,32 @@ img {
 
 .s-label {
   display: inline-block;
-  font-size: 11px;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 14px;
 }
 
 h2 {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-size: clamp(34px, 3.8vw, 52px);
   font-weight: 800;
-  letter-spacing: -0.038em;
-  line-height: 1.08;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-style: italic;
   color: var(--text);
   margin-bottom: 18px;
 }
 
 .section-intro {
-  font-size: 17px;
-  color: var(--text-2);
+  font-family: 'Epilogue', sans-serif;
   font-weight: 300;
-  line-height: 1.72;
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text-2);
   max-width: 480px;
 }
 
@@ -134,9 +137,10 @@ h2 {
   gap: 8px;
   padding: 11px 22px;
   border-radius: var(--r-sm);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Epilogue', sans-serif;
   font-weight: 500;
-  font-size: 14.5px;
+  font-size: 14px;
+  letter-spacing: 0.01em;
   transition: all .22s ease;
   white-space: nowrap;
 }
@@ -242,18 +246,19 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 700;
   font-size: 14px;
   color: #021a0a;
   box-shadow: 0 0 16px var(--a-glow);
 }
 
 .nav-logo-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 15.5px;
-  letter-spacing: -0.02em
+  font-style: italic;
+  font-size: 16px;
+  letter-spacing: -0.01em
 }
 
 .nav-links {
@@ -406,7 +411,7 @@ h2 {
   position: relative;
   z-index: 2;
   text-align: center;
-  max-width: 720px;
+  max-width: 900px;
   padding: 0 24px;
   margin-bottom: 52px;
 }
@@ -420,10 +425,11 @@ h2 {
   margin-bottom: 32px;
   border: 1px solid rgba(34, 197, 94, 0.22);
   background: rgba(34, 197, 94, 0.07);
-  font-size: 12px;
+  font-family: 'Epilogue', sans-serif;
+  font-size: 11.5px;
   font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--accent);
-  letter-spacing: .03em;
 }
 
 .badge-dot {
@@ -448,12 +454,16 @@ h2 {
 }
 
 #hero h1 {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(52px, 8.5vw, 96px);
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(56px, 8vw, 100px);
   font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 1.02;
+  letter-spacing: -0.02em;
+  line-height: 1.0;
+  font-style: italic;
   margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .h1-line1 {
@@ -461,6 +471,15 @@ h2 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
+}
+
+.h1-line-sub {
+  white-space: nowrap;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
 }
 
 .h1-line2 {
@@ -468,13 +487,23 @@ h2 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  display: inline-block;
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1), filter 0.45s ease;
+  cursor: default;
+  font-weight: 800;
+}
+
+.h1-line2:hover {
+  transform: translateY(-5px) scale(1.03);
+  filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.45));
 }
 
 .hero-sub {
-  font-size: 18px;
+  font-family: 'Epilogue', sans-serif;
   font-weight: 300;
+  font-size: 17px;
+  line-height: 1.75;
   color: var(--text-2);
-  line-height: 1.72;
   max-width: 480px;
   margin: 0 auto 40px;
 }
@@ -513,14 +542,14 @@ h2 {
 }
 
 .tab-btn {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Epilogue', sans-serif;
   font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--text-3);
   padding: 8px 20px;
   border-radius: 9px 9px 0 0;
   transition: color .2s, background .2s;
-  letter-spacing: 0.01em;
 }
 
 .tab-btn:hover {
@@ -657,9 +686,10 @@ h2 {
 }
 
 .mock-title {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-style: italic;
   font-size: 13.5px;
-  font-weight: 700
 }
 
 .mock-search {
@@ -1005,16 +1035,17 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-size: 14px;
   font-weight: 700;
   color: var(--accent);
 }
 
 .intel-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-style: italic;
   font-size: 15px;
-  font-weight: 700
 }
 
 .intel-role {
@@ -1217,10 +1248,11 @@ h2 {
 }
 
 .feat-header-right {
-  font-size: 16px;
-  color: var(--text-2);
+  font-family: 'Epilogue', sans-serif;
   font-weight: 300;
-  line-height: 1.72;
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--text-2);
   padding-bottom: 6px;
 }
 
@@ -1243,9 +1275,10 @@ h2 {
 }
 
 .feat-tag {
+  font-family: 'Epilogue', sans-serif;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: .14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 14px;
@@ -1263,20 +1296,22 @@ h2 {
 }
 
 .feat-text h3 {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(26px, 3vw, 38px);
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 3vw, 40px);
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   line-height: 1.1;
+  font-style: italic;
   margin-bottom: 16px;
   color: var(--text);
 }
 
 .feat-desc {
-  font-size: 16px;
-  color: var(--text-2);
+  font-family: 'Epilogue', sans-serif;
   font-weight: 300;
+  font-size: 17px;
   line-height: 1.75;
+  color: var(--text-2);
   margin-bottom: 28px
 }
 
@@ -1377,16 +1412,17 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-size: 12px;
   font-weight: 700;
   color: var(--accent);
 }
 
 .fd-nm {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-style: italic;
   font-size: 13px;
-  font-weight: 700
 }
 
 .fd-rl {
@@ -1687,18 +1723,20 @@ h2 {
 }
 
 .fg-item h4 {
-  font-family: 'Syne', sans-serif;
-  font-size: 17px;
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  font-style: italic;
   margin-bottom: 8px;
 }
 
 .fg-item p {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 300;
+  line-height: 1.7;
   font-size: 13.5px;
   color: var(--text-2);
-  font-weight: 300;
-  line-height: 1.65
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1735,12 +1773,13 @@ h2 {
 }
 
 .privacy-inner p {
+  font-family: 'Epilogue', sans-serif;
   font-size: 18px;
-  color: var(--text-2);
   font-weight: 300;
+  line-height: 1.75;
+  color: var(--text-2);
   max-width: 500px;
   margin: 0 auto 40px;
-  line-height: 1.72;
 }
 
 .privacy-chips {
@@ -1823,11 +1862,12 @@ h2 {
 }
 
 .price-num {
-  font-family: 'Syne', sans-serif;
-  font-size: 60px;
+  font-family: 'Playfair Display', serif;
+  font-size: 64px;
   font-weight: 800;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.03em;
   line-height: 1;
+  font-style: normal;
   margin-bottom: 6px;
 }
 
@@ -1847,11 +1887,12 @@ h2 {
 }
 
 .p-desc {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 300;
+  line-height: 1.7;
   font-size: 13.5px;
   color: var(--text-2);
   margin-bottom: 32px;
-  font-weight: 300;
-  line-height: 1.6
 }
 
 .p-features {
@@ -1862,12 +1903,14 @@ h2 {
 }
 
 .p-feat {
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 300;
+  line-height: 1.7;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   font-size: 14px;
   color: var(--text-2);
-  font-weight: 300;
 }
 
 .p-feat::before {
@@ -1990,17 +2033,18 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: 11px;
+  font-family: 'Epilogue', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
   color: #021a0a;
 }
 
 .footer-logo-name {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-weight: 700;
-  font-size: 14px;
-  letter-spacing: -0.02em
+  font-style: italic;
+  font-size: 16px;
+  letter-spacing: -0.01em
 }
 
 .footer-copy {
