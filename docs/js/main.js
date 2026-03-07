@@ -11,7 +11,7 @@
   onScroll();
 
   /* ── HERO INTERACTIVE TABS ── */
-  const tabBtns  = document.querySelectorAll('.tab-btn');
+  const tabBtns = document.querySelectorAll('.tab-btn');
   const tabPanes = document.querySelectorAll('.tab-pane');
 
   function switchTab(id) {
@@ -20,7 +20,7 @@
     });
 
     const current = document.querySelector('.tab-pane.active');
-    const next    = document.getElementById('pane-' + id);
+    const next = document.getElementById('pane-' + id);
     if (!next || current === next) return;
 
     current.style.opacity = '0';
@@ -79,21 +79,6 @@
 
   revealEls.forEach(el => observer.observe(el));
 
-  /* ── SUBTLE PARALLAX on feat visuals ── */
-  const featVisuals = document.querySelectorAll('.feat-visual');
-  if (window.matchMedia('(min-width: 900px)').matches) {
-    window.addEventListener('scroll', () => {
-      const sy = window.scrollY;
-      featVisuals.forEach((v, i) => {
-        const rect   = v.getBoundingClientRect();
-        const centre = rect.top + rect.height / 2;
-        const vp     = window.innerHeight / 2;
-        const dist   = (centre - vp) / window.innerHeight;
-        const dir    = i % 2 === 0 ? 1 : -1;
-        v.style.transform = `translateY(${dist * 28 * dir}px)`;
-      });
-    }, { passive: true });
-  }
 
   /* ── AUTO cycle tabs every 4s if user hasn't interacted ── */
   const tabOrder = ['contacts', 'pipeline', 'outreach', 'intel'];
