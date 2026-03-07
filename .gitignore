@@ -48,3 +48,12 @@ release_notes/
 .agents
 .claude
 .playwright-mcp
+
+# AI IDE artifacts — never commit these
+skills-lock.json
+.antigravity/
+.cursor/
+.windsurf/
+
+# Lock files — Bun only, not npm
+package-lock.json
