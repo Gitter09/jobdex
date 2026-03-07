@@ -344,67 +344,6 @@ h2 {
   z-index: 1;
   width: 1.5px;
   height: 1.5px;
-  background: #fff;
-  border-radius: 50%;
-  opacity: 0;
-}
-
-.sstar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 100%;
-  height: 1px;
-  width: 80px;
-  background: linear-gradient(270deg, rgba(255, 255, 255, .6), transparent);
-}
-
-@keyframes shoot1 {
-  0% {
-    transform: translate(0, 0) rotate(30deg);
-    opacity: 0
-  }
-
-  5% {
-    opacity: .9
-  }
-
-  90% {
-    opacity: .5
-  }
-
-  100% {
-    transform: translate(800px, -260px) rotate(30deg);
-    opacity: 0
-  }
-}
-
-@keyframes shoot2 {
-  0% {
-    transform: translate(0, 0) rotate(22deg);
-    opacity: 0
-  }
-
-  6% {
-    opacity: .8
-  }
-
-  100% {
-    transform: translate(700px, -200px) rotate(22deg);
-    opacity: 0
-  }
-}
-
-.ss1 {
-  top: 18%;
-  right: 30%;
-  animation: shoot1 5.5s ease-in 2s infinite
-}
-
-.ss2 {
-  top: 35%;
-  right: 55%;
-  animation: shoot2 7s ease-in 11s infinite
 }
 
 .hero-content {
@@ -417,6 +356,7 @@ h2 {
 }
 
 .hero-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -430,6 +370,47 @@ h2 {
   font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--accent);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-badge::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 900px;
+  height: 900px;
+  background: conic-gradient(from 0deg,
+      transparent 350deg,
+      var(--accent) 360deg);
+  transform: translate(-50%, -50%);
+  animation: beamSpin 3s linear infinite;
+  z-index: -1;
+}
+
+.hero-badge::after {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 100px;
+  background: var(--bg-void);
+  z-index: -1;
+}
+
+@keyframes beamSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.hero-badge>* {
+  position: relative;
+  z-index: 2;
 }
 
 .badge-dot {
@@ -1838,14 +1819,56 @@ h2 {
 
 .p-card {
   border-radius: var(--r-xl);
-  padding: 44px 38px
+  padding: 44px 38px;
+  background: var(--glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border);
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.p-card:hover {
+  background: var(--glass-h);
 }
 
 .p-card.hot {
-  background: rgba(34, 197, 94, .055);
-  border-color: rgba(34, 197, 94, .2) !important;
-  border-top-color: rgba(34, 197, 94, .35) !important;
-  box-shadow: 0 0 80px rgba(34, 197, 94, .08), 0 16px 56px rgba(0, 0, 0, .5) !important;
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25) !important;
+  border-top-color: rgba(34, 197, 94, 0.45) !important;
+  box-shadow: 0 0 80px rgba(34, 197, 94, 0.12), 0 16px 56px rgba(0, 0, 0, 0.6) !important;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.p-card.hot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1200px;
+  height: 1200px;
+  background: conic-gradient(from 0deg,
+      transparent 330deg,
+      var(--accent) 360deg);
+  transform: translate(-50%, -50%);
+  animation: beamSpin 5s linear infinite;
+  z-index: -1;
+}
+
+.p-card.hot::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: var(--r-xl);
+  background: #060912;
+  /* Strengthened background for better contrast */
+  z-index: -1;
+}
+
+.p-card.hot>* {
+  position: relative;
+  z-index: 2;
 }
 
 .p-tier {
