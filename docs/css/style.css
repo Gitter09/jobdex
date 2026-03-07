@@ -2131,3 +2131,57 @@ footer {
     font-size: 12px
   }
 }
+
+/* ── CUSTOM CURSOR ── */
+* {
+  cursor: none !important;
+}
+
+#cursor-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+  will-change: transform;
+}
+
+#cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: transparent;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: transform 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, width 0.18s ease, height 0.18s ease;
+  will-change: transform;
+}
+
+#cursor-dot.is-hovering {
+  transform: translate(-50%, -50%) scale(0);
+}
+
+#cursor-ring.is-hovering {
+  width: 28px;
+  height: 28px;
+  border-color: #22c55e;
+  transform: translate(-50%, -50%) scale(1.75);
+}
+
+#cursor-ring.is-on-window {
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translate(-50%, -50%) scale(1.25);
+}

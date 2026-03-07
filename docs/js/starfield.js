@@ -39,47 +39,56 @@
   }
 
   function spawnShooter() {
-    // Angle between 20° and 45°, always travelling toward lower-left
-    // (enters from top-right or right edge, exits toward bottom-left)
-    const angleDeg = 200 + Math.random() * 25; // 200°–225° in screen space
-    const angleRad = angleDeg * Math.PI / 180;
-    const speed = 380 + Math.random() * 280;       // px/sec, variance between fast and slow
-    const lifespan = 0.55 + Math.random() * 0.85;  // seconds, 0.55–1.4s
-    const tailLength = speed * lifespan * 0.55;     // tail scales with speed × time
-
-    // Spawn off the top edge or right edge
+    // Pick a random edge to spawn from: 0=top, 1=right, 2=bottom, 3=left
+    const edge = Math.floor(Math.random() * 4);
     let sx, sy;
-    if (Math.random() > 0.45) {
-      // from top edge
-      sx = W * 0.3 + Math.random() * W * 0.7;
-      sy = -10;
-    } else {
-      // from right edge
-      sx = W + 10;
-      sy = Math.random() * H * 0.55;
+
+    if (edge === 0) { // Top
+      sx = Math.random() * W;
+      sy = -20;
+    } else if (edge === 1) { // Right
+      sx = W + 20;
+      sy = Math.random() * H;
+    } else if (edge === 2) { // Bottom
+      sx = Math.random() * W;
+      sy = H + 20;
+    } else { // Left
+      sx = -20;
+      sy = Math.random() * H;
     }
+
+    // Aim toward a random point in the center 60% of the screen
+    const tx = W * 0.2 + Math.random() * W * 0.6;
+    const ty = H * 0.2 + Math.random() * H * 0.6;
+
+    // Calculate angle and velocity
+    const dx = tx - sx;
+    const dy = ty - sy;
+    const angleRad = Math.atan2(dy, dx);
+    const speed = 350 + Math.random() * 350;       // 350–700 px/sec
+    const lifespan = 0.5 + Math.random() * 1.0;    // 0.5–1.5s
+    const tailLength = speed * lifespan * 0.5;
 
     shooters.push({
       x: sx,
       y: sy,
       vx: Math.cos(angleRad) * speed,
       vy: Math.sin(angleRad) * speed,
-      life: 0,          // current age in seconds
+      life: 0,
       lifespan,
       tailLength,
       speed,
-      // brightness: brighter for faster stars
-      brightness: 0.55 + (speed / 660) * 0.45,
+      brightness: 0.5 + (speed / 700) * 0.5,
     });
   }
 
   function drawShooters(dt) {
     const now = performance.now() / 1000;
 
-    // Spawn a new shooter on a random interval between 4s and 9s
+    // Spawn a new shooter on a random interval between 2s and 12s
     if (now >= nextShooterAt) {
       spawnShooter();
-      nextShooterAt = now + 4 + Math.random() * 5;
+      nextShooterAt = now + 2 + Math.random() * 10;
     }
 
     shooters = shooters.filter(s => s.life < s.lifespan);
@@ -173,8 +182,10 @@
   let lastFrameTime = 0;
 
   function frame(timestamp) {
-    const dt = lastFrameTime === 0 ? 0.016 : Math.min((timestamp - lastFrameTime) / 1000, 0.05);
-    lastFrameTime = timestamp;
+    // timestamp will be undefined on the very first call from init()
+    // dt = delta time in seconds
+    const dt = (!timestamp || lastFrameTime === 0) ? 0.016 : Math.min((timestamp - lastFrameTime) / 1000, 0.05);
+    lastFrameTime = timestamp || performance.now();
 
     ctx.clearRect(0, 0, W, H);
     t += 0.012;
