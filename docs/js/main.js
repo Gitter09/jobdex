@@ -83,9 +83,6 @@
   if (hero) heroObserver.observe(hero);
 
   const parallaxLayers = [
-    { el: document.querySelector('.n1'), tx: 0, ty: 0, mx: 0.018, my: 0.012 },
-    { el: document.querySelector('.n2'), tx: 0, ty: 0, mx: -0.014, my: -0.010 },
-    { el: document.querySelector('.n3'), tx: 0, ty: 0, mx: 0.022, my: 0.016 },
     { el: document.querySelector('.hero-content'), tx: 0, ty: 0, mx: -0.010, my: -0.007 },
     { el: document.querySelector('.hero-preview'), tx: 0, ty: 0, mx: -0.006, my: -0.004 },
   ];

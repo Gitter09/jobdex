@@ -9,7 +9,7 @@
     content="Privacy-first, offline-capable CRM for founders, VCs, and professional networkers. Your data never leaves your machine. Built with Tauri 2 + Rust.">
   <meta property="og:title" content="Personal Email CRM — Built by Harshit Singh">
   <meta property="og:description" content="I built my own CRM instead of paying for one. Free, local-first, open source.">
-  <meta name="theme-color" content="#03030a">
+  <meta name="theme-color" content="#000000">
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -22,7 +22,13 @@
 ══════════════════════════════════════════ -->
   <nav id="nav">
     <a href="#" class="nav-logo">
-      <div class="nav-logo-mark">O</div>
+      <div class="nav-logo-mark">
+        <svg width="22" height="22" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z" fill="#000000"/>
+          <path d="M456.124 46.0815C483.732 58.1553 507.867 76.9668 526.317 100.791C544.766 124.615 556.939 152.69 561.72 182.441L530.264 187.496C526.329 163.011 516.31 139.905 501.127 120.298C485.943 100.691 466.08 85.2088 443.358 75.2721L456.124 46.0815Z" fill="#000000"/>
+          <path d="M430.086 102.473C449.258 110.858 466.019 123.921 478.831 140.466C491.643 157.011 500.097 176.507 503.417 197.167L476.36 201.515C473.768 185.384 467.168 170.162 457.164 157.244C447.161 144.327 434.075 134.127 419.106 127.581L430.086 102.473Z" fill="#000000"/>
+        </svg>
+      </div>
       <span class="nav-logo-name">OutreachOS</span>
     </a>
 
@@ -41,14 +47,9 @@
 
 
   <!-- ══════════════════════════════════════════
-     HERO — SPACE SCENE
+     HERO
 ══════════════════════════════════════════ -->
   <section id="hero">
-    <canvas id="starfield" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
-
-    <div class="nebula n1"></div>
-    <div class="nebula n2"></div>
-    <div class="nebula n3"></div>
 
     <!-- headline -->
     <div class="hero-content">
@@ -86,7 +87,7 @@
         <div class="tab-pane active" id="pane-contacts">
           <div class="mock-sidebar">
             <div class="ms-icon on" title="Dashboard">⊞</div>
-            <div class="ms-icon on" title="Contacts" style="background:rgba(34,197,94,.14);color:var(--accent)">◎</div>
+            <div class="ms-icon on" title="Contacts">◎</div>
             <div class="ms-icon" title="Templates">☰</div>
             <div class="ms-icon bot" title="Settings">⚙</div>
           </div>
@@ -273,7 +274,7 @@
                 Compose to</div>
               <div style="padding:6px 8px;display:flex;flex-direction:column;gap:2px">
                 <div
-                  style="padding:8px 10px;border-radius:8px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);cursor:pointer">
+                  style="padding:8px 10px;border-radius:8px;background:rgba(244,245,248,.08);border:1px solid rgba(244,245,248,.12);cursor:pointer">
                   <div style="font-size:11.5px;font-weight:500;color:var(--text)">Sarah Chen</div>
                   <div style="font-size:10px;color:var(--text-3);margin-top:2px">VP · Nexus Ventures</div>
                 </div>
@@ -292,7 +293,7 @@
               <div class="compose-field">
                 <span>To</span>
                 <span
-                  style="color:var(--text);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);padding:2px 10px;border-radius:6px;font-size:11px">sarah.chen@nexusventures.com</span>
+                  style="color:var(--text);background:rgba(244,245,248,.08);border:1px solid rgba(244,245,248,.12);padding:2px 10px;border-radius:6px;font-size:11px">sarah.chen@nexusventures.com</span>
               </div>
               <div class="compose-field">
                 <span>Subject</span>
@@ -349,7 +350,7 @@
               <div class="i-field"><span class="i-key">Location</span><span class="i-val">San Francisco, CA</span></div>
               <div class="i-field"><span class="i-key">Company</span><span class="i-val">Starlight Systems</span></div>
               <div class="i-field"><span class="i-key">LinkedIn</span><span class="i-val"
-                  style="color:var(--accent)">linkedin.com/in/…</span></div>
+                  style="color:var(--text-2)">linkedin.com/in/…</span></div>
               <div class="i-field"><span class="i-key">Last</span><span class="i-val">Never</span></div>
               <div class="i-field"><span class="i-key">Tags</span><span class="i-val" style="color:var(--text-3)">+ Add
                   tag</span></div>
@@ -359,7 +360,7 @@
             <div class="intel-card">
               <div class="intel-card-title">
                 <span>✦ Highlights</span>
-                <span style="color:var(--accent);font-size:10px;cursor:pointer;font-weight:400">✎ Update</span>
+                <span style="color:var(--text-3);font-size:10px;cursor:pointer;font-weight:400">✎ Update</span>
               </div>
               <div class="intel-card-body" style="color:var(--text-3);font-style:italic;font-size:11px">
                 No summary yet. Click "Update" to add focused insights about this contact.
@@ -381,7 +382,7 @@
                   style="font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px">
                   📅 Upcoming Events</div>
                 <div style="font-size:11px;color:var(--text-3);font-style:italic">No upcoming events. <span
-                    style="color:var(--accent);font-style:normal;cursor:pointer">Schedule one →</span></div>
+                    style="color:var(--text-2);font-style:normal;cursor:pointer">Schedule one →</span></div>
               </div>
               <div style="flex:1">
                 <div
@@ -389,7 +390,7 @@
                   ✉ Emails</div>
                 <div style="display:flex;flex-direction:column;gap:4px">
                   <div style="font-size:10.5px;color:var(--text-2)">No emails yet</div>
-                  <div style="font-size:10px;color:var(--accent);cursor:pointer">Compose first email →</div>
+                  <div style="font-size:10px;color:var(--text-2);cursor:pointer">Compose first email →</div>
                 </div>
               </div>
             </div>
@@ -428,7 +429,7 @@
         <span class="tech-pill">Vite</span>
         <span class="tech-pill">React</span>
         <span class="tech-pill">SQLite</span>
-        <span class="tech-pill">Agentic AI Development</span>
+        <span class="tech-pill">Rust</span>
       </div>
     </div>
   </div>
@@ -490,7 +491,7 @@
                     <span class="fd-stage-chip">Interested ▾</span>
                   </div>
                   <div class="fd-pbar">
-                    <div class="fd-pfill" style="width:60%;background:linear-gradient(90deg,#22c55e,#4ade80)"></div>
+                    <div class="fd-pfill" style="width:60%;background:rgba(244,245,248,.5)"></div>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
@@ -499,7 +500,7 @@
                     Recent Activity</div>
                   <div id="activity-line"
                     style="font-size:10.5px;color:var(--text-2);display:flex;align-items:center;gap:6px">
-                    <span style="color:var(--accent)">✉</span> Email opened 2h ago · 3 link clicks
+                    <span style="color:var(--text-2)">✉</span> Email opened 2h ago · 3 link clicks
                   </div>
                 </div>
               </div>
@@ -573,8 +574,8 @@
               <div class="fk-col">
                 <div class="fk-head"><span>Interested</span><span class="fk-cnt">2</span></div>
                 <div id="sarah-card" class="fk-card"
-                  style="border-color:rgba(34,197,94,.2);border-top-color:rgba(34,197,94,.35);background:rgba(34,197,94,.06)">
-                  <div class="fk-card-name" style="color:var(--accent)">Sarah Chen</div>
+                  style="border-color:rgba(244,245,248,.14);border-top-color:rgba(244,245,248,.22);background:rgba(244,245,248,.05)">
+                  <div class="fk-card-name" style="color:var(--text)">Sarah Chen</div>
                   <div class="fk-card-role">VP at Nexus Ventures</div>
                 </div>
                 <div class="fk-card">
@@ -606,7 +607,7 @@
             <div class="fe-layout">
               <div class="fe-compose">
                 <div class="fe-field"><span class="fe-key">To</span><span
-                    style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);padding:2px 9px;border-radius:5px;font-size:10.5px;color:var(--text)">sarah.chen@nexusventures.com</span>
+                    style="background:rgba(244,245,248,.08);border:1px solid rgba(244,245,248,.12);padding:2px 9px;border-radius:5px;font-size:10.5px;color:var(--text)">sarah.chen@nexusventures.com</span>
                 </div>
                 <div class="fe-field"><span class="fe-key">Subject</span><span style="color:var(--text)">Following up —
                     Seed Round Discussion</span></div>
@@ -759,7 +760,13 @@
       <div class="footer-inner">
         <div class="footer-left">
           <div class="footer-logo">
-            <div class="footer-logo-mark">O</div>
+            <div class="footer-logo-mark">
+              <svg width="17" height="17" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z" fill="#000000"/>
+                <path d="M456.124 46.0815C483.732 58.1553 507.867 76.9668 526.317 100.791C544.766 124.615 556.939 152.69 561.72 182.441L530.264 187.496C526.329 163.011 516.31 139.905 501.127 120.298C485.943 100.691 466.08 85.2088 443.358 75.2721L456.124 46.0815Z" fill="#000000"/>
+                <path d="M430.086 102.473C449.258 110.858 466.019 123.921 478.831 140.466C491.643 157.011 500.097 176.507 503.417 197.167L476.36 201.515C473.768 185.384 467.168 170.162 457.164 157.244C447.161 144.327 434.075 134.127 419.106 127.581L430.086 102.473Z" fill="#000000"/>
+              </svg>
+            </div>
             <span class="footer-logo-name">OutreachOS</span>
           </div>
           <p class="footer-copy">© 2026 OutreachOS · All Rights Reserved · Proprietary License</p>
@@ -773,7 +780,6 @@
     </div>
   </footer>
 
-  <script src="js/starfield.js"></script>
   <script src="js/main.js"></script>
 </body>
 

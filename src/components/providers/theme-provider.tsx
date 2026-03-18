@@ -15,7 +15,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
         const applyTheme = () => {
             const themeMode = settings["theme_mode"] || "system"
-            const accentColor = settings["theme_color"] || "#3b82f6"
+            const accentColor = settings["theme_color"] || "#222326"
 
             root.classList.remove("light", "dark")
             let effectiveTheme: "light" | "dark" = "light"

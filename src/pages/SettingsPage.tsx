@@ -97,6 +97,7 @@ export function SettingsPage() {
                 <Label className="text-sm font-semibold">Accent Color</Label>
                 <div className="flex flex-wrap gap-3">
                     {[
+                        { name: "Neutral", hex: "#222326" },
                         { name: "Blue", hex: "#3b82f6" },
                         { name: "Green", hex: "#22c55e" },
                         { name: "Purple", hex: "#a855f7" },
@@ -129,8 +130,8 @@ export function SettingsPage() {
                             className={cn(
                                 "w-10 h-10 rounded-full border-2 transition-all bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500",
                                 ![
-                                    "#3b82f6", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#6366f1", "#ef4444"
-                                ].includes(settings["theme_color"] || "#3b82f6")
+                                    "#222326", "#3b82f6", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#6366f1", "#ef4444"
+                                ].includes(settings["theme_color"] || "#222326")
                                     ? "border-foreground scale-110"
                                     : "border-transparent"
                             )}
@@ -140,7 +141,7 @@ export function SettingsPage() {
                             id="custom-accent-color"
                             type="color"
                             className="absolute inset-0 opacity-0 pointer-events-none"
-                            value={settings["theme_color"] || "#3b82f6"}
+                            value={settings["theme_color"] || "#222326"}
                             onChange={(e) => handleSettingChange("theme_color", e.target.value)}
                         />
                     </div>
