@@ -2786,9 +2786,11 @@ footer {
 .dense-mockup {
   width: 1200px;
   transform: scale(0.85);
-  transform-origin: top left;
+  transform-origin: top center;
   border-radius: var(--r-md);
   margin-top: 24px;
+  left: 50%;
+  margin-left: -600px;
 }
 
 .dm-layout {
@@ -2944,6 +2946,13 @@ footer {
 
 /* ── 768px additions ── */
 @media (max-width: 768px) {
+  /* Reset desktop centering — mobile anchors left and clips with fade mask */
+  .dense-mockup {
+    left: 0;
+    margin-left: 0;
+    transform-origin: top left;
+  }
+
   /* Tab pane height reduction */
   .tab-pane {
     height: 380px;

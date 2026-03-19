@@ -44,6 +44,16 @@ const settingsSubItems: NavItem[] = [
     { label: "Data", icon: Database, path: "/settings/data" },
 ];
 
+function OutreachMark({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 600 600" fill="none" className={className} aria-hidden="true">
+            <path d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z" fill="currentColor" />
+            <path d="M456.124 46.0815C483.732 58.1553 507.867 76.9668 526.317 100.791C544.766 124.615 556.939 152.69 561.72 182.441L530.264 187.496C526.329 163.011 516.31 139.905 501.127 120.298C485.943 100.691 466.08 85.2088 443.358 75.2721L456.124 46.0815Z" fill="currentColor" />
+            <path d="M430.086 102.473C449.258 110.858 466.019 123.921 478.831 140.466C491.643 157.011 500.097 176.507 503.417 197.167L476.36 201.515C473.768 185.384 467.168 170.162 457.164 157.244C447.161 144.327 434.075 134.127 419.106 127.581L430.086 102.473Z" fill="currentColor" />
+        </svg>
+    );
+}
+
 export function AppSidebar() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -78,9 +88,12 @@ export function AppSidebar() {
                 {/* Top: Branding + Collapse Toggle */}
                 <div className="flex items-center justify-between h-[60px] px-4 border-b shrink-0">
                     {!collapsed && (
-                        <h1 className="text-sm font-bold tracking-tight truncate">
-                            OutreachOS
-                        </h1>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <OutreachMark className="h-5 w-5 shrink-0 text-foreground" />
+                            <h1 className="text-sm font-bold tracking-tight truncate">
+                                OutreachOS
+                            </h1>
+                        </div>
                     )}
                     <button
                         onClick={() => setCollapsed(!collapsed)}

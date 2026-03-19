@@ -367,19 +367,6 @@ async fn update_contact(db: tauri::State<'_, Db>, args: UpdateContactArgs) -> Re
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Load environment variables from .env and .env.local
-    dotenvy::dotenv().ok();
-    dotenvy::from_filename(".env.local").ok();
-    dotenvy::from_filename("../.env.local").ok();
-
-    // Also try to find it in the current directory or parent directories
-    if let Ok(cwd) = std::env::current_dir() {
-        let _ = dotenvy::from_path(cwd.join(".env.local"));
-        if let Some(parent) = cwd.parent() {
-            let _ = dotenvy::from_path(parent.join(".env.local"));
-        }
-    }
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

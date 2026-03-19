@@ -9,16 +9,9 @@ OutreachOS is a **privacy-first, offline-capable** personal CRM desktop applicat
 - 🕒 **Contact Timeline**: Track a full history of events, meetings, and notes for every contact.
 - 📥 **Two-Step Import**: Excel/XLSX/CSV import with simplified mapping and duplicate checking.
 - 📝 **Templates & Quick-Insert**: Create reusable email templates and insert variables using one-click "Chips."
-- 📧 **Outreach Infrastructure**: Full-stack support for email open and link click tracking.
 - 📬 **Email Integration**: Connect Gmail and Outlook via OAuth; sync threads and schedule follow-ups.
 - 🔐 **Privacy First**: Local SQLite database encrypted with **SQLCipher (AES-256)**. Your data never leaves your machine.
 - 🌓 **Premium UI**: Sleek, collapsible sidebar layout with smooth transitions and dark mode support.
-
-## 💼 Open Core Model
-
-OutreachOS follows an Open Core model:
-- **Free Desktop App**: Fully functional local-first CRM (MIT).
-- **Relay Service**: Optional Cloudflare Worker for commercial-grade tracking metrics and relaying events.
 
 ## 🛠 Tech Stack
 

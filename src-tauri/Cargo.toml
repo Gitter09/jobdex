@@ -36,6 +36,5 @@ arboard = "3"
 keyring = "3.6.3"
 dirs = "5"
 thiserror = "2"
-dotenvy = "0.15.7"
 
 

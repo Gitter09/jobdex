@@ -1,7 +1,7 @@
 fn main() {
-    // Load .env.local so VITE_CLERK_PUBLISHABLE_KEY is available at compile-time
-    // via option_env!(). This is critical for production builds where the binary
-    // runs from /Applications and cannot find .env.local at runtime.
+    // Load .env.local so environment variables (e.g. Gmail credentials) are available
+    // at compile-time via option_env!(). This is needed for production builds where
+    // the binary runs from /Applications and cannot find .env.local at runtime.
     let env_path = std::path::Path::new("../.env.local");
     if env_path.exists() {
         if let Ok(contents) = std::fs::read_to_string(env_path) {

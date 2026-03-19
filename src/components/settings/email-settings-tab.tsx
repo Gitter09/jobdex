@@ -206,9 +206,9 @@ export function EmailSettingsTab() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-lg font-medium">Email & Tracking</h3>
+                    <h3 className="text-lg font-medium">Email</h3>
                     <p className="text-sm text-muted-foreground">
-                        Connect accounts and track engagement automatically via our secure relay.
+                        Connect your Gmail or Outlook account to send and receive emails.
                     </p>
                 </div>
             </div>
