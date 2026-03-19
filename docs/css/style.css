@@ -532,13 +532,8 @@ h2 {
 .h1-line2 {
   color: var(--text-2);
   display: inline-block;
-  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
   cursor: default;
   font-weight: 600;
-}
-
-.h1-line2:hover {
-  transform: translateY(-3px);
 }
 
 .hero-sub {
@@ -1363,22 +1358,60 @@ h2 {
   padding-bottom: 6px;
 }
 
-/* alternating feature rows */
+/* ── Linear Features Layout Redesign ── */
 .feat-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 72px;
-  align-items: center;
-  padding: 72px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  padding: 110px 0;
   border-top: 1px solid var(--section-line);
 }
 
 .feat-row.flip .feat-text {
-  order: 2
+  order: unset;
 }
 
 .feat-row.flip .feat-visual {
-  order: 1
+  order: unset;
+}
+
+/* Wide Container for Bleed Effect */
+.feat-visual.wide {
+  width: calc(100vw - 32px);
+  max-width: 1300px;
+  align-self: center;
+}
+
+/* Feature Mock scaling for the massive wide boxes */
+.feat-mock.feat-scale {
+  transform: scale(1);
+  transform-origin: top center;
+  width: 100%;
+  border-radius: 12px; /* Smoother corner for large window */
+}
+
+/* 2-Column Text Header */
+.feat-text {
+  width: 100%;
+}
+
+.feat-text-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 48px;
+  width: 100%;
+}
+
+.ftl-left {
+  flex: 1;
+  max-width: 480px;
+}
+
+.ftl-right {
+  flex: 1;
+  max-width: 480px;
+  margin-top: 22px; /* aligns the right col with the H3 visually */
 }
 
 .feat-tag {
@@ -1403,21 +1436,20 @@ h2 {
 
 .feat-text h3 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(28px, 3vw, 40px);
+  font-size: clamp(32px, 3.5vw, 48px);
   font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1.1;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   color: var(--text);
 }
 
 .feat-desc {
   font-weight: 400;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.75;
   color: var(--text-2);
-  margin-bottom: 28px;
-  max-width: 560px;
+  margin-bottom: 24px;
 }
 
 .feat-list {
@@ -1648,15 +1680,21 @@ h2 {
 /* kanban feature mockup */
 .fk-board {
   display: flex;
-  gap: 8px;
-  padding: 14px;
-  height: 280px;
-  overflow: hidden
+  gap: 12px;
+  padding: 18px;
+  height: 100%;
+  min-height: 280px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+.fk-board::-webkit-scrollbar {
+  display: none; /* Safari/Chrome */
 }
 
 .fk-col {
+  flex: 1;
   min-width: 148px;
-  flex-shrink: 0
 }
 
 .fk-head {
@@ -1707,9 +1745,10 @@ h2 {
 
 /* email tracking mockup */
 .fe-layout {
-  height: 280px;
+  height: 100%;
+  min-height: 280px;
   display: flex;
-  flex-direction: column
+  flex-direction: row
 }
 
 .fe-compose {
@@ -1817,30 +1856,61 @@ h2 {
 
 .fg-item {
   background: var(--bg-surface);
-  padding: 40px 32px;
+  padding: 32px;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
   transition: background .2s;
+  overflow: hidden;
 }
 
 .fg-item:hover {
   background: var(--bg-elevated)
 }
 
-.fg-ico {
-  font-size: 22px;
-  margin-bottom: 16px
+.fg-label {
+  position: absolute;
+  top: 32px;
+  left: 32px;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  opacity: 0.6;
+  text-transform: uppercase;
+  z-index: 2;
+}
+
+.fg-art {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fg-text-box {
+  position: relative;
+  z-index: 2;
 }
 
 .fg-item h4 {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   margin-bottom: 8px;
+  color: var(--text);
 }
 
 .fg-item p {
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.6;
   font-size: 13.5px;
   color: var(--text-2);
 }
@@ -2399,6 +2469,7 @@ footer {
   .feat-grid-sm::-webkit-scrollbar { display: none; }
   .fg-item {
     min-width: 280px;
+    height: 480px;
     flex-shrink: 0;
     scroll-snap-align: start;
     border-radius: var(--r-md);
