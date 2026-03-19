@@ -280,19 +280,7 @@
   </section>
 
 
-  <!-- ══════════════════════════════════════════
-     WHY I BUILT THIS
-══════════════════════════════════════════ -->
-  <section id="why">
-    <div class="container">
-      <div class="why-inner reveal">
-        <h2>Why I built this.</h2>
-        <p>Most CRM tools are built for sales teams. I needed something personal — a way to manage the relationships that matter in my actual life and work. Streak was the closest thing to what I wanted, but the free tier expired and the paid tier was ₹3000/month for features I knew I could build myself.</p>
-        <p>So I built it instead. Local-first, no server, no recurring cost. The data lives on your machine. I own the product decisions. And now I'm shipping it publicly.</p>
-        <p>This isn't a startup. It's a tool I built for myself that might be useful to you.</p>
-      </div>
-    </div>
-  </section>
+
 
 
   <!-- ══════════════════════════════════════════
@@ -325,15 +313,87 @@
   <section id="features">
     <div class="container">
 
-      <div class="feat-header reveal">
-        <div>
-          <p class="s-label">Why OutreachOS</p>
-          <h2>Precision tools.<br>Zero compromise.</h2>
+      <div class="feat-hero-intro reveal">
+        <h2>
+          <span class="hl-white">A personal engine for professional networks.</span>
+          <span class="hl-grey">Built with Rust for absolute data persistence and zero latency. OutreachOS is a local-first interface designed entirely around how I manage relationships.</span>
+        </h2>
+      </div>
+
+      <!-- SMALL FEATURE GRID (ELEVATED) -->
+      <div class="feat-grid-sm" style="margin-bottom: 120px;">
+        <div class="fg-item reveal d1">
+          <div class="fg-label">FIG 1.1</div>
+          <div class="fg-art">
+            <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
+                <path d="M40 160 v15 M200 160 v15 M120 120 v15" stroke="rgba(255,255,255,0.05)" />
+                <path d="M120 170 L200 130 L120 90 L40 130 Z" />
+                <path d="M120 155 L200 115 L120 75 L40 115 Z" />
+                <path d="M120 140 L200 100 L120 60 L40 100 Z" />
+                <path d="M120 125 L200 85 L120 45 L40 85 Z" />
+                <path d="M120 110 L200 70 L120 30 L40 70 Z" fill="rgba(255,255,255,0.02)" />
+                <ellipse cx="120" cy="70" rx="30" ry="15" stroke-dasharray="4 4" />
+                <path d="M100 70 L140 70 M105 75 L135 75 M110 80 L130 80" />
+                <path d="M40 70 v60 M200 70 v60 M120 170 v-60 M120 110 L120 170" stroke-width="0.5" stroke="rgba(255,255,255,0.08)"/>
+              </g>
+            </svg>
+          </div>
+          <div class="fg-text-box">
+            <h4>LinkedIn Import</h4>
+            <p>Two-step CSV / XLSX import with column mapping and smart duplicate detection. Skip, merge, or import all.</p>
+          </div>
         </div>
-        <p class="feat-header-right">
-          Built for people who treat relationships like assets and privacy like a principle. Not another cloud CRM with
-          a dark mode.
-        </p>
+        <div class="fg-item reveal d2">
+          <div class="fg-label">FIG 1.2</div>
+          <div class="fg-art">
+             <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
+                <path d="M120 90 L160 70 L120 50 L80 70 Z" fill="rgba(255,255,255,0.03)" />
+                <path d="M80 70 L120 90 L120 130 L80 110 Z" />
+                <path d="M120 90 L160 70 L160 110 L120 130 Z" />
+                <path d="M115 75 L125 70 M115 65 L125 60 M110 70 L120 75 M120 60 L130 65" stroke-width="0.5" />
+                <g transform="translate(45, -30)">
+                  <path d="M120 90 L140 80 L120 70 L100 80 Z" />
+                  <path d="M100 80 L120 90 L120 110 L100 100 Z" />
+                  <path d="M120 90 L140 80 L140 100 L120 110 Z" />
+                </g>
+                <g transform="translate(-40, 40)">
+                  <path d="M120 90 L140 80 L120 70 L100 80 Z" />
+                  <path d="M100 80 L120 90 L120 110 L100 100 Z" />
+                  <path d="M120 90 L140 80 L140 100 L120 110 Z" />
+                </g>
+                <path d="M120 130 L120 160 M80 110 L60 120 M160 110 L180 120" stroke="rgba(255,255,255,0.08)" stroke-dasharray="2 2" />
+              </g>
+            </svg>
+          </div>
+          <div class="fg-text-box">
+            <h4>Command Palette</h4>
+            <p>Hit ⌘K to search contacts, open dialogs, and run any action — without ever touching the mouse.</p>
+          </div>
+        </div>
+        <div class="fg-item reveal d3">
+          <div class="fg-label">FIG 1.3</div>
+          <div class="fg-art">
+             <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
+                <path d="M120 180 L200 140 L120 100 L40 140 Z" />
+                <path d="M60 130 L140 170 M80 120 L160 160 M100 110 L180 150" stroke="rgba(255,255,255,0.05)" />
+                <path d="M60 150 L140 110 M80 160 L160 120 M100 170 L180 130" stroke="rgba(255,255,255,0.05)" />
+                <path d="M120 140 v-50 M140 130 v-30 M100 130 v-60 M160 120 v-40" stroke="rgba(255,255,255,0.1)" />
+                <circle cx="120" cy="90" r="3" fill="rgba(255,255,255,0.3)" />
+                <circle cx="140" cy="100" r="3" fill="rgba(255,255,255,0.3)" />
+                <circle cx="100" cy="70" r="3" fill="rgba(255,255,255,0.3)" />
+                <circle cx="160" cy="80" r="3" fill="rgba(255,255,255,0.3)" />
+                <path d="M120 90 L140 100 L160 80 M100 70 L120 90" stroke="rgba(255,255,255,0.2)" stroke-dasharray="2 2" />
+              </g>
+            </svg>
+          </div>
+          <div class="fg-text-box">
+            <h4>Tags &amp; Segments</h4>
+            <p>Color-coded tags for any contact. Build targeted lists for every recruiting cycle or batch.</p>
+          </div>
+        </div>
       </div>
 
       <!-- FEATURE 1: Contact Intelligence -->
@@ -837,82 +897,22 @@
 
     </div><!-- end container -->
 
-      <!-- SMALL FEATURE GRID -->
-      <div class="feat-grid-sm">
-        <div class="fg-item reveal d1">
-          <div class="fg-label">FIG 1.1</div>
-          <div class="fg-art">
-            <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
-                <path d="M40 160 v15 M200 160 v15 M120 120 v15" stroke="rgba(255,255,255,0.05)" />
-                <path d="M120 170 L200 130 L120 90 L40 130 Z" />
-                <path d="M120 155 L200 115 L120 75 L40 115 Z" />
-                <path d="M120 140 L200 100 L120 60 L40 100 Z" />
-                <path d="M120 125 L200 85 L120 45 L40 85 Z" />
-                <path d="M120 110 L200 70 L120 30 L40 70 Z" fill="rgba(255,255,255,0.02)" />
-                <ellipse cx="120" cy="70" rx="30" ry="15" stroke-dasharray="4 4" />
-                <path d="M100 70 L140 70 M105 75 L135 75 M110 80 L130 80" />
-                <path d="M40 70 v60 M200 70 v60 M120 170 v-60 M120 110 L120 170" stroke-width="0.5" stroke="rgba(255,255,255,0.08)"/>
-              </g>
-            </svg>
-          </div>
-          <div class="fg-text-box">
-            <h4>LinkedIn Import</h4>
-            <p>Two-step CSV / XLSX import with column mapping and smart duplicate detection. Skip, merge, or import all.</p>
-          </div>
-        </div>
-        <div class="fg-item reveal d2">
-          <div class="fg-label">FIG 1.2</div>
-          <div class="fg-art">
-             <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
-                <path d="M120 90 L160 70 L120 50 L80 70 Z" fill="rgba(255,255,255,0.03)" />
-                <path d="M80 70 L120 90 L120 130 L80 110 Z" />
-                <path d="M120 90 L160 70 L160 110 L120 130 Z" />
-                <path d="M115 75 L125 70 M115 65 L125 60 M110 70 L120 75 M120 60 L130 65" stroke-width="0.5" />
-                <g transform="translate(45, -30)">
-                  <path d="M120 90 L140 80 L120 70 L100 80 Z" />
-                  <path d="M100 80 L120 90 L120 110 L100 100 Z" />
-                  <path d="M120 90 L140 80 L140 100 L120 110 Z" />
-                </g>
-                <g transform="translate(-40, 40)">
-                  <path d="M120 90 L140 80 L120 70 L100 80 Z" />
-                  <path d="M100 80 L120 90 L120 110 L100 100 Z" />
-                  <path d="M120 90 L140 80 L140 100 L120 110 Z" />
-                </g>
-                <path d="M120 130 L120 160 M80 110 L60 120 M160 110 L180 120" stroke="rgba(255,255,255,0.08)" stroke-dasharray="2 2" />
-              </g>
-            </svg>
-          </div>
-          <div class="fg-text-box">
-            <h4>Command Palette</h4>
-            <p>Hit ⌘K to search contacts, open dialogs, and run any action — without ever touching the mouse.</p>
-          </div>
-        </div>
-        <div class="fg-item reveal d3">
-          <div class="fg-label">FIG 1.3</div>
-          <div class="fg-art">
-             <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-linejoin="round">
-                <path d="M120 180 L200 140 L120 100 L40 140 Z" />
-                <path d="M60 130 L140 170 M80 120 L160 160 M100 110 L180 150" stroke="rgba(255,255,255,0.05)" />
-                <path d="M60 150 L140 110 M80 160 L160 120 M100 170 L180 130" stroke="rgba(255,255,255,0.05)" />
-                <path d="M120 140 v-50 M140 130 v-30 M100 130 v-60 M160 120 v-40" stroke="rgba(255,255,255,0.1)" />
-                <circle cx="120" cy="90" r="3" fill="rgba(255,255,255,0.3)" />
-                <circle cx="140" cy="100" r="3" fill="rgba(255,255,255,0.3)" />
-                <circle cx="100" cy="70" r="3" fill="rgba(255,255,255,0.3)" />
-                <circle cx="160" cy="80" r="3" fill="rgba(255,255,255,0.3)" />
-                <path d="M120 90 L140 100 L160 80 M100 70 L120 90" stroke="rgba(255,255,255,0.2)" stroke-dasharray="2 2" />
-              </g>
-            </svg>
-          </div>
-          <div class="fg-text-box">
-            <h4>Tags &amp; Segments</h4>
-            <p>Color-coded tags for any contact. Build targeted lists for every recruiting cycle or batch.</p>
-          </div>
-        </div>
-      </div>
 
+  </section>
+
+
+  <!-- ══════════════════════════════════════════
+     WHY I BUILT THIS
+══════════════════════════════════════════ -->
+  <section id="why">
+    <div class="container">
+      <div class="why-inner reveal">
+        <h2>Why I built this.</h2>
+        <p>Like every junior, I started my internship search in Google Sheets. It worked for the first 20 cold emails, but broke down completely by the 100th. Trying to track which engineers I emailed, who replied, and who I needed to follow up with became a nightmare of endless tabs and copy-pasted templates.</p>
+        <p>Existing CRMs were designed for sales teams with enterprise quotas, not students targeting SWE roles. I didn't need to track "$50k ARR pipelines". I just needed a fast, offline system to give me deep context before I hit send.</p>
+        <p>So I engineered it myself. No monthly subscriptions, no sluggish web apps. Just a blazing fast local tool to get the offer.</p>
+      </div>
+    </div>
   </section>
 
 

@@ -1338,24 +1338,26 @@ h2 {
   z-index: 2;
 }
 
-.feat-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: end;
-  margin-bottom: 88px;
+.feat-hero-intro {
+  margin: 0 auto 96px auto;
+  max-width: 1100px;
+  text-align: left;
 }
 
-.feat-header h2 {
-  margin-bottom: 0
+.feat-hero-intro h2 {
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+  margin-bottom: 0;
 }
 
-.feat-header-right {
-  font-weight: 400;
-  font-size: 17px;
-  line-height: 1.75;
-  color: var(--text-2);
-  padding-bottom: 6px;
+.feat-hero-intro .hl-white {
+  color: var(--text);
+}
+
+.feat-hero-intro .hl-grey {
+  color: var(--text-3);
 }
 
 /* ── Linear Features Layout Redesign ── */
@@ -2423,8 +2425,7 @@ footer {
   }
 
   /* Feature rows */
-  .feat-row,
-  .feat-header {
+  .feat-row {
     grid-template-columns: 1fr;
     gap: 40px;
   }
@@ -2451,8 +2452,11 @@ footer {
     mask-composite: intersect;
   }
 
-  .feat-header {
-    margin-bottom: 56px;
+  .feat-hero-intro {
+    margin-bottom: 64px;
+  }
+  .feat-hero-intro h2 {
+    font-size: clamp(28px, 6vw, 36px);
   }
 
   .feat-grid-sm {
@@ -2492,9 +2496,7 @@ footer {
     padding: 72px 0 0;
   }
 
-  #why {
-    padding: 72px 0 48px;
-  }
+
 
   #decisions {
     padding: 64px 0;
@@ -2581,8 +2583,8 @@ footer {
     padding: 40px 0;
   }
 
-  .feat-header {
-    margin-bottom: 40px;
+  .feat-hero-intro {
+    margin-bottom: 48px;
   }
 
   #why {
@@ -2934,12 +2936,7 @@ footer {
     gap: 40px;
   }
 
-  /* Feature header: 2 cols → 1 col */
-  .feat-header {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-bottom: 56px;
-  }
+
 }
 
 /* ── 768px additions ── */
