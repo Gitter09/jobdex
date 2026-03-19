@@ -2472,10 +2472,11 @@ footer {
   }
   .feat-grid-sm::-webkit-scrollbar { display: none; }
   .fg-item {
+    width: 85vw;
     min-width: 280px;
     height: 480px;
     flex-shrink: 0;
-    scroll-snap-align: start;
+    scroll-snap-align: center;
     border-radius: var(--r-md);
     border: 1px solid var(--section-line);
   }
@@ -2496,7 +2497,9 @@ footer {
     padding: 72px 0 0;
   }
 
-
+  #why {
+    padding: 72px 0 48px;
+  }
 
   #decisions {
     padding: 64px 0;
