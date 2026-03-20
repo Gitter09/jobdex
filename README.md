@@ -1,59 +1,110 @@
 # OutreachOS
-
-OutreachOS is a **privacy-first, offline-capable** personal CRM desktop application built with **Tauri 2**, **React**, and **Rust**. Designed for startup founders, VC researchers, and professional networkers who need to manage relationships with precision and privacy.
-
-## ✨ Features (v0.1.3)
-
-- 📋 **Contact Management**: Modern interface for tracking professional relationships, titles, and companies.
-- 📊 **Kanban Pipeline**: Drag-and-drop board to track where every relationship stands.
-- 🕒 **Contact Timeline**: Track a full history of events, meetings, and notes for every contact.
-- 📥 **Two-Step Import**: Excel/XLSX/CSV import with simplified mapping and duplicate checking.
-- 📝 **Templates & Quick-Insert**: Create reusable email templates and insert variables using one-click "Chips."
-- 📬 **Email Integration**: Connect Gmail and Outlook via OAuth; sync threads and schedule follow-ups.
-- 🔐 **Privacy First**: Local SQLite database encrypted with **SQLCipher (AES-256)**. Your data never leaves your machine.
-- 🌓 **Premium UI**: Sleek, collapsible sidebar layout with smooth transitions and dark mode support.
-
-## 🛠 Tech Stack
-
-- **Core**: Rust (Tauri 2.0 / Edition 2021)
-- **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Database**: SQLite with SQLCipher (sqlx 0.8+)
-- **Runtime**: Bun
-
-## 🚀 Roadmap
-
-### Phase 2: Engagement & Intelligence
-- [ ] **Automated Enrichment**: Periodic background checking for contact updates.
-- [ ] **Robust Scraping**: Search fallback for enrichment when direct scraping is blocked.
-- [ ] **AI Drafting**: Context-aware email drafting based on contact history (Opt-in).
-
-### Phase 3: Scaling & Polish
-- [ ] **Unified Error Handling**: Comprehensive toast notifications and error states.
-- [ ] **Team Support**: Multi-user collaboration features for small teams.
-- [ ] **Mobile App**: Tauri-based mobile client for iOS and Android.
-
-## 📦 Installation
-
-Automated builds are available on the [GitHub Releases](https://github.com/Gitter09/outreach-os/releases) page for:
--  macOS (.dmg)
-- 🪟 Windows (.exe)
-- 🐧 Linux (.AppImage)
-
-## 🏗 Development
-
+ 
+**I built my own CRM instead of paying for one.**
+ 
+Streak's free trial expired. I refused to pay for features I knew I could build. So I built them. This is that product.
+ 
+OutreachOS is a privacy-first, offline-capable personal CRM for students doing cold email outreach — internship hunting, job searching, or anyone who needs to systematically manage relationships without a $50/month subscription hanging over their head.
+ 
+Everything runs locally on your machine. No cloud. No telemetry. No vendor lock-in.
+ 
+---
+ 
+## What it does
+ 
+- **People & Pipeline** — A clean contact database with a drag-and-drop Kanban board. Track every relationship from first email to offer.
+- **Contact Intelligence** — A living profile for every contact. Write your own notes, track interaction history, see exactly where things stand before you hit send.
+- **Email Integration** — Connect Gmail or Outlook via OAuth and send directly from OutreachOS. Mail merge templates with variables. Schedule sends. Full email history per contact.
+- **Two-Step Import** — Drag in a LinkedIn CSV export and map columns in two clicks. Smart duplicate detection handles the rest.
+- **Templates** — Reusable email templates with merge variables (`{{firstName}}`, `{{company}}`, `{{role}}`). Write once, personalise at scale.
+- **Privacy by default** — SQLite database encrypted with SQLCipher AES-256. OAuth tokens encrypted with AES-256-GCM. Master key in your OS Keychain. Your data never leaves your machine.
+ 
+---
+ 
+## Why I built it
+ 
+Like every junior, I started my internship search in Google Sheets. It worked for the first 20 cold emails, but broke down completely by the 100th.
+ 
+Existing CRMs were designed for sales teams chasing enterprise quotas — not students targeting SWE roles. I didn't need to track $50k ARR pipelines. I just needed a fast, local tool that gave me deep context before I hit send.
+ 
+So I built it myself.
+ 
+---
+ 
+## Download
+ 
+Grab the latest build from [GitHub Releases](https://github.com/Gitter09/outreach-os/releases):
+ 
+| Platform | Format |
+|---|---|
+| macOS | `.dmg` |
+| Windows | `.exe` |
+| Linux | `.AppImage` |
+ 
+---
+ 
+## Tech Stack
+ 
+| Layer | Technology |
+|---|---|
+| Core | Rust (Tauri 2.0, Edition 2021) |
+| Frontend | React 19 + TypeScript + Vite |
+| Styling | Tailwind CSS + shadcn/ui |
+| Database | SQLite with SQLCipher (sqlx 0.8+) |
+| Runtime | Bun |
+ 
+---
+ 
+## Running locally
+ 
 ```bash
 # Install dependencies
 bun install
-
-# Run in development mode
+ 
+# Dev mode with hot reload
 bun run tauri dev
-
-# Build for production
+ 
+# Production build
 bun run tauri build
 ```
-
+ 
+---
+ 
+## Roadmap
+ 
+These are the things I'm actively thinking about or working toward. No timelines — this is a passion project.
+ 
+**Coming next:**
+- Multi-step email campaigns — set up a sequence, OutreachOS handles the follow-ups
+- Email open & click tracking — know when someone actually read your message
+- Full pipeline configuration — custom stages, colors, ordering
+- Dashboard — a real one, with actual data
+- Keyboard shortcuts — the full set, not just ⌘K
+- Tag filtering on the People page
+- Onboarding flow — so new users aren't dropped into an empty app with no idea what to do
+ 
+**On the horizon:**
+- Tasks — a job-search specific to-do list tied to contacts and companies
+- Emails page — a lightweight inbox so you don't have to context-switch to Gmail
+- Automation rules — if a contact replies, move them forward automatically
+- Company entity — group contacts by company, track applications per org
+ 
+---
+ 
+## Decisions I made while building this
+ 
+**Local-first, always.** No server means no recurring cost, no data leaving your machine, and no dependency on my uptime. The tradeoff: no sync across devices in v0.1. Worth it.
+ 
+**Deferred the AI layer.** I had planned AI-assisted email drafting for v0.1. I cut it deliberately to ship faster. A product that ships without AI beats a product that never ships with it.
+ 
+**Free, not freemium.** There's no $9 tier. This is a personal project I'm sharing publicly. If it grows into something more, I'll cross that bridge when I get there — but today, it's just free.
+ 
+---
+ 
 ## License
-
-Private - All Rights Reserved
-
+ 
+Private — All Rights Reserved
+ 
+---
+ 
+*Built by [Harshit Singh](https://github.com/Gitter09)*
