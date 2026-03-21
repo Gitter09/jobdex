@@ -12,7 +12,7 @@ export interface Release {
 export const CHANGELOG: Release[] = [
     {
         version: "0.1.3",
-        date: "March 2026",
+        date: "March 21, 2026",
         entries: [
             {
                 label: "Activity timeline",

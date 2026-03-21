@@ -570,7 +570,8 @@ pub fn run() {
             attach_file,
             delete_contact_file,
             open_contact_file,
-            utils::open_external_url
+            utils::open_external_url,
+            check_for_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2022,4 +2023,53 @@ async fn sync_contact_emails(db: tauri::State<'_, Db>, contact_id: String) -> Re
     });
 
     Ok(())
+}
+
+// ===== Update Check =====
+
+#[tauri::command]
+async fn check_for_update() -> Result<String, AppError> {
+    #[cfg(debug_assertions)]
+    println!("[update] checking GitHub for latest release...");
+
+    let client = reqwest::Client::builder()
+        .user_agent("OutreachOS")
+        .build()
+        .map_err(|e| AppError::Network(e.to_string()))?;
+
+    let res = client
+        .get("https://api.github.com/repos/Gitter09/outreach-os/releases/latest")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| {
+            #[cfg(debug_assertions)]
+            println!("[update] request failed: {e}");
+            AppError::Network(e.to_string())
+        })?;
+
+    #[cfg(debug_assertions)]
+    println!("[update] response status: {}", res.status());
+
+    if !res.status().is_success() {
+        #[cfg(debug_assertions)]
+        println!("[update] non-success status, skipping");
+        return Ok(String::new());
+    }
+
+    let data: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| AppError::Network(e.to_string()))?;
+
+    let tag = data["tag_name"]
+        .as_str()
+        .unwrap_or("")
+        .trim_start_matches('v')
+        .to_string();
+
+    #[cfg(debug_assertions)]
+    println!("[update] latest tag: {:?}", tag);
+
+    Ok(tag)
 }
