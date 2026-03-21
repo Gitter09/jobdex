@@ -57,7 +57,7 @@ async fn check_and_send_scheduled_emails(
         FROM scheduled_emails s
         JOIN contacts c ON s.contact_id = c.id
         WHERE s.status = 'pending' 
-        AND s.scheduled_at <= CURRENT_TIMESTAMP
+        AND datetime(s.scheduled_at) <= CURRENT_TIMESTAMP
         "#,
     )
     .fetch_all(db.pool())
