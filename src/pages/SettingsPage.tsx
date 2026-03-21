@@ -199,7 +199,7 @@ export function SettingsPage() {
     return (
         <div className="flex flex-col h-full relative">
             <PageHeader title={tabTitles[activeTab] || "Settings"} />
-            <div className="flex-1 overflow-auto p-6 max-w-4xl w-full">
+            <div className={`flex-1 overflow-auto p-6 w-full ${activeTab !== "about" ? "max-w-4xl" : ""}`}>
                 {renderContent()}
             </div>
         </div>
