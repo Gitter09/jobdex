@@ -299,7 +299,6 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
-                                                    console.log("Inner cancel clicked, current scroll:", window.scrollY);
                                                     // Move focus to a stable element before unmounting the autoFocus input
                                                     // otherwise browser might scroll to bottom if focus is lost
                                                     const firstNameInput = document.getElementById("firstName");
@@ -380,7 +379,6 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                console.log("Main cancel clicked, current scroll:", window.scrollY);
                                 setOpen(false);
                             }}
                         >

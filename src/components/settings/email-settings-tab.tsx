@@ -111,7 +111,7 @@ export function EmailSettingsTab() {
             const result = await invoke<string>(command);
             toast.success(result);
             fetchAccounts();
-        } catch (e: any) {
+        } catch (e: unknown) {
             // Check if it's a "not configured" error
             const errorStr = String(e);
             if (errorStr.includes("credentials not configured") || errorStr.includes("disabled while in beta")) {
@@ -503,7 +503,7 @@ export function EmailSettingsTab() {
                                         variant="outline"
                                         size="sm"
                                         className="w-full"
-                                        onClick={() => window.open(getSetupGuideUrl(setupProvider!), "_blank")}
+                                        onClick={() => window.open(getSetupGuideUrl(setupProvider ?? "gmail"), "_blank")}
                                     >
                                         <ExternalLink className="mr-2 h-4 w-4" />
                                         Open {setupProvider === "gmail" ? "Google Cloud Console" : "Azure Portal"}

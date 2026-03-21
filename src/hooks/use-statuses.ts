@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Status } from "@/types/crm";
+import { useErrors } from "@/hooks/use-errors";
 
 export function useStatuses() {
+    const { handleError } = useErrors();
     const [statuses, setStatuses] = useState<Status[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -12,7 +14,7 @@ export function useStatuses() {
             const data = await invoke<Status[]>("get_statuses");
             setStatuses(data);
         } catch (e) {
-            console.error("Failed to fetch statuses", e);
+            handleError(e, "Failed to load pipeline stages");
         } finally {
             setLoading(false);
         }

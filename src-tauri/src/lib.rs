@@ -1194,12 +1194,14 @@ async fn save_api_key(
     service: String,
     key: String,
 ) -> Result<(), AppError> {
+    #[cfg(debug_assertions)]
     println!("--- [DB Debug] Saving key for service: {} ---", service);
     let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
     manager
         .set(&service, &key)
         .await
         .map_err(|e| e.to_string())?;
+    #[cfg(debug_assertions)]
     println!("--- [DB Debug] Key saved successfully ---");
     Ok(())
 }
@@ -1854,7 +1856,7 @@ async fn get_contact_events(
     let pool = db.pool();
     // Only return user-created events (meetings, calls, etc.) — NOT system activity
     let events = sqlx::query_as::<_, outreach_core::models::ContactEvent>(
-        "SELECT * FROM contact_events WHERE contact_id = ? AND event_type = 'user_event' ORDER BY event_at ASC",
+        "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'user_event' ORDER BY event_at ASC",
     )
     .bind(contact_id)
     .fetch_all(pool)
@@ -1870,7 +1872,7 @@ async fn get_contact_activity(
     let pool = db.pool();
     // Only return system-generated activity events for the Activity tab
     let events = sqlx::query_as::<_, outreach_core::models::ContactEvent>(
-        "SELECT * FROM contact_events WHERE contact_id = ? AND event_type = 'activity' ORDER BY event_at DESC",
+        "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'activity' ORDER BY event_at DESC",
     )
     .bind(contact_id)
     .fetch_all(pool)
@@ -1946,82 +1948,6 @@ async fn delete_contact_event(db: tauri::State<'_, Db>, id: String) -> Result<()
         .bind(id)
         .execute(pool)
         .await?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn sync_contact_emails(db: tauri::State<'_, Db>, contact_id: String) -> Result<(), AppError> {
-    let pool = db.pool().clone();
-
-    // Trigger the background sync for all accounts associated with this contact
-    // We already have polling logic in various places, but here we can specifically
-    // trigger a sync for accounts that have threads with this contact.
-
-    // For now, we'll trigger a broad fetch_new_messages for all configured accounts
-    // and let the internal deduplication and thread matching handle the contact's updates.
-    let accounts =
-        sqlx::query_as::<_, outreach_core::models::EmailAccount>("SELECT * FROM email_accounts")
-            .fetch_all(&pool)
-            .await?;
-
-    for account in accounts {
-        let db_instance = db.inner().clone();
-        tokio::spawn(async move {
-            let service = outreach_core::EmailService::new(db_instance);
-            let _ = service.sync_account(&account.id).await;
-        });
-    }
-
-    // Also update the last_interaction_at for the contact based on the most recent message,
-    // and register activity events for any received emails not yet tracked.
-    tokio::spawn(async move {
-        let pool = pool;
-        let most_recent = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
-            "SELECT MAX(sent_at) FROM email_messages WHERE thread_id IN (SELECT id FROM email_threads WHERE contact_id = ?)"
-        )
-        .bind(&contact_id)
-        .fetch_optional(&pool)
-        .await;
-
-        if let Ok(Some(latest)) = most_recent {
-            let _ = sqlx::query("UPDATE contacts SET last_interaction_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                .bind(latest)
-                .bind(&contact_id)
-                .execute(&pool)
-                .await;
-        }
-
-        // Create activity events for received emails not yet registered.
-        // Uses 'recv_{message_id}' as the event PK so INSERT OR IGNORE deduplicates on repeat syncs.
-        let msgs: Vec<(String, Option<String>, Option<chrono::DateTime<chrono::Utc>>)> =
-            sqlx::query_as(
-                r#"SELECT em.id, em.subject, em.sent_at
-                   FROM email_messages em
-                   JOIN email_threads et ON em.thread_id = et.id
-                   WHERE et.contact_id = ? AND em.status = 'received'"#,
-            )
-            .bind(&contact_id)
-            .fetch_all(&pool)
-            .await
-            .unwrap_or_default();
-
-        for (msg_id, subject, sent_at) in msgs {
-            let event_id = format!("recv_{}", msg_id);
-            let title = format!("Email received: {}", subject.unwrap_or_else(|| "(no subject)".to_string()));
-            let event_at = sent_at.unwrap_or_else(chrono::Utc::now);
-            let _ = sqlx::query(
-                "INSERT OR IGNORE INTO contact_events (id, contact_id, title, description, event_at, event_type) VALUES (?, ?, ?, ?, ?, 'activity')",
-            )
-            .bind(&event_id)
-            .bind(&contact_id)
-            .bind(&title)
-            .bind(Option::<String>::None)
-            .bind(event_at)
-            .execute(&pool)
-            .await;
-        }
-    });
-
     Ok(())
 }
 

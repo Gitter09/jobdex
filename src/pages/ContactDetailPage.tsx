@@ -126,8 +126,7 @@ export function ContactDetailPage() {
             const result = await invoke<ContactEvent[]>("get_contact_activity", { contactId: id });
             setActivity(result);
         } catch (err) {
-            // Silently fail — activity is non-critical
-            console.error("Failed to load activity:", err);
+            handleError(err, "Failed to load activity");
         } finally {
             setActivityLoading(false);
         }
@@ -286,7 +285,7 @@ export function ContactDetailPage() {
             await invoke("delete_contact", { id: contact.id });
             navigate("/");
         } catch (error) {
-            console.error("Delete failed:", error);
+            handleError(error, "Failed to delete contact");
         }
     };
 

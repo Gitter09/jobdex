@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useErrors } from "@/hooks/use-errors";
+import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
 import { EmailSettingsTab } from "@/components/settings/email-settings-tab";
 import { SecuritySettingsTab } from "@/components/settings/security-settings-tab";
@@ -122,8 +123,8 @@ export function SettingsPage() {
         }
         try {
             await invoke("clear_all_data");
-            alert("Database cleared successfully. The app will now reload.");
-            window.location.reload();
+            toast.success("Database cleared. Reloading...");
+            setTimeout(() => window.location.reload(), 1000);
         } catch (error) {
             handleError(error, "Failed to clear database");
         }
