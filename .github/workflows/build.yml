@@ -57,7 +57,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsqlcipher-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsqlcipher-dev rpm
 
       - name: Install SQLCipher (macOS only)
         if: matrix.platform == 'macos-latest'
@@ -107,6 +107,7 @@ jobs:
           path: |
             target/release/bundle/deb/*.deb
             target/release/bundle/appimage/*.AppImage
+            target/release/bundle/rpm/*.rpm
           if-no-files-found: warn
 
   test:
