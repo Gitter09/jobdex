@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { EmailSettingsTab } from "@/components/settings/email-settings-tab";
 import { SecuritySettingsTab } from "@/components/settings/security-settings-tab";
 import { AboutTab } from "@/components/settings/about-tab";
+import { PipelineSettingsTab } from "@/components/settings/pipeline-settings-tab";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -184,7 +185,7 @@ export function SettingsPage() {
         switch (activeTab) {
             case "email": return <EmailSettingsTab />;
             case "appearance": return renderAppearanceContent();
-            case "pipeline": return <div className="p-4 text-muted-foreground">Pipeline configuration coming soon.</div>;
+            case "pipeline": return <PipelineSettingsTab />;
             case "data": return renderDataContent();
             case "security": return <SecuritySettingsTab />;
             case "about": return <AboutTab />;

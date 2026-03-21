@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Contact } from "@/types/crm";
+import { Contact, Status } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -42,6 +42,7 @@ import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { useStatuses } from "@/hooks/use-statuses";
 import { getColorHex } from "@/lib/utils";
 import { ManageTagsDialog } from "@/components/tags/manage-tags-dialog";
+import { EditStatusDialog } from "@/components/settings/edit-status-dialog";
 import { useTags } from "@/hooks/use-tags";
 import { useErrors } from "@/hooks/use-errors";
 
@@ -53,7 +54,7 @@ export function ContactsPage() {
     const navigate = useNavigate();
     const { handleError } = useErrors();
     const [contacts, setContacts] = useState<Contact[]>([]);
-    const { statuses, refreshStatuses } = useStatuses();
+    const { statuses, refreshStatuses, addStatus, editStatus, removeStatus } = useStatuses();
     const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
     const [loading, setLoading] = useState(true);
 
@@ -74,6 +75,13 @@ export function ContactsPage() {
     const [tagFilter, setTagFilter] = useState<string>("all");
     const [manageTagsOpen, setManageTagsOpen] = useState(false);
     const { tags: availableTags } = useTags();
+
+    // Status management (Kanban edit/delete/add)
+    const [editingStatus, setEditingStatus] = useState<Status | null>(null);
+    const [deletingStatus, setDeletingStatus] = useState<Status | null>(null);
+    const [editStatusDialogOpen, setEditStatusDialogOpen] = useState(false);
+    const [addStatusDialogOpen, setAddStatusDialogOpen] = useState(false);
+    const [isDeletingStatus, setIsDeletingStatus] = useState(false);
 
     // Re-fetch when global actions complete
     useEffect(() => {
@@ -201,6 +209,41 @@ export function ContactsPage() {
     const handleOpenAddContact = (statusId?: string) => {
         setNewContactStatusId(statusId);
         setAddContactOpen(true);
+    };
+
+    const handleEditStatus = (status: Status) => {
+        setEditingStatus(status);
+        setEditStatusDialogOpen(true);
+    };
+
+    const handleDeleteStatus = (status: Status) => {
+        setDeletingStatus(status);
+    };
+
+    const handleConfirmDeleteStatus = async () => {
+        if (!deletingStatus) return;
+        setIsDeletingStatus(true);
+        try {
+            await removeStatus(deletingStatus.id);
+            toast.success(`"${deletingStatus.label}" stage removed.`);
+            setDeletingStatus(null);
+        } catch (error) {
+            handleError(error, "Failed to delete stage");
+        } finally {
+            setIsDeletingStatus(false);
+        }
+    };
+
+    const handleSaveStatus = async (label: string, color: string) => {
+        if (editingStatus) {
+            await editStatus(editingStatus.id, label, color);
+            toast.success("Stage updated.");
+        }
+    };
+
+    const handleAddStatus = async (label: string, color: string) => {
+        await addStatus(label, color);
+        toast.success(`"${label}" stage added.`);
     };
 
     useEffect(() => {
@@ -368,6 +411,9 @@ export function ContactsPage() {
                                     onContactMove={handleContactMove}
                                     onContactClick={handleContactClick}
                                     onAddContact={handleOpenAddContact}
+                                    onEditStatus={handleEditStatus}
+                                    onDeleteStatus={handleDeleteStatus}
+                                    onAddStatus={() => setAddStatusDialogOpen(true)}
                                 />
                             </div>
                         ) : (
@@ -568,6 +614,49 @@ export function ContactsPage() {
             </AlertDialog>
 
             <ManageTagsDialog open={manageTagsOpen} onOpenChange={setManageTagsOpen} />
+
+            {/* Edit Status Dialog */}
+            <EditStatusDialog
+                status={editingStatus}
+                open={editStatusDialogOpen}
+                onOpenChange={(open) => {
+                    setEditStatusDialogOpen(open);
+                    if (!open) setEditingStatus(null);
+                }}
+                onSave={handleSaveStatus}
+            />
+
+            {/* Add Status Dialog */}
+            <EditStatusDialog
+                open={addStatusDialogOpen}
+                onOpenChange={setAddStatusDialogOpen}
+                onSave={handleAddStatus}
+            />
+
+            {/* Delete Status Confirmation */}
+            <AlertDialog
+                open={!!deletingStatus}
+                onOpenChange={(open) => { if (!open) setDeletingStatus(null); }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove this stage?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Any contacts in <span className="font-semibold text-foreground">"{deletingStatus?.label}"</span> will lose their stage. This can't be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingStatus}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={(e) => { e.preventDefault(); handleConfirmDeleteStatus(); }}
+                            disabled={isDeletingStatus}
+                        >
+                            {isDeletingStatus ? "Removing…" : "Remove stage"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

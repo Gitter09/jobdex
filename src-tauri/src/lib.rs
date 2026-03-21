@@ -236,6 +236,30 @@ async fn delete_status(db: tauri::State<'_, Db>, id: String) -> Result<(), AppEr
 }
 
 #[derive(serde::Deserialize)]
+struct StatusPosition {
+    id: String,
+    position: i32,
+}
+
+#[tauri::command]
+async fn reorder_statuses(
+    db: tauri::State<'_, Db>,
+    positions: Vec<StatusPosition>,
+) -> Result<(), AppError> {
+    let pool = db.pool();
+    let mut tx = pool.begin().await?;
+    for sp in positions {
+        sqlx::query("UPDATE statuses SET position = ? WHERE id = ?")
+            .bind(sp.position)
+            .bind(&sp.id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddContactArgs {
     pub first_name: String,
@@ -489,6 +513,7 @@ pub fn run() {
             create_status,
             update_status,
             delete_status,
+            reorder_statuses,
             add_contact,
             update_contact,
             delete_contact,
@@ -555,46 +580,31 @@ pub fn run() {
 async fn fix_orphan_contacts(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     let pool = db.pool();
 
-    // Ensure statuses exist
-    sqlx::query(
-        r#"
-        INSERT OR IGNORE INTO statuses (id, label, color, position, is_default) VALUES 
-        ('stat-new', 'New', '#3b82f6', 0, 1),
-        ('stat-contacted', 'Contacted', '#eab308', 1, 0),
-        ('stat-replied', 'Replied', '#a855f7', 2, 0),
-        ('stat-interested', 'Interested', '#22c55e', 3, 0),
-        ('stat-not-interested', 'Not Interested', '#ef4444', 4, 0)
-        "#,
-    )
-    .execute(pool)
-    .await
-    .map_err(|e| e.to_string())?;
-
-    // Count before
-    let before: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM contacts WHERE status_id IS NULL OR status_id NOT IN ('stat-new', 'stat-contacted', 'stat-replied', 'stat-interested', 'stat-not-interested')")
+    // Only seed defaults on a completely fresh install (empty statuses table).
+    // Do NOT run INSERT OR IGNORE unconditionally — that would restore any status
+    // the user intentionally deleted.
+    let status_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM statuses")
         .fetch_one(pool)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e: sqlx::Error| e.to_string())?;
 
-    // Fix NULL status_id
-    sqlx::query("UPDATE contacts SET status_id = 'stat-new' WHERE status_id IS NULL")
+    if status_count == 0 {
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO statuses (id, label, color, position, is_default) VALUES
+            ('stat-new', 'New', '#3b82f6', 0, 1),
+            ('stat-contacted', 'Contacted', '#eab308', 1, 0),
+            ('stat-replied', 'Replied', '#a855f7', 2, 0),
+            ('stat-interested', 'Interested', '#22c55e', 3, 0),
+            ('stat-not-interested', 'Not Interested', '#ef4444', 4, 0)
+            "#,
+        )
         .execute(pool)
         .await
         .map_err(|e| e.to_string())?;
+    }
 
-    // Fix legacy def-stat-* IDs
-    sqlx::query("UPDATE contacts SET status_id = 'stat-new' WHERE status_id LIKE 'def-stat-%'")
-        .execute(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Fix any other invalid status_id
-    sqlx::query("UPDATE contacts SET status_id = 'stat-new' WHERE status_id IS NOT NULL AND status_id NOT IN ('stat-new', 'stat-contacted', 'stat-replied', 'stat-interested', 'stat-not-interested')")
-        .execute(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Cleanup old statuses
+    // Cleanup legacy status rows (safe to always run)
     sqlx::query("DELETE FROM statuses WHERE id = 'stat-int-ni'")
         .execute(pool)
         .await
@@ -610,7 +620,42 @@ async fn fix_orphan_contacts(db: tauri::State<'_, Db>) -> Result<String, AppErro
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(format!("Fixed {} orphan contacts", before.0))
+    // Determine the fallback status (default or first by position)
+    let fallback: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM statuses ORDER BY is_default DESC, position ASC LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e: sqlx::Error| e.to_string())?;
+
+    if let Some(ref fallback_id) = fallback {
+        // Fix NULL status_id
+        sqlx::query("UPDATE contacts SET status_id = ? WHERE status_id IS NULL")
+            .bind(fallback_id)
+            .execute(pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Fix legacy def-stat-* IDs
+        sqlx::query("UPDATE contacts SET status_id = ? WHERE status_id LIKE 'def-stat-%'")
+            .bind(fallback_id)
+            .execute(pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        // Fix contacts whose status_id references a status that no longer exists.
+        // Use the actual statuses table — not a hardcoded list — so user-created
+        // custom statuses are never mistakenly reset.
+        sqlx::query(
+            "UPDATE contacts SET status_id = ? WHERE status_id IS NOT NULL AND status_id NOT IN (SELECT id FROM statuses)",
+        )
+        .bind(fallback_id)
+        .execute(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok("ok".to_string())
 }
 
 #[tauri::command]

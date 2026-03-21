@@ -18,6 +18,8 @@ import { Contact, Status } from "@/types/crm";
 import { KanbanColumn } from "./kanban-column";
 import { KanbanCard } from "./kanban-card";
 import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 
 interface KanbanBoardProps {
     contacts: Contact[];
@@ -27,9 +29,10 @@ interface KanbanBoardProps {
     onAddContact?: (statusId: string) => void;
     onEditStatus?: (status: Status) => void;
     onDeleteStatus?: (status: Status) => void;
+    onAddStatus?: () => void;
 }
 
-export function KanbanBoard({ contacts, statuses, onContactMove, onContactClick, onAddContact, onEditStatus, onDeleteStatus }: KanbanBoardProps) {
+export function KanbanBoard({ contacts, statuses, onContactMove, onContactClick, onAddContact, onEditStatus, onDeleteStatus, onAddStatus }: KanbanBoardProps) {
     const [activeId, setActiveId] = useState<string | null>(null);
 
     // Group contacts by status_id
@@ -129,6 +132,18 @@ export function KanbanBoard({ contacts, statuses, onContactMove, onContactClick,
                         onDelete={onDeleteStatus}
                     />
                 ))}
+                {onAddStatus && (
+                    <div className="flex-shrink-0 w-[280px] flex items-start pt-1">
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground border border-dashed"
+                            onClick={onAddStatus}
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add stage
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {createPortal(

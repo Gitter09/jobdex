@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { StatusPicker } from "@/components/contacts/status-picker";
-import { getInitials, cn } from "@/lib/utils";
+import { getInitials, cn, getColorHex } from "@/lib/utils";
+import { useStatuses } from "@/hooks/use-statuses";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -79,7 +80,7 @@ export function ContactDetailPage() {
     const [files, setFiles] = useState<ContactFile[]>([]);
     const [filesLoading, setFilesLoading] = useState(false);
     const { setCommandOpen } = useOutletContext<{ setCommandOpen: (open: boolean) => void }>();
-    // const { statuses } = useStatuses(); // Not used for progress bar anymore
+    const { statuses } = useStatuses();
 
     const { tags: availableTags, assignTag, unassignTag } = useTags();
     const { handleError } = useErrors();
@@ -808,43 +809,19 @@ export function ContactDetailPage() {
                                     {/* Status Progress Bar */}
                                     <div className="flex gap-1 h-1.5 mt-3">
                                         {(() => {
-                                            // Define the 4 steps
-                                            const steps = [
-                                                { id: 'stat-new', color: '#3b82f6' },       // New
-                                                { id: 'stat-contacted', color: '#eab308' }, // Contacted
-                                                { id: 'stat-replied', color: '#a855f7' },   // Replied
-                                                { id: 'stat-final', color: '#64748b' }      // Final (Int/NI)
-                                            ];
-
-                                            // Determine current step index
-                                            let currentStep = 0;
-                                            const sId = contact.status_id;
-                                            if (sId === 'stat-contacted') currentStep = 1;
-                                            else if (sId === 'stat-replied') currentStep = 2;
-                                            else if (sId === 'stat-interested' || sId === 'stat-not-interested' || sId === 'stat-int-ni') currentStep = 3;
-
-                                            // Determine color for the final step if active
-                                            let finalColor = '#64748b';
-                                            if (sId === 'stat-interested') finalColor = '#22c55e'; // Green
-                                            else if (sId === 'stat-not-interested') finalColor = '#ef4444'; // Red
-
-                                            return steps.map((step, index) => {
-                                                const isActive = index <= currentStep;
-                                                let color = step.color;
-
-                                                // Use specific color for final step if active
-                                                if (index === 3 && isActive) {
-                                                    color = finalColor;
-                                                }
-
+                                            const sorted = [...statuses].sort((a, b) => a.position - b.position);
+                                            const currentIndex = sorted.findIndex(s => s.id === contact.status_id);
+                                            return sorted.map((status, index) => {
+                                                const isActive = index <= currentIndex;
+                                                const hex = getColorHex(status.color);
                                                 return (
                                                     <div
-                                                        key={index}
+                                                        key={status.id}
                                                         className={cn(
                                                             "flex-1 rounded-full transition-all",
                                                             isActive ? "opacity-100" : "opacity-20"
                                                         )}
-                                                        style={{ backgroundColor: isActive ? color : undefined }}
+                                                        style={{ backgroundColor: isActive ? hex : undefined }}
                                                     >
                                                         {!isActive && (
                                                             <div className="w-full h-full bg-muted rounded-full" />
