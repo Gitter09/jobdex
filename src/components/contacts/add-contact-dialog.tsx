@@ -185,6 +185,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     onChange={(e) => setFirstName(e.target.value)}
                                     placeholder="John"
                                     required
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -195,6 +198,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     onChange={(e) => setLastName(e.target.value)}
                                     placeholder="Doe"
                                     required
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>
@@ -207,6 +213,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="VP of Sales"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -216,6 +225,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     value={company}
                                     onChange={(e) => setCompany(e.target.value)}
                                     placeholder="Acme Corp"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>
@@ -228,6 +240,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
                                     placeholder="San Francisco, CA"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -237,6 +252,9 @@ export function AddContactDialog({ onContactAdded, open: controlledOpen, onOpenC
                                     value={companyWebsite}
                                     onChange={(e) => setCompanyWebsite(e.target.value)}
                                     placeholder="acme.com"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>

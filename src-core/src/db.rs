@@ -138,6 +138,7 @@ pub mod models {
         pub status_label: Option<String>, // Join result
         pub status_color: Option<String>, // Join result
 
+        #[serde(rename = "summary")]
         pub intelligence_summary: Option<String>,
 
         // Dates & Cadence

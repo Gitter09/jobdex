@@ -24,7 +24,7 @@ export interface Contact {
     next_contact_event?: string;
     cadence_stage?: number;
 
-    intelligence_summary?: string;
+    summary?: string;
     created_at: string;
     updated_at: string;
     tags?: Tag[];
@@ -87,4 +87,34 @@ export interface EmailTemplate {
     body?: string;
     created_at: string;
     updated_at: string;
+}
+
+export interface ContactFile {
+    id: string;
+    contactId: string;
+    filename: string;
+    filePath: string;
+    createdAt: string;
+}
+
+export interface EmailSignature {
+    id: string;
+    name: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ScheduledEmail {
+    id: string;
+    contactId: string;
+    contactFirstName: string;
+    contactLastName: string;
+    accountId: string;
+    subject: string;
+    body: string;
+    scheduledAt: string; // ISO string
+    status: string; // 'pending', 'sent', 'failed'
+    errorMessage?: string;
+    createdAt: string;
 }

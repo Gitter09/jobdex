@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Contact, ContactEvent } from "@/types/crm";
+import { Contact, ContactEvent, ContactFile } from "@/types/crm";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useErrors } from "@/hooks/use-errors";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Mail, Linkedin, Calendar, MapPin, Building, Loader2, Sparkles, Briefcase, Copy, RotateCw, MoreHorizontal, Send, Check, Pencil, Trash2, Tag as TagIcon, Plus, X, Clock, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail, Linkedin, Calendar, MapPin, Building, Loader2, Sparkles, Briefcase, Copy, MoreHorizontal, Send, Check, Pencil, Trash2, Tag as TagIcon, Plus, X, Clock, RefreshCw, Paperclip, FileIcon, ExternalLink } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,6 +75,9 @@ export function ContactDetailPage() {
     const [eventTimeDraft, setEventTimeDraft] = useState("10:00");
     const [eventDescDraft, setEventDescDraft] = useState("");
     const [isSyncing, setIsSyncing] = useState(false);
+    const [activityToDelete, setActivityToDelete] = useState<ContactEvent | null>(null);
+    const [files, setFiles] = useState<ContactFile[]>([]);
+    const [filesLoading, setFilesLoading] = useState(false);
     const { setCommandOpen } = useOutletContext<{ setCommandOpen: (open: boolean) => void }>();
     // const { statuses } = useStatuses(); // Not used for progress bar anymore
 
@@ -98,6 +102,7 @@ export function ContactDetailPage() {
         fetchContact();
         fetchEvents();
         fetchActivity();
+        fetchFiles();
     }, [id]);
 
     const fetchEvents = async () => {
@@ -127,14 +132,55 @@ export function ContactDetailPage() {
         }
     };
 
-    const handleSyncEmails = async () => {
+    const fetchFiles = async () => {
         if (!id) return;
+        setFilesLoading(true);
+        try {
+            const result = await invoke<ContactFile[]>("get_contact_files", { contactId: id });
+            setFiles(result);
+        } catch (err) {
+            handleError(err, "Failed to load files");
+        } finally {
+            setFilesLoading(false);
+        }
+    };
+
+    const handleAttachFile = async () => {
+        if (!id) return;
+        try {
+            const selected = await openFileDialog({ multiple: false });
+            if (!selected) return;
+            await invoke("attach_file", { contactId: id, srcPath: selected });
+            toast.success("File attached");
+            fetchFiles();
+        } catch (err) {
+            handleError(err, "Failed to attach file");
+        }
+    };
+
+    const handleDeleteFile = async (fileId: string) => {
+        try {
+            await invoke("delete_contact_file", { id: fileId });
+            toast.success("File removed");
+            setFiles((prev) => prev.filter((f) => f.id !== fileId));
+        } catch (err) {
+            handleError(err, "Failed to remove file");
+        }
+    };
+
+    const handleOpenFile = async (fileId: string) => {
+        try {
+            await invoke("open_contact_file", { id: fileId });
+        } catch (err) {
+            handleError(err, "Failed to open file");
+        }
+    };
+
+    const handleSyncEmails = async () => {
         setIsSyncing(true);
         try {
-            await invoke("sync_contact_emails", { contactId: id });
-            toast.success("Email sync started. This may take a moment to reflect.");
-            // Refresh contact to get updated last_interaction_at
-            setTimeout(fetchContact, 2000);
+            await invoke("sync_email_accounts");
+            toast.success("Sync complete. New emails will appear shortly.");
         } catch (err) {
             handleError(err, "Failed to sync emails");
         } finally {
@@ -223,7 +269,7 @@ export function ContactDetailPage() {
             await invoke("update_contact", {
                 args: {
                     id: contact.id,
-                    intelligenceSummary: summaryDraft
+                    summary: summaryDraft
                 }
             });
             await fetchContact();
@@ -425,25 +471,6 @@ export function ContactDetailPage() {
                             </div>
                             <div className="flex items-center justify-between py-2">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground w-1/3">
-                                    <RotateCw className="h-3 w-3" />
-                                    Last interact...
-                                </div>
-                                <div className="text-sm w-2/3 truncate">
-                                    {contact.last_contacted_date ? (
-                                        (() => {
-                                            try {
-                                                const d = new Date(contact.last_contacted_date);
-                                                if (isNaN(d.getTime())) return "Never";
-                                                return formatDistanceToNow(d, { addSuffix: true });
-                                            } catch (e) {
-                                                return "Never";
-                                            }
-                                        })()
-                                    ) : "Never"}
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between py-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground w-1/3">
                                     <Clock className="h-3 w-3" />
                                     Next Contact
                                 </div>
@@ -583,7 +610,7 @@ export function ContactDetailPage() {
                                 <Card
                                     className={cn(
                                         "shadow-sm transition-all duration-200 flex-1 min-h-[250px] flex flex-col",
-                                        contact.intelligence_summary && "hover:shadow-md cursor-pointer hover:bg-muted/30"
+                                        contact.summary && "hover:shadow-md cursor-pointer hover:bg-muted/30"
                                     )}
                                 >
                                     <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -594,7 +621,7 @@ export function ContactDetailPage() {
                                             className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSummaryDraft(contact.intelligence_summary || "");
+                                                setSummaryDraft(contact.summary || "");
                                                 setIsSummaryEditOpen(true);
                                             }}
                                         >
@@ -602,15 +629,15 @@ export function ContactDetailPage() {
                                             Update
                                         </Button>
                                     </CardHeader>
-                                    <CardContent onClick={() => contact.intelligence_summary && setIsSummaryExpanded(!isSummaryExpanded)}>
+                                    <CardContent onClick={() => contact.summary && setIsSummaryExpanded(!isSummaryExpanded)}>
                                         <div className="text-sm leading-relaxed">
-                                            {contact.intelligence_summary ? (
-                                                <p className={cn("whitespace-pre-wrap text-muted-foreground/90", !isSummaryExpanded && "line-clamp-4")}>
-                                                    {contact.intelligence_summary}
+                                            {contact.summary ? (
+                                                <p className={cn("whitespace-pre-wrap text-foreground/80", !isSummaryExpanded && "line-clamp-4")}>
+                                                    {contact.summary}
                                                 </p>
                                             ) : (
                                                 <div className="text-muted-foreground italic text-xs">
-                                                    No summary available. Click "Update" to add focused insights for this contact.
+                                                    Add what you know — how you met, what to remember, what to say when you reach out.
                                                 </div>
                                             )}
                                         </div>
@@ -700,18 +727,49 @@ export function ContactDetailPage() {
                             </section>
 
                             <section>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className="h-5 w-5 rounded bg-[#0077b5] flex items-center justify-center text-white font-bold text-[10px]">in</div>
-                                    <h2 className="text-lg font-semibold">LinkedIn</h2>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Paperclip className="h-4 w-4 text-muted-foreground" />
+                                        <h2 className="text-lg font-semibold">Attached Files</h2>
+                                    </div>
+                                    <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={handleAttachFile}>
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Attach
+                                    </Button>
                                 </div>
-                                <Card className="shadow-sm hover:shadow-md transition-shadow h-[100px] flex flex-col justify-center">
-                                    <CardContent className="pt-0">
-                                        {contact.linkedin_url ? (
-                                            <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline break-all">
-                                                {contact.linkedin_url}
-                                            </a>
+                                <Card className="shadow-sm min-h-[100px]">
+                                    <CardContent className="pt-4">
+                                        {filesLoading ? (
+                                            <div className="flex items-center justify-center py-4">
+                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                            </div>
+                                        ) : files.length === 0 ? (
+                                            <div className="text-muted-foreground text-sm italic text-center py-2">
+                                                No files attached yet.
+                                            </div>
                                         ) : (
-                                            <div className="text-muted-foreground text-sm">No LinkedIn profile linked.</div>
+                                            <div className="space-y-2">
+                                                {files.map((file) => (
+                                                    <div key={file.id} className="flex items-center justify-between group">
+                                                        <button
+                                                            className="flex items-center gap-2 text-sm hover:text-primary truncate text-left"
+                                                            onClick={() => handleOpenFile(file.id)}
+                                                        >
+                                                            <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                            <span className="truncate">{file.filename}</span>
+                                                            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100" />
+                                                        </button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                            onClick={() => handleDeleteFile(file.id)}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>
@@ -856,7 +914,7 @@ export function ContactDetailPage() {
                                                         const isTag = event.title.startsWith("Tag added:") || event.title.startsWith("Tag removed:");
                                                         const IconComp = isEmail ? Mail : isStatus ? ArrowRight : isTag ? TagIcon : Calendar;
                                                         return (
-                                                            <div key={event.id} className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors">
+                                                            <div key={event.id} className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors group">
                                                                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border shrink-0 mt-0.5">
                                                                     <IconComp className="h-4 w-4 text-muted-foreground" />
                                                                 </div>
@@ -869,6 +927,14 @@ export function ContactDetailPage() {
                                                                         {formatDistanceToNow(new Date(event.event_at), { addSuffix: true })}
                                                                     </p>
                                                                 </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                                    onClick={() => setActivityToDelete(event)}
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
                                                             </div>
                                                         );
                                                     })}
@@ -962,6 +1028,9 @@ export function ContactDetailPage() {
                                             placeholder="e.g. Project Kickoff"
                                             value={eventTitleDraft}
                                             onChange={(e) => setEventTitleDraft(e.target.value)}
+                                            autoCorrect="off"
+                                            autoCapitalize="off"
+                                            spellCheck={false}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
@@ -1000,6 +1069,9 @@ export function ContactDetailPage() {
                                             value={eventDescDraft}
                                             onChange={(e) => setEventDescDraft(e.target.value)}
                                             className="resize-none"
+                                            autoCorrect="off"
+                                            autoCapitalize="off"
+                                            spellCheck={false}
                                         />
                                     </div>
                                 </div>
@@ -1010,21 +1082,56 @@ export function ContactDetailPage() {
                             </DialogContent>
                         </Dialog>
 
+                        {/* Activity Delete Confirmation */}
+                        <AlertDialog open={activityToDelete !== null} onOpenChange={(open) => !open && setActivityToDelete(null)}>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Remove this activity entry?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently remove <strong>"{activityToDelete?.title}"</strong> from the timeline. This can't be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        className="bg-red-600 hover:bg-red-700 text-white"
+                                        onClick={async () => {
+                                            if (!activityToDelete) return;
+                                            try {
+                                                await invoke("delete_contact_event", { id: activityToDelete.id });
+                                                toast.success("Activity entry removed");
+                                                fetchActivity();
+                                            } catch (err) {
+                                                handleError(err, "Failed to remove activity entry");
+                                            } finally {
+                                                setActivityToDelete(null);
+                                            }
+                                        }}
+                                    >
+                                        Remove
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
                         {/* Summary Edit Dialog */}
                         <Dialog open={isSummaryEditOpen} onOpenChange={setIsSummaryEditOpen}>
                             <DialogContent className="max-w-2xl">
                                 <DialogHeader>
                                     <DialogTitle>Contact Summary</DialogTitle>
                                     <DialogDescription>
-                                        Add key context or focused insights for <strong>{contact.first_name}</strong>.
+                                        Add what you know about <strong>{contact.first_name}</strong>.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="py-4">
                                     <Textarea
-                                        placeholder="Type a summary..."
+                                        placeholder="Add what you know — how you met, what to remember, what to say when you reach out."
                                         className="min-h-[200px] resize-none focus-visible:ring-primary/30"
                                         value={summaryDraft}
                                         onChange={(e) => setSummaryDraft(e.target.value)}
+                                        autoCorrect="off"
+                                        autoCapitalize="off"
+                                        spellCheck={false}
                                     />
                                 </div>
                                 <DialogFooter>

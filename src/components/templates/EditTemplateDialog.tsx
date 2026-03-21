@@ -113,6 +113,9 @@ export function EditTemplateDialog({
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             disabled={isLoading}
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
                         />
                     </div>
 
@@ -124,6 +127,9 @@ export function EditTemplateDialog({
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
                             disabled={isLoading}
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
                         />
                     </div>
 
@@ -137,6 +143,9 @@ export function EditTemplateDialog({
                             onChange={(e) => setBody(e.target.value)}
                             disabled={isLoading}
                             rows={10}
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
                         />
                         <div className="flex flex-wrap gap-2 mt-1 items-center">
                             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium mr-1">Insert:</span>

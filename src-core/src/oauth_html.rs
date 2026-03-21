@@ -127,6 +127,13 @@ pub fn get_success_html(service: &str) -> String {
             letter-spacing: 0.05em;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }}
+
+        .fallback {{
+            font-size: 0.8rem;
+            color: rgba(148, 163, 184, 0.6);
+            margin-top: 1rem;
+            margin-bottom: 0;
+        }}
     </style>
 </head>
 <body>
@@ -137,9 +144,10 @@ pub fn get_success_html(service: &str) -> String {
             </svg>
         </div>
         <div class="service-badge">{service} Connected</div>
-        <h1>Success</h1>
-        <p>Your account has been connected securely. You can now close this window and return to OutreachOS.</p>
-        <button class="btn" onclick="window.close()">Close Window</button>
+        <h1>You're connected.</h1>
+        <p>Head back to OutreachOS — your account is good to go.</p>
+        <button class="btn" onclick="window.close()">Close this tab</button>
+        <p class="fallback">If this doesn't close, you can close the tab manually.</p>
     </div>
 </body>
 </html>
@@ -276,6 +284,13 @@ pub fn get_error_html(error: &str) -> String {
             letter-spacing: 0.05em;
             border: 1px solid rgba(239, 68, 68, 0.2);
         }}
+
+        .fallback {{
+            font-size: 0.8rem;
+            color: rgba(148, 163, 184, 0.6);
+            margin-top: 1rem;
+            margin-bottom: 0;
+        }}
     </style>
 </head>
 <body>
@@ -285,10 +300,11 @@ pub fn get_error_html(error: &str) -> String {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </div>
-        <div class="error-badge">Authorization Failed</div>
-        <h1>Something went wrong</h1>
-        <p>{error}</p>
-        <button class="btn" onclick="window.close()">Close and Try Again</button>
+        <div class="error-badge">Connection failed</div>
+        <h1>That didn't work.</h1>
+        <p>{error}<br><br>Close this tab and try connecting again from OutreachOS.</p>
+        <button class="btn" onclick="window.close()">Close this tab</button>
+        <p class="fallback">If this doesn't close, you can close the tab manually.</p>
     </div>
 </body>
 </html>

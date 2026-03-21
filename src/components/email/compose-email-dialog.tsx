@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { useErrors } from "@/hooks/use-errors";
 import {
@@ -20,14 +21,15 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Send, Loader2, Calendar as CalendarIcon, FileText } from "lucide-react";
-import { Contact, EmailTemplate } from "@/types/crm";
+import { Mail, Send, Loader2, Calendar as CalendarIcon, FileText, Clock, Trash2, Pencil, X, Check } from "lucide-react";
+import { Contact, EmailTemplate, ScheduledEmail, EmailSignature } from "@/types/crm";
 import { format } from "date-fns";
 
 
@@ -63,20 +65,42 @@ export function ComposeEmailDialog({
     // Templates
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
 
+    // Schedule send
     const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
+    const [scheduledTime, setScheduledTime] = useState("");
     const [isScheduling, setIsScheduling] = useState(false);
 
-    // We need a ref to the textarea to get the cursor position
+    // Signatures
+    const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+    const [selectedSignatureId, setSelectedSignatureId] = useState<string>("none");
+    const SIGNATURE_SEPARATOR = "\n\n--\n";
+
+    // Scheduled emails viewer
+    const [contactScheduled, setContactScheduled] = useState<ScheduledEmail[]>([]);
+    const [showScheduledDialog, setShowScheduledDialog] = useState(false);
+
+    // Edit scheduled email
+    const [editingEmail, setEditingEmail] = useState<ScheduledEmail | null>(null);
+    const [editSubject, setEditSubject] = useState("");
+    const [editBody, setEditBody] = useState("");
+    const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+    const [editTime, setEditTime] = useState("");
+    const [editSaving, setEditSaving] = useState(false);
+
+    // Variable insertion — track which field is focused
+    const subjectRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [focusedField, setFocusedField] = useState<"subject" | "body">("body");
 
     const AVAILABLE_VARIABLES = ["first_name", "last_name", "company", "title", "location"];
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [accts, tpl] = await Promise.all([
+                const [accts, tpl, sigs] = await Promise.all([
                     invoke<EmailAccount[]>("get_email_accounts"),
-                    invoke<EmailTemplate[]>("get_email_templates")
+                    invoke<EmailTemplate[]>("get_email_templates"),
+                    invoke<EmailSignature[]>("get_signatures"),
                 ]);
 
                 setAccounts(accts);
@@ -84,8 +108,9 @@ export function ComposeEmailDialog({
                     setSelectedAccount(accts[0].id);
                 }
                 setTemplates(tpl);
+                setSignatures(sigs);
             } catch (err) {
-                console.error("Failed to fetch data:", err);
+                handleError(err, "Failed to load email data");
             }
         };
         if (open) {
@@ -100,22 +125,56 @@ export function ComposeEmailDialog({
         }
     }, [contact]);
 
-    const insertVariable = (variable: string) => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
+    // Fetch contact's scheduled emails when dialog opens with a contact
+    useEffect(() => {
+        if (open && contact?.id) {
+            invoke<ScheduledEmail[]>("get_scheduled_emails", { contactId: contact.id })
+                .then(setContactScheduled)
+                .catch(() => setContactScheduled([]));
+        } else {
+            setContactScheduled([]);
+        }
+    }, [open, contact?.id]);
 
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
+    const insertVariable = (variable: string) => {
         const textToInsert = `{{${variable}}}`;
 
-        const newBody = body.substring(0, start) + textToInsert + body.substring(end);
-        setBody(newBody);
+        if (focusedField === "subject") {
+            const input = subjectRef.current;
+            if (!input) return;
+            const start = input.selectionStart ?? subject.length;
+            const end = input.selectionEnd ?? subject.length;
+            const newSubject = subject.substring(0, start) + textToInsert + subject.substring(end);
+            setSubject(newSubject);
+            setTimeout(() => {
+                input.focus();
+                input.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+            }, 0);
+        } else {
+            const textarea = textareaRef.current;
+            if (!textarea) return;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const newBody = body.substring(0, start) + textToInsert + body.substring(end);
+            setBody(newBody);
+            setTimeout(() => {
+                textarea.focus();
+                textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+            }, 0);
+        }
+    };
 
-        // Reset focus and cursor position after React re-renders
-        setTimeout(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
-        }, 0);
+    const getScheduledDateTime = (): Date | null => {
+        if (!scheduledDate) return null;
+        const combined = new Date(scheduledDate);
+        if (scheduledTime) {
+            const [hours, minutes] = scheduledTime.split(":").map(Number);
+            combined.setHours(hours, minutes, 0, 0);
+        } else {
+            const now = new Date();
+            combined.setHours(now.getHours() + 1, 0, 0, 0);
+        }
+        return combined;
     };
 
     const handleSend = async () => {
@@ -130,7 +189,8 @@ export function ComposeEmailDialog({
 
         setSending(true);
         try {
-            if (scheduledDate) {
+            const scheduleAt = getScheduledDateTime();
+            if (scheduleAt) {
                 if (!contact?.id) {
                     handleError("Scheduling requires a contact context currently.");
                     setSending(false);
@@ -142,9 +202,9 @@ export function ComposeEmailDialog({
                     contactId: contact.id,
                     subject,
                     body,
-                    scheduledAt: Math.floor(scheduledDate.getTime() / 1000)
+                    scheduledAt: Math.floor(scheduleAt.getTime() / 1000)
                 });
-                toast.success(`Email scheduled for ${format(scheduledDate, "PP p")}`);
+                toast.success(`Email scheduled for ${format(scheduleAt, "PP p")}`);
             } else {
                 await invoke("email_send", {
                     accountId: selectedAccount,
@@ -155,13 +215,14 @@ export function ComposeEmailDialog({
                 });
                 toast.success("Email sent successfully!");
                 onEmailSent?.();
-
             }
             onOpenChange(false);
             setSubject("");
             setBody("");
             setScheduledDate(undefined);
+            setScheduledTime("");
             setIsScheduling(false);
+            setSelectedSignatureId("none");
         } catch (err) {
             handleError(err, "Failed to send email");
         } finally {
@@ -193,6 +254,62 @@ export function ComposeEmailDialog({
         setBody(newBody);
         toast.info(`Applied template: ${template.name}`);
     };
+
+    const applySignature = (sigId: string) => {
+        // Strip any previously applied signature first
+        const baseBody = selectedSignatureId !== "none"
+            ? body.split(SIGNATURE_SEPARATOR)[0]
+            : body;
+
+        if (sigId === "none") {
+            setBody(baseBody);
+            setSelectedSignatureId("none");
+            return;
+        }
+
+        const sig = signatures.find((s) => s.id === sigId);
+        if (sig) {
+            setBody(baseBody + SIGNATURE_SEPARATOR + sig.content);
+            setSelectedSignatureId(sigId);
+        }
+    };
+
+    const openEdit = (email: ScheduledEmail) => {
+        const d = new Date(email.scheduledAt);
+        setEditDate(d);
+        setEditTime(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+        setEditSubject(email.subject);
+        setEditBody(email.body);
+        setEditingEmail(email);
+    };
+
+    const saveEdit = async () => {
+        if (!editingEmail || !editDate) return;
+        setEditSaving(true);
+        const combined = new Date(editDate);
+        if (editTime) {
+            const [h, m] = editTime.split(":").map(Number);
+            combined.setHours(h, m, 0, 0);
+        }
+        try {
+            await invoke("update_scheduled_email", {
+                id: editingEmail.id,
+                subject: editSubject,
+                body: editBody,
+                scheduledAt: Math.floor(combined.getTime() / 1000),
+            });
+            toast.success("Scheduled email updated");
+            const updated = await invoke<ScheduledEmail[]>("get_scheduled_emails", { contactId: contact?.id });
+            setContactScheduled(updated);
+            setEditingEmail(null);
+        } catch (err) {
+            handleError(err, "Failed to update scheduled email");
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const scheduleAt = getScheduledDateTime();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -239,6 +356,9 @@ export function ComposeEmailDialog({
                                 value={to}
                                 onChange={(e) => setTo(e.target.value)}
                                 className="col-span-3"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
                             />
                         </div>
 
@@ -272,14 +392,40 @@ export function ComposeEmailDialog({
                             </div>
                         </div>
 
+                        {signatures.length > 0 && (
+                            <div className="grid grid-cols-4 gap-4 items-center">
+                                <Label className="text-right">Signature</Label>
+                                <div className="col-span-3">
+                                    <Select value={selectedSignatureId} onValueChange={applySignature}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="No signature" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No signature</SelectItem>
+                                            {signatures.map((sig) => (
+                                                <SelectItem key={sig.id} value={sig.id}>
+                                                    {sig.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-4 gap-4 items-start">
                             <Label htmlFor="subject" className="text-right pt-2">Subject</Label>
                             <div className="col-span-3">
                                 <Input
                                     id="subject"
+                                    ref={subjectRef}
                                     value={subject}
                                     onChange={(e) => setSubject(e.target.value)}
+                                    onFocus={() => setFocusedField("subject")}
                                     placeholder="Subject line..."
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>
@@ -290,8 +436,12 @@ export function ComposeEmailDialog({
                                 ref={textareaRef}
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
+                                onFocus={() => setFocusedField("body")}
                                 rows={12}
                                 className="font-sans"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
                             />
                             <div className="flex flex-wrap gap-2 mt-1 items-center">
                                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium mr-1">Insert Variable:</span>
@@ -314,27 +464,50 @@ export function ComposeEmailDialog({
                 <DialogFooter className="flex justify-between items-center w-full sm:justify-between">
                     <Popover open={isScheduling} onOpenChange={setIsScheduling}>
                         <PopoverTrigger asChild>
-                            <Button variant={scheduledDate ? "secondary" : "ghost"} size="sm">
+                            <Button variant={scheduleAt ? "secondary" : "ghost"} size="sm">
                                 <CalendarIcon className="h-4 w-4 mr-2" />
-                                {scheduledDate ? format(scheduledDate, "MMM d, h:mm a") : "Schedule Send"}
+                                {scheduleAt ? format(scheduleAt, "MMM d, h:mm a") : "Schedule Send"}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-4" align="start">
-                            <div className="space-y-4">
-                                <Label>Schedule Time</Label>
-                                <Input
-                                    type="datetime-local"
-                                    className="w-full block"
-                                    onChange={(e) => {
-                                        if (e.target.value) {
-                                            setScheduledDate(new Date(e.target.value));
-                                        } else {
-                                            setScheduledDate(undefined);
+                            <div className="space-y-3">
+                                <CalendarComponent
+                                    mode="single"
+                                    selected={scheduledDate}
+                                    onSelect={(date) => {
+                                        setScheduledDate(date);
+                                        if (!scheduledTime && date) {
+                                            const next = new Date();
+                                            next.setHours(next.getHours() + 1, 0, 0, 0);
+                                            const hh = String(next.getHours()).padStart(2, "0");
+                                            const mm = String(next.getMinutes()).padStart(2, "0");
+                                            setScheduledTime(`${hh}:${mm}`);
                                         }
                                     }}
-                                    min={new Date().toISOString().slice(0, 16)}
+                                    initialFocus
+                                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                 />
-                                <div className="flex justify-end pt-2">
+                                <div className="px-1">
+                                    <Label className="text-xs font-medium uppercase text-muted-foreground">Time</Label>
+                                    <Input
+                                        type="time"
+                                        value={scheduledTime}
+                                        onChange={(e) => setScheduledTime(e.target.value)}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div className="flex justify-between gap-2 pt-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setScheduledDate(undefined);
+                                            setScheduledTime("");
+                                            setIsScheduling(false);
+                                        }}
+                                    >
+                                        Clear
+                                    </Button>
                                     <Button size="sm" onClick={() => setIsScheduling(false)}>Done</Button>
                                 </div>
                             </div>
@@ -349,18 +522,157 @@ export function ComposeEmailDialog({
                             {sending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    {scheduledDate ? "Scheduling..." : "Sending..."}
+                                    {scheduleAt ? "Scheduling..." : "Sending..."}
                                 </>
                             ) : (
                                 <>
-                                    {scheduledDate ? <CalendarIcon className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                                    {scheduledDate ? "Schedule" : "Send"}
+                                    {scheduleAt ? <CalendarIcon className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                                    {scheduleAt ? "Schedule" : "Send"}
                                 </>
                             )}
                         </Button>
                     </div>
+                    {contact && contactScheduled.filter(e => e.status === "pending").length > 0 && (
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="text-xs text-muted-foreground h-auto p-0 ml-2"
+                            onClick={() => setShowScheduledDialog(true)}
+                        >
+                            <Clock className="h-3 w-3 mr-1" />
+                            {contactScheduled.filter(e => e.status === "pending").length} scheduled for {contact.first_name}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
+
+            {/* Scheduled emails for this contact */}
+            <Dialog open={showScheduledDialog} onOpenChange={setShowScheduledDialog}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Scheduled for {contact?.first_name}</DialogTitle>
+                        <DialogDescription>
+                            Pending emails queued to send to {contact?.first_name} {contact?.last_name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2 max-h-[480px] overflow-y-auto">
+                        {contactScheduled.filter(e => e.status === "pending").length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-8">No pending scheduled emails.</p>
+                        ) : (
+                            contactScheduled.filter(e => e.status === "pending").map((email) => (
+                                <div key={email.id} className="rounded-lg border bg-card">
+                                    {editingEmail?.id === email.id ? (
+                                        <div className="p-3 space-y-3">
+                                            <Input
+                                                value={editSubject}
+                                                onChange={(e) => setEditSubject(e.target.value)}
+                                                placeholder="Subject"
+                                                autoCorrect="off"
+                                                autoCapitalize="off"
+                                                spellCheck={false}
+                                                className="text-sm"
+                                            />
+                                            <Textarea
+                                                value={editBody}
+                                                onChange={(e) => setEditBody(e.target.value)}
+                                                placeholder="Email body"
+                                                autoCorrect="off"
+                                                autoCapitalize="off"
+                                                spellCheck={false}
+                                                rows={5}
+                                                className="text-sm font-sans"
+                                            />
+                                            <div className="flex gap-2 items-center">
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" size="sm" className="text-xs gap-1">
+                                                            <CalendarIcon className="h-3 w-3" />
+                                                            {editDate ? format(editDate, "MMM d") : "Pick date"}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <CalendarComponent
+                                                            mode="single"
+                                                            selected={editDate}
+                                                            onSelect={setEditDate}
+                                                            initialFocus
+                                                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <Input
+                                                    type="time"
+                                                    value={editTime}
+                                                    onChange={(e) => setEditTime(e.target.value)}
+                                                    className="w-32 text-xs"
+                                                />
+                                                <div className="flex gap-1 ml-auto">
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                        onClick={() => setEditingEmail(null)}
+                                                        title="Cancel edit"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 text-green-600 hover:text-green-700"
+                                                        onClick={saveEdit}
+                                                        disabled={editSaving}
+                                                        title="Save changes"
+                                                    >
+                                                        {editSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between p-3 group">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium truncate">{email.subject}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    {format(new Date(email.scheduledAt), "MMM d, h:mm a")}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                    onClick={() => openEdit(email)}
+                                                    title="Edit scheduled email"
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                                    onClick={async () => {
+                                                        try {
+                                                            await invoke("cancel_scheduled_email", { id: email.id });
+                                                            toast.success("Scheduled email cancelled");
+                                                            setContactScheduled(prev => prev.filter(e => e.id !== email.id));
+                                                        } catch (err) {
+                                                            handleError(err, "Failed to cancel email");
+                                                        }
+                                                    }}
+                                                    title="Cancel scheduled send"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Dialog>
     );
 }

@@ -127,6 +127,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={firstName}
                                     onChange={(e) => setFirstName(e.target.value)}
                                     required
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -136,6 +139,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
                                     required
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>
@@ -148,6 +154,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="e.g. CEO"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -157,6 +166,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={company}
                                     onChange={(e) => setCompany(e.target.value)}
                                     placeholder="e.g. Acme Inc"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>
@@ -169,6 +181,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
                                     placeholder="e.g. San Francisco"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -178,6 +193,9 @@ export function EditContactDialog({ contact, open, onOpenChange, onContactUpdate
                                     value={companyWebsite}
                                     onChange={(e) => setCompanyWebsite(e.target.value)}
                                     placeholder="e.g. acme.com"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                         </div>

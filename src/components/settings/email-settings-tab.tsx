@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, Key, Loader2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ExternalLink, Key, Loader2, Mail, Plus, RefreshCw, Trash2, Pencil, PenLine } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useErrors } from "@/hooks/use-errors";
-import { EmailAccount } from "@/types/crm";
+import { EmailAccount, EmailSignature } from "@/types/crm";
+import { EditSignatureDialog } from "@/components/settings/EditSignatureDialog";
 
 interface SyncResult {
     account_id: string;
@@ -39,6 +40,29 @@ export function EmailSettingsTab() {
     const [syncing, setSyncing] = useState<string | null>(null); // account_id or "all"
     const [showAdvanced, setShowAdvanced] = useState(false);
 
+    const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+    const [editSignature, setEditSignature] = useState<EmailSignature | undefined>(undefined);
+    const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
+
+    const fetchSignatures = async () => {
+        try {
+            const data = await invoke<EmailSignature[]>("get_signatures");
+            setSignatures(data);
+        } catch (e) {
+            handleError(e, "Failed to fetch signatures");
+        }
+    };
+
+    const handleDeleteSignature = async (id: string) => {
+        try {
+            await invoke("delete_signature", { id });
+            toast.success("Signature deleted");
+            setSignatures((prev) => prev.filter((s) => s.id !== id));
+        } catch (e) {
+            handleError(e, "Failed to delete signature");
+        }
+    };
+
     const fetchAccounts = async () => {
         setLoading(true);
         try {
@@ -54,6 +78,7 @@ export function EmailSettingsTab() {
 
     useEffect(() => {
         fetchAccounts();
+        fetchSignatures();
     }, []);
 
     const handleSaveCredentials = async () => {
@@ -133,30 +158,6 @@ export function EmailSettingsTab() {
             }
         } catch (error) {
             handleError(error, `Full re-sync failed for ${accountEmail}`);
-        } finally {
-            setSyncing(null);
-        }
-    };
-
-    const handleSyncAccount = async (accountId: string, accountEmail: string, provider: string) => {
-        setSyncing(accountId);
-        try {
-            const result = await invoke<SyncResult>("sync_email_account", { accountId });
-            if (result.token_expired) {
-                toast.error(`Token expired for ${accountEmail}. Please reconnect your account.`, {
-                    action: {
-                        label: "Reconnect",
-                        onClick: () => handleConnect(provider as "gmail" | "outlook"),
-                    },
-                });
-            } else {
-                toast.success(
-                    `Synced ${result.synced_count} new email${result.synced_count !== 1 ? "s" : ""} from ${accountEmail}`
-                );
-                fetchAccounts();
-            }
-        } catch (error) {
-            handleError(error, `Sync failed for ${accountEmail}`);
         } finally {
             setSyncing(null);
         }
@@ -356,21 +357,6 @@ export function EmailSettingsTab() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => handleSyncAccount(account.id, account.email, account.provider)}
-                                        disabled={syncing !== null}
-                                        title="Sync new emails"
-                                        className="gap-1.5 text-xs"
-                                    >
-                                        {syncing === account.id ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        ) : (
-                                            <RefreshCw className="h-3.5 w-3.5" />
-                                        )}
-                                        Sync
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
                                         onClick={() => handleFullResync(account.id, account.email, account.provider)}
                                         disabled={syncing !== null}
                                         title="Re-fetch all emails (fixes missing content)"
@@ -398,6 +384,83 @@ export function EmailSettingsTab() {
                 )}
             </div>
 
+
+            {/* Signatures */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                            <PenLine className="h-4 w-4" />
+                            Signatures
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Append a signature when composing emails.
+                        </p>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => {
+                            setEditSignature(undefined);
+                            setSignatureDialogOpen(true);
+                        }}
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add signature
+                    </Button>
+                </div>
+
+                {signatures.length === 0 ? (
+                    <div className="text-center p-6 border rounded-lg border-dashed text-muted-foreground text-sm">
+                        No signatures yet.
+                    </div>
+                ) : (
+                    <div className="grid gap-2">
+                        {signatures.map((sig) => (
+                            <div
+                                key={sig.id}
+                                className="flex items-start justify-between p-4 border rounded-lg bg-card"
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-medium text-sm">{sig.name}</p>
+                                    <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap line-clamp-2 font-mono">
+                                        {sig.content}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1 ml-3 shrink-0">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground"
+                                        onClick={() => {
+                                            setEditSignature(sig);
+                                            setSignatureDialogOpen(true);
+                                        }}
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                        onClick={() => handleDeleteSignature(sig.id)}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <EditSignatureDialog
+                open={signatureDialogOpen}
+                onOpenChange={setSignatureDialogOpen}
+                signature={editSignature}
+                onSuccess={fetchSignatures}
+            />
 
             {/* Credential Setup Dialog */}
             <Dialog open={setupProvider !== null} onOpenChange={(open) => !open && setSetupProvider(null)}>

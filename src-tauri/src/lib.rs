@@ -328,6 +328,7 @@ pub struct UpdateContactArgs {
     pub company: Option<String>,
     pub location: Option<String>,
     pub company_website: Option<String>,
+    #[serde(rename = "summary")]
     pub intelligence_summary: Option<String>,
 }
 
@@ -499,7 +500,6 @@ pub fn run() {
             delete_email_account,
             email_schedule,
             get_emails_for_contact,
-            sync_contact_emails,
             get_contact_events,
             get_contact_activity,
             create_contact_event,
@@ -533,7 +533,18 @@ pub fn run() {
             has_lock_pin,
             remove_lock_pin,
             get_email_templates,
+            upsert_email_template,
             delete_email_template,
+            get_scheduled_emails,
+            cancel_scheduled_email,
+            update_scheduled_email,
+            get_signatures,
+            upsert_signature,
+            delete_signature,
+            get_contact_files,
+            attach_file,
+            delete_contact_file,
+            open_contact_file,
             utils::open_external_url
         ])
         .run(tauri::generate_context!())
@@ -801,6 +812,262 @@ async fn email_schedule(
     .await;
 
     Ok(result)
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ContactFileRow {
+    id: String,
+    contact_id: String,
+    filename: String,
+    file_path: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[tauri::command]
+async fn get_contact_files(
+    db: tauri::State<'_, Db>,
+    contact_id: String,
+) -> Result<Vec<ContactFileRow>, AppError> {
+    let rows = sqlx::query_as::<_, ContactFileRow>(
+        "SELECT id, contact_id, filename, file_path, created_at
+         FROM contact_files WHERE contact_id = ? ORDER BY created_at ASC",
+    )
+    .bind(&contact_id)
+    .fetch_all(db.pool())
+    .await?;
+    Ok(rows)
+}
+
+#[tauri::command]
+async fn attach_file(
+    app_handle: tauri::AppHandle,
+    db: tauri::State<'_, Db>,
+    contact_id: String,
+    src_path: String,
+) -> Result<ContactFileRow, AppError> {
+    let src = std::path::Path::new(&src_path);
+    let filename = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| AppError::from("Invalid file path".to_string()))?
+        .to_string();
+
+    let app_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::from(e.to_string()))?;
+    let files_dir = app_dir.join("files");
+    std::fs::create_dir_all(&files_dir).map_err(|e| AppError::from(e.to_string()))?;
+
+    let file_id = uuid::Uuid::new_v4().to_string();
+    let dest_name = format!("{}_{}", file_id, filename);
+    let dest_path = files_dir.join(&dest_name);
+    std::fs::copy(src, &dest_path).map_err(|e| AppError::from(e.to_string()))?;
+
+    let dest_str = dest_path
+        .to_str()
+        .ok_or_else(|| AppError::from("Invalid destination path".to_string()))?
+        .to_string();
+
+    sqlx::query(
+        "INSERT INTO contact_files (id, contact_id, filename, file_path) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&file_id)
+    .bind(&contact_id)
+    .bind(&filename)
+    .bind(&dest_str)
+    .execute(db.pool())
+    .await?;
+
+    let row = sqlx::query_as::<_, ContactFileRow>(
+        "SELECT id, contact_id, filename, file_path, created_at FROM contact_files WHERE id = ?",
+    )
+    .bind(&file_id)
+    .fetch_one(db.pool())
+    .await?;
+
+    Ok(row)
+}
+
+#[tauri::command]
+async fn delete_contact_file(
+    db: tauri::State<'_, Db>,
+    id: String,
+) -> Result<(), AppError> {
+    let row = sqlx::query_as::<_, ContactFileRow>(
+        "SELECT id, contact_id, filename, file_path, created_at FROM contact_files WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(db.pool())
+    .await?;
+
+    if let Some(r) = row {
+        let _ = std::fs::remove_file(&r.file_path); // best-effort
+    }
+
+    sqlx::query("DELETE FROM contact_files WHERE id = ?")
+        .bind(&id)
+        .execute(db.pool())
+        .await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_contact_file(
+    db: tauri::State<'_, Db>,
+    id: String,
+) -> Result<(), AppError> {
+    let row = sqlx::query_as::<_, ContactFileRow>(
+        "SELECT id, contact_id, filename, file_path, created_at FROM contact_files WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_one(db.pool())
+    .await?;
+
+    open::that(&row.file_path).map_err(|e| AppError::from(e.to_string()))?;
+    Ok(())
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct EmailSignatureRow {
+    id: String,
+    name: String,
+    content: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[tauri::command]
+async fn get_signatures(db: tauri::State<'_, Db>) -> Result<Vec<EmailSignatureRow>, AppError> {
+    let rows = sqlx::query_as::<_, EmailSignatureRow>(
+        "SELECT id, name, content, created_at, updated_at FROM email_signatures ORDER BY name ASC",
+    )
+    .fetch_all(db.pool())
+    .await?;
+    Ok(rows)
+}
+
+#[tauri::command]
+async fn upsert_signature(
+    db: tauri::State<'_, Db>,
+    id: Option<String>,
+    name: String,
+    content: String,
+) -> Result<(), AppError> {
+    let sig_id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    sqlx::query(
+        "INSERT INTO email_signatures (id, name, content)
+         VALUES (?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, content = excluded.content",
+    )
+    .bind(&sig_id)
+    .bind(&name)
+    .bind(&content)
+    .execute(db.pool())
+    .await?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_signature(db: tauri::State<'_, Db>, id: String) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM email_signatures WHERE id = ?")
+        .bind(&id)
+        .execute(db.pool())
+        .await?;
+    Ok(())
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ScheduledEmailRow {
+    id: String,
+    contact_id: String,
+    contact_first_name: String,
+    contact_last_name: String,
+    account_id: String,
+    subject: String,
+    body: String,
+    scheduled_at: chrono::DateTime<chrono::Utc>,
+    status: String,
+    error_message: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[tauri::command]
+async fn get_scheduled_emails(
+    db: tauri::State<'_, Db>,
+    contact_id: Option<String>,
+) -> Result<Vec<ScheduledEmailRow>, AppError> {
+    let pool = db.pool();
+    let rows = if let Some(cid) = contact_id {
+        sqlx::query_as::<_, ScheduledEmailRow>(
+            "SELECT se.id, se.contact_id,
+                    COALESCE(c.first_name, '') AS contact_first_name,
+                    COALESCE(c.last_name, '') AS contact_last_name,
+                    se.account_id, se.subject, se.body, se.scheduled_at, se.status,
+                    se.error_message, se.created_at
+             FROM scheduled_emails se
+             LEFT JOIN contacts c ON se.contact_id = c.id
+             WHERE se.contact_id = ?
+             ORDER BY se.scheduled_at ASC",
+        )
+        .bind(cid)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as::<_, ScheduledEmailRow>(
+            "SELECT se.id, se.contact_id,
+                    COALESCE(c.first_name, '') AS contact_first_name,
+                    COALESCE(c.last_name, '') AS contact_last_name,
+                    se.account_id, se.subject, se.body, se.scheduled_at, se.status,
+                    se.error_message, se.created_at
+             FROM scheduled_emails se
+             LEFT JOIN contacts c ON se.contact_id = c.id
+             ORDER BY se.scheduled_at ASC",
+        )
+        .fetch_all(pool)
+        .await?
+    };
+    Ok(rows)
+}
+
+#[tauri::command]
+async fn cancel_scheduled_email(
+    db: tauri::State<'_, Db>,
+    id: String,
+) -> Result<(), AppError> {
+    let pool = db.pool();
+    sqlx::query("DELETE FROM scheduled_emails WHERE id = ?")
+        .bind(&id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_scheduled_email(
+    db: tauri::State<'_, Db>,
+    id: String,
+    subject: String,
+    body: String,
+    scheduled_at: i64,
+) -> Result<(), AppError> {
+    let pool = db.pool();
+    let scheduled_time = chrono::DateTime::from_timestamp(scheduled_at, 0)
+        .ok_or_else(|| AppError::Internal("Invalid timestamp".into()))?;
+    sqlx::query(
+        "UPDATE scheduled_emails SET subject = ?, body = ?, scheduled_at = ? WHERE id = ? AND status = 'pending'"
+    )
+    .bind(&subject)
+    .bind(&body)
+    .bind(scheduled_time)
+    .bind(&id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 #[tauri::command]
