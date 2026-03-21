@@ -80,14 +80,13 @@ export function CommandPalette({ open, onOpenChange, onOpenImport, onOpenAddCont
             <CommandInput placeholder="Type a command or search..." />
             <CommandList>
                 <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup heading="Intelligence">
+                <CommandGroup heading="Actions">
                     <CommandItem
                         onSelect={() => handleAction("add_contact")}
                         onPointerDown={(e) => e.preventDefault()}
                     >
                         <Users className="mr-2 h-4 w-4" />
                         <span>Add New Contact</span>
-                        <CommandShortcut>C</CommandShortcut>
                     </CommandItem>
                     <CommandItem
                         onSelect={() => handleAction("open_import")}
