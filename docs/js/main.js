@@ -335,4 +335,153 @@
     decryptObserver.observe(chipsContainer);
   })();
 
+
+  /* ── OS-AWARE DOWNLOAD BUTTONS ── */
+  (function () {
+    var GITHUB_API = 'https://api.github.com/repos/Gitter09/outreach-os/releases/latest';
+    var RELEASES_URL = 'https://github.com/Gitter09/outreach-os/releases';
+    var CACHE_KEY = 'outreachos_release';
+
+    function detectOS() {
+      var ua = navigator.userAgent || '';
+      var platform = navigator.platform || '';
+      if (/Mac|iPhone|iPad|iPod/i.test(platform) || /Macintosh/i.test(ua)) return 'mac';
+      if (/Win/i.test(platform) || /Windows/i.test(ua)) return 'windows';
+      return 'other';
+    }
+
+    function getRecommendedAsset(os, assets) {
+      if (!assets || !assets.length) return null;
+      var match = null;
+      if (os === 'mac') {
+        match = assets.find(function (a) { return /_aarch64\.dmg$/.test(a.name); });
+      } else if (os === 'windows') {
+        match = assets.find(function (a) { return /_x64-setup\.exe$/.test(a.name); });
+      }
+      return match || null;
+    }
+
+    function osLabel(os) {
+      if (os === 'mac') return 'macOS';
+      if (os === 'windows') return 'Windows';
+      return null;
+    }
+
+    function fetchLatestRelease() {
+      // Check sessionStorage cache first
+      try {
+        var cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) return Promise.resolve(JSON.parse(cached));
+      } catch (e) { /* ignore */ }
+
+      return fetch(GITHUB_API)
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          var result = {
+            tag: data.tag_name,
+            version: (data.tag_name || '').replace(/^v/, ''),
+            assets: (data.assets || []).map(function (a) {
+              return { name: a.name, url: a.browser_download_url, size: a.size };
+            })
+          };
+          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch (e) { /* ignore */ }
+          return result;
+        });
+    }
+
+    function enhanceButtons(os, asset) {
+      var label = osLabel(os);
+      if (!label || !asset) return;
+
+      var buttons = document.querySelectorAll('[data-download="cta"]');
+      buttons.forEach(function (btn) {
+        btn.href = asset.url;
+
+        // Update text — preserve the arrow prefix for buttons that have it
+        var text = btn.textContent.trim();
+        if (/Download Free/i.test(text) || /↓/.test(text)) {
+          btn.innerHTML = '&darr;&nbsp;&nbsp;Download for ' + label;
+        } else if (/^Download$/i.test(text)) {
+          btn.textContent = 'Download for ' + label;
+        }
+      });
+    }
+
+    // Enhance version badges on download page
+    function enhanceDownloadPage(release, os) {
+      var versionEls = document.querySelectorAll('[data-download="version"]');
+      versionEls.forEach(function (el) { el.textContent = 'v' + release.version; });
+
+      var label = osLabel(os);
+      var asset = getRecommendedAsset(os, release.assets);
+
+      // Recommended section
+      var recSection = document.getElementById('dl-recommended');
+      var recFallback = document.getElementById('dl-fallback');
+      if (recSection && asset && label) {
+        recSection.style.display = '';
+        if (recFallback) recFallback.style.display = 'none';
+
+        var recBtn = recSection.querySelector('[data-download="rec-btn"]');
+        var recLabel = recSection.querySelector('[data-download="rec-label"]');
+        var recNote = recSection.querySelector('[data-download="rec-note"]');
+        var recIcon = recSection.querySelector('[data-download="rec-icon"]');
+        if (recBtn) {
+          recBtn.href = asset.url;
+          recBtn.innerHTML = '&darr;&nbsp;&nbsp;Download for ' + label;
+        }
+        if (recLabel) recLabel.textContent = label;
+        if (recNote) {
+          recNote.textContent = os === 'mac' ? 'Apple Silicon (M1+) · .dmg' : 'Windows 10/11 (64-bit) · .exe';
+        }
+        if (recIcon) recIcon.setAttribute('data-os', os);
+      } else if (recSection) {
+        recSection.style.display = 'none';
+        if (recFallback) recFallback.style.display = '';
+      }
+
+      // All platforms grid
+      var grid = document.getElementById('dl-grid');
+      if (!grid) return;
+
+      var assetMap = {
+        'mac-dmg': { pattern: /_aarch64\.dmg$/, label: 'macOS (Apple Silicon)', note: '.dmg · M1+' },
+        'win-exe': { pattern: /_x64-setup\.exe$/, label: 'Windows (64-bit)', note: '.exe installer' },
+        'win-msi': { pattern: /_x64_en-US\.msi$/, label: 'Windows (64-bit)', note: '.msi installer' },
+        'linux-deb': { pattern: /_amd64\.deb$/, label: 'Linux (Debian/Ubuntu)', note: '.deb package' },
+        'linux-rpm': { pattern: /\.x86_64\.rpm$/, label: 'Linux (Fedora/RHEL)', note: '.rpm package' },
+        'linux-appimage': { pattern: /_amd64\.AppImage$/, label: 'Linux (Universal)', note: '.AppImage' }
+      };
+
+      Object.keys(assetMap).forEach(function (key) {
+        var slot = grid.querySelector('[data-asset="' + key + '"]');
+        if (!slot) return;
+        var info = assetMap[key];
+        var found = release.assets.find(function (a) { return info.pattern.test(a.name); });
+        if (found) {
+          var link = slot.querySelector('a');
+          if (link) link.href = found.url;
+          slot.style.display = '';
+        } else {
+          slot.style.display = 'none';
+        }
+      });
+    }
+
+    // Run
+    var os = detectOS();
+    fetchLatestRelease()
+      .then(function (release) {
+        var asset = getRecommendedAsset(os, release.assets);
+        enhanceButtons(os, asset);
+        enhanceDownloadPage(release, os);
+      })
+      .catch(function () {
+        // Graceful degradation — buttons keep their GitHub Releases fallback href
+      });
+  })();
+
 })();

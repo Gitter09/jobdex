@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download — OutreachOS</title>
+  <meta name="description"
+    content="Download OutreachOS for macOS or Windows. Free, local-first CRM — your data never leaves your machine.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/svg+xml" sizes="512x512" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body data-theme="dark">
+  <!-- ══════════════════════════════════════════
+     SITE HEADER & NAV
+══════════════════════════════════════════ -->
+  <header class="site-header" id="site-header">
+    <nav class="navbar" aria-label="Main Navigation">
+      <div class="navbar__toggle-wrapper">
+        <button class="navbar__toggle" id="navbar-toggle" aria-label="Open menu" aria-expanded="false"
+          aria-controls="mobile-nav">
+          <span class="toggle-line top"></span>
+          <span class="toggle-line middle"></span>
+          <span class="toggle-line bottom"></span>
+        </button>
+      </div>
+
+      <a href="index.html" class="navbar__brand" aria-label="OutreachOS Home">
+        <div class="navbar__logo">
+          <svg width="22" height="22" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z"
+              fill="#000000" />
+            <path
+              d="M456.124 46.0815C483.732 58.1553 507.867 76.9668 526.317 100.791C544.766 124.615 556.939 152.69 561.72 182.441L530.264 187.496C526.329 163.011 516.31 139.905 501.127 120.298C485.943 100.691 466.08 85.2088 443.358 75.2721L456.124 46.0815Z"
+              fill="#000000" />
+            <path
+              d="M430.086 102.473C449.258 110.858 466.019 123.921 478.831 140.466C491.643 157.011 500.097 176.507 503.417 197.167L476.36 201.515C473.768 185.384 467.168 170.162 457.164 157.244C447.161 144.327 434.075 134.127 419.106 127.581L430.086 102.473Z"
+              fill="#000000" />
+          </svg>
+        </div>
+        <span class="navbar__title">OutreachOS</span>
+      </a>
+
+      <nav class="navbar__nav" aria-label="Desktop Navigation">
+        <ul class="navbar__nav-links">
+          <li><a href="index.html#features" class="nav-link">Features</a></li>
+          <li><a href="download.html" class="nav-link" aria-current="page">Downloads</a></li>
+          <li><a href="https://docs.outreach-os.app" target="_parent" rel="noopener noreferrer"
+              class="nav-link">Docs</a>
+          </li>
+          <li><a href="https://github.com/Gitter09/outreach-os/wiki" target="_blank" rel="noopener noreferrer"
+              class="nav-link">Developers</a></li>
+          <li><a href="https://github.com/Gitter09/outreach-os" target="_blank" rel="noopener noreferrer"
+              class="nav-link">GitHub</a></li>
+          <li><a href="contact.html" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="navbar__actions">
+        <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-primary navbar__cta"
+          data-download="cta">Download</a>
+      </div>
+
+    </nav>
+  </header>
+
+  <!-- Mobile Navigation Overlay -->
+  <div id="mobile-nav" class="mobile-nav" aria-hidden="true" inert>
+    <ul class="mobile-nav__links">
+      <li><a href="index.html#features" class="mobile-nav__link">Features</a></li>
+      <li><a href="download.html" class="mobile-nav__link">Downloads</a></li>
+      <li><a href="https://docs.outreach-os.app" target="_parent" rel="noopener noreferrer"
+          class="mobile-nav__link">Docs</a></li>
+      <li><a href="https://github.com/Gitter09/outreach-os/wiki" target="_blank" rel="noopener noreferrer"
+          class="mobile-nav__link">Developers</a></li>
+      <li><a href="https://github.com/Gitter09/outreach-os" target="_blank" rel="noopener noreferrer"
+          class="mobile-nav__link">GitHub</a></li>
+      <li><a href="contact.html" class="mobile-nav__link">Contact</a></li>
+    </ul>
+    <div class="mobile-nav__footer">
+      <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-primary btn-lg" style="width: 100%;"
+        data-download="cta">
+        &darr;&nbsp;&nbsp;Download Free
+      </a>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+     DOWNLOAD HERO
+══════════════════════════════════════════ -->
+  <section id="dl-hero">
+    <div class="dl-hero-inner">
+      <p class="s-label reveal">Download</p>
+      <h2 class="reveal d1">Get OutreachOS.</h2>
+      <p class="dl-hero-sub reveal d2">Free, local-first, runs on your machine. Pick your platform below.</p>
+      <span class="dl-version-badge reveal d3" data-download="version">Loading...</span>
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════
+     RECOMMENDED DOWNLOAD
+══════════════════════════════════════════ -->
+  <section id="dl-body">
+    <div class="container">
+
+      <!-- Recommended (shown when OS detected) -->
+      <div id="dl-recommended" class="dl-recommended" style="display: none;">
+        <div class="dl-rec-inner">
+          <div class="dl-rec-icon" data-download="rec-icon" data-os="mac">
+            <!-- Mac icon -->
+            <svg class="rec-icon-mac" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>
+            <!-- Windows icon -->
+            <svg class="rec-icon-windows" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M3 12V6.75l8-1.25V12H3zm0 .5h8v6.5l-8-1.25V12.5zM11.5 5.34l9.5-1.59V12h-9.5V5.34zM11.5 12.5H21v7.75l-9.5-1.59V12.5z"/>
+            </svg>
+          </div>
+          <div class="dl-rec-content">
+            <p class="dl-rec-title">Recommended for <span data-download="rec-label">your system</span></p>
+            <p class="dl-rec-note" data-download="rec-note">Detecting...</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-primary btn-lg"
+            data-download="rec-btn">
+            &darr;&nbsp;&nbsp;Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Fallback (shown when OS not detected or API fails) -->
+      <div id="dl-fallback" class="dl-fallback">
+        <p>Checking latest release...</p>
+      </div>
+
+      <!-- All Platforms -->
+      <div class="dl-section-label reveal">All platforms</div>
+
+      <div id="dl-grid" class="dl-grid">
+        <!-- macOS -->
+        <div class="dl-card reveal d1" data-asset="mac-dmg">
+          <div class="dl-card-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">macOS</p>
+            <p class="dl-card-note">Apple Silicon (M1+) · .dmg</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+
+        <!-- Windows EXE -->
+        <div class="dl-card reveal d2" data-asset="win-exe">
+          <div class="dl-card-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 12V6.75l8-1.25V12H3zm0 .5h8v6.5l-8-1.25V12.5zM11.5 5.34l9.5-1.59V12h-9.5V5.34zM11.5 12.5H21v7.75l-9.5-1.59V12.5z" />
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">Windows</p>
+            <p class="dl-card-note">64-bit · .exe installer</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+
+        <!-- Windows MSI -->
+        <div class="dl-card reveal d3" data-asset="win-msi">
+          <div class="dl-card-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 12V6.75l8-1.25V12H3zm0 .5h8v6.5l-8-1.25V12.5zM11.5 5.34l9.5-1.59V12h-9.5V5.34zM11.5 12.5H21v7.75l-9.5-1.59V12.5z" />
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">Windows</p>
+            <p class="dl-card-note">64-bit · .msi installer</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+
+        <!-- Linux DEB -->
+        <div class="dl-card reveal d1" data-asset="linux-deb">
+          <div class="dl-card-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.43.39.03.8-.066 1.109-.347.3-.262.466-.702.466-1.26v-.013c-.003-.1.009-.247.009-.347 0-.382-.092-.603-.166-.737-.093-.168-.243-.3-.35-.367l-.003-.005-.07-.043c-.063-.011-.116-.03-.187-.07a.556.556 0 01-.216-.319c-.036-.104-.048-.278-.003-.466.09-.381.382-.867.34-1.432-.013-.187-.066-.368-.15-.544-.01-.062-.02-.132-.032-.199.003-.026.007-.05.003-.076a.512.512 0 00-.032-.2 2.427 2.427 0 00-.466-.68c-.233-.234-.452-.44-.57-.603-.084-.118-.123-.226-.128-.313a2.416 2.416 0 00-.032-.265 1.89 1.89 0 00-.578-.892c-.2-.174-.41-.296-.6-.382-.19-.089-.382-.131-.552-.155a2.39 2.39 0 00-.543-.028c-.126.013-.262.042-.39.1h-.004c-.195-.275-.64-.692-1.37-.692-.143 0-.296.023-.462.076-.238.07-.44.225-.603.38a1.83 1.83 0 00-.392.49c-.055.11-.094.218-.126.3l-.01-.002c-.003-.04-.013-.08-.023-.124a2.867 2.867 0 00-.15-.45 2.41 2.41 0 00-.62-.776A2.062 2.062 0 0012.504 0z" />
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">Linux (Debian/Ubuntu)</p>
+            <p class="dl-card-note">amd64 · .deb package</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+
+        <!-- Linux RPM (Fedora) -->
+        <div class="dl-card reveal d2" data-asset="linux-rpm">
+          <div class="dl-card-icon">
+            <!-- Fedora logo (simpleicons) -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.37 4.826c2.27 0 4.118 1.849 4.118 4.119 0 1.644-.968 3.075-2.385 3.749v1.658h-1.734V12.36h-.428c-2.27 0-4.119-1.848-4.119-4.118 0-.374.052-.736.147-1.08h1.794a2.397 2.397 0 00-.19.947 2.384 2.384 0 002.383 2.384h.43V8.067H10.42V6.333h1.95V4.826zm1.733 0v1.507h-1.733V4.826zm0 3.241v1.734h-1.733V8.067zm-1.733 4.293h1.733v6.814h-1.733z"/>
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">Linux (Fedora/RHEL)</p>
+            <p class="dl-card-note">x86_64 · .rpm package</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+
+        <!-- Linux AppImage -->
+        <div class="dl-card reveal d3" data-asset="linux-appimage">
+          <div class="dl-card-icon">
+            <!-- AppImage / generic Linux penguin (Tux) -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.001 1c-1.46 0-2.773.618-3.718 1.606-.945.988-1.533 2.35-1.533 3.844 0 .944.24 1.83.659 2.598-.421.16-.82.385-1.178.672C5.2 10.401 4.5 11.7 4.5 13.15v.35c0 2.481 1.697 4.56 3.993 5.126.11.705.25 1.3.404 1.74.204.582.452 1.01.736 1.284.285.275.615.4.957.4h2.82c.342 0 .672-.125.957-.4.284-.274.532-.702.736-1.284.154-.44.294-1.035.404-1.74C17.803 18.06 19.5 15.98 19.5 13.5v-.35c0-1.45-.7-2.749-1.731-3.43a4.757 4.757 0 00-1.178-.672c.42-.768.659-1.654.659-2.598 0-1.494-.588-2.856-1.533-3.844C14.773 1.618 13.46 1 12.001 1zm0 1.5c1.07 0 2.03.453 2.725 1.183.695.73 1.125 1.748 1.125 2.867 0 .798-.214 1.544-.587 2.183a3.25 3.25 0 00-2.634-1.358h-.629a3.25 3.25 0 00-2.634 1.358 5.228 5.228 0 01-.587-2.183c0-1.119.43-2.136 1.125-2.867C10.97 2.953 11.93 2.5 13 2.5zM9.629 8.875h4.742c.966 0 1.75.784 1.75 1.75v2.75c0 1.933-1.567 3.5-3.5 3.5h-.621c-1.933 0-3.5-1.567-3.5-3.5v-2.75c0-.966.784-1.75 1.75-1.75zM10 11a1 1 0 100 2 1 1 0 000-2zm4 0a1 1 0 100 2 1 1 0 000-2z"/>
+            </svg>
+          </div>
+          <div class="dl-card-info">
+            <p class="dl-card-title">Linux (Universal)</p>
+            <p class="dl-card-note">amd64 · .AppImage</p>
+          </div>
+          <a href="https://github.com/Gitter09/outreach-os/releases" class="btn btn-ghost dl-card-btn">Download</a>
+        </div>
+      </div>
+
+      <div class="dl-github-link reveal">
+        <a href="https://github.com/Gitter09/outreach-os/releases" target="_blank" rel="noopener noreferrer">
+          Or browse all releases on GitHub →
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════ -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-left">
+          <div class="footer-logo">
+            <div class="footer-logo-mark">
+              <svg width="17" height="17" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z"
+                  fill="#000000" />
+                <path
+                  d="M456.124 46.0815C483.732 58.1553 507.867 76.9668 526.317 100.791C544.766 124.615 556.939 152.69 561.72 182.441L530.264 187.496C526.329 163.011 516.31 139.905 501.127 120.298C485.943 100.691 466.08 85.2088 443.358 75.2721L456.124 46.0815Z"
+                  fill="#000000" />
+                <path
+                  d="M430.086 102.473C449.258 110.858 466.019 123.921 478.831 140.466C491.643 157.011 500.097 176.507 503.417 197.167L476.36 201.515C473.768 185.384 467.168 170.162 457.164 157.244C447.161 144.327 434.075 134.127 419.106 127.581L430.086 102.473Z"
+                  fill="#000000" />
+              </svg>
+            </div>
+            <span class="footer-logo-name">OutreachOS</span>
+          </div>
+          <p class="footer-copy">Built by Harshit Singh · &copy; 2026 OutreachOS · Source-available · MIT + Commons Clause
+          </p>
+        </div>
+        <nav class="footer-links">
+          <a href="index.html#features">Features</a>
+          <a href="https://docs.outreach-os.app" target="_parent">Docs</a>
+          <a href="https://github.com/Gitter09/outreach-os" target="_blank">GitHub</a>
+          <a href="contact.html">Contact</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+
+</html>
