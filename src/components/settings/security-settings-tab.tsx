@@ -28,7 +28,7 @@ export function SecuritySettingsTab() {
             const status = await invoke<boolean>("has_lock_pin");
             setHasPin(status);
         } catch (error) {
-            handleError(error, "Security system error: Failed to access keychain");
+            handleError(error, "Couldn't access your computer's keychain.");
             setHasPin(false);
         }
     };
@@ -54,9 +54,9 @@ export function SecuritySettingsTab() {
             setShowPinDialog(false);
             setPin("");
             setConfirmPin("");
-            toast.success("App lock PIN configured successfully");
+            toast.success("PIN saved. OutreachOS will now ask for it on startup.");
         } catch (error) {
-            handleError(error, "Failed to set PIN");
+            handleError(error, "Couldn't save your PIN.");
         } finally {
             setLoading(false);
         }
@@ -95,7 +95,7 @@ export function SecuritySettingsTab() {
                 setReAuthError(true);
             }
         } catch (error) {
-            handleError(error, "Security system error while verifying PIN");
+            handleError(error, "Couldn't verify your PIN.");
         } finally {
             setReAuthLoading(false);
         }
@@ -105,9 +105,9 @@ export function SecuritySettingsTab() {
         try {
             await invoke("remove_lock_pin");
             setHasPin(false);
-            toast.success("App lock disabled");
+            toast.success("App lock turned off.");
         } catch (error) {
-            handleError(error, "Failed to remove PIN");
+            handleError(error, "Couldn't turn off app lock.");
         }
     };
 
@@ -115,7 +115,7 @@ export function SecuritySettingsTab() {
         <div className="space-y-6">
             <div>
                 <h3 className="text-lg font-medium">Security</h3>
-                <p className="text-sm text-muted-foreground">Manage your application security and access controls.</p>
+                <p className="text-sm text-muted-foreground">Keep your data safe. Everything is encrypted and stays on your machine.</p>
             </div>
 
             <Card className="border-primary/10 bg-primary/5">
@@ -138,8 +138,8 @@ export function SecuritySettingsTab() {
                             <Label className="text-sm font-medium">Startup PIN Protection</Label>
                             <p className="text-[11px] text-muted-foreground">
                                 {hasPin
-                                    ? "Enabled — You will be prompted for your PIN when the app launches."
-                                    : "Disabled — Anyone with access to your computer can open the app."}
+                                    ? "Enabled — you'll need your PIN every time you open the app."
+                                    : "Disabled — anyone using this computer can see your contacts."}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -250,7 +250,7 @@ export function SecuritySettingsTab() {
                             <DialogHeader>
                                 <DialogTitle>Verify Current PIN</DialogTitle>
                                 <DialogDescription>
-                                    Please enter your current security PIN to {reAuthAction === 'remove' ? 'disable the app lock' : 'change your PIN'}.
+                                    Enter your current PIN to {reAuthAction === 'remove' ? 'turn off app lock' : 'change it'}.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="flex flex-col space-y-4 py-4">
@@ -274,7 +274,7 @@ export function SecuritySettingsTab() {
                                     autoFocus
                                 />
                                 {reAuthError && (
-                                    <p className="text-sm text-destructive font-medium">Incorrect PIN. Please try again.</p>
+                                    <p className="text-sm text-destructive font-medium">Incorrect PIN.</p>
                                 )}
                             </div>
                             <DialogFooter className="sm:justify-end">
@@ -308,7 +308,7 @@ export function SecuritySettingsTab() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            Your database is fully encrypted with SQLCipher (AES-256-CBC). All OAuth tokens and service credentials are encrypted using AES-256-GCM before storage.
+                            Your contacts and notes are fully encrypted with SQLCipher. Sensitive data like OAuth tokens are double-encrypted with AES-256-GCM before being saved to your disk.
                         </p>
                     </CardContent>
                 </Card>
@@ -322,7 +322,7 @@ export function SecuritySettingsTab() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            No data leaves your device unless you explicitly export it. Your security keys are securely stored in your operating system's hardware-backed keychain.
+                            Nothing leaves this computer unless you export it yourself. Your encryption keys are safely tucked away in your operating system's native keychain.
                         </p>
                     </CardContent>
                 </Card>
