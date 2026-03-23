@@ -30,10 +30,10 @@ pub fn start_email_scheduler(app_handle: AppHandle, db: Db) {
         loop {
             interval.tick().await;
 
-            if let Err(e) = check_and_send_scheduled_emails(&app_handle, &db, &email_service).await
+            if let Err(_e) = check_and_send_scheduled_emails(&app_handle, &db, &email_service).await
             {
                 #[cfg(debug_assertions)]
-                eprintln!("Error in scheduled email loop: {}", e);
+                eprintln!("Error in scheduled email loop: {}", _e);
             }
         }
     });

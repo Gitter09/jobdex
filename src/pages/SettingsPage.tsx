@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useErrors } from "@/hooks/use-errors";
 import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
@@ -16,6 +16,7 @@ import {
     Monitor,
     Trash2,
     Database,
+    Power,
 } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,30 @@ export function SettingsPage() {
 
     const { settings, loading, updateSetting } = useSettings();
     const { handleError } = useErrors();
+
+    const [autostart, setAutostart] = useState(false);
+
+    useEffect(() => {
+        invoke<boolean>("is_background_service_enabled")
+            .then(setAutostart)
+            .catch(() => {});
+    }, []);
+
+    const handleAutostartToggle = async () => {
+        try {
+            if (autostart) {
+                await invoke("disable_background_service");
+                setAutostart(false);
+                toast.success("Background service disabled");
+            } else {
+                await invoke("enable_background_service");
+                setAutostart(true);
+                toast.success("OutreachOS will run in the background on login");
+            }
+        } catch (error) {
+            handleError(error, "Failed to toggle background service");
+        }
+    };
 
     // Redirect /settings to /settings/ai
     useEffect(() => {
@@ -94,6 +119,34 @@ export function SettingsPage() {
                             <span className="text-xs font-medium">{t.label}</span>
                         </button>
                     ))}
+                </div>
+            </div>
+
+            <Separator />
+
+            {/* Background Service */}
+            <div className="space-y-4">
+                <Label className="text-sm font-semibold">Background Service</Label>
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-md">
+                            <Power className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium">Start on login</p>
+                            <p className="text-xs text-muted-foreground">
+                                Launch OutreachOS in the background when you start your computer.
+                                Scheduled emails will send even when the window is closed.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        variant={autostart ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleAutostartToggle}
+                    >
+                        {autostart ? "Enabled" : "Disabled"}
+                    </Button>
                 </div>
             </div>
 

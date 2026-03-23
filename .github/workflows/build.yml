@@ -70,11 +70,17 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Build Tauri App
-        run: bun run tauri build
+      - name: Build Tauri App (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: npm run build:mac
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build Tauri App (Linux/Windows)
+        if: matrix.platform != 'macos-latest'
+        run: bun run tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Artifacts (macOS)
         if: matrix.platform == 'macos-latest'

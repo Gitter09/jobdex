@@ -3,8 +3,11 @@ use tauri::Manager;
 
 mod error;
 use error::AppError;
-mod scheduler; // Added scheduler module
-mod utils; // Added utils module
+#[cfg(target_os = "macos")]
+mod launchagent;
+mod scheduler;
+mod tray;
+mod utils;
 
 pub fn extract_linkedin_slug(url: &str) -> Option<&str> {
     // Match /in/username or /pub/username patterns
@@ -443,6 +446,36 @@ async fn clear_contact_next_date(db: tauri::State<'_, Db>, id: String) -> Result
     Ok(())
 }
 
+#[tauri::command]
+async fn enable_background_service() -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        launchagent::enable()?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_background_service() -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        launchagent::disable()?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn is_background_service_enabled() -> Result<bool, AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        return launchagent::is_enabled();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(false)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -499,6 +532,26 @@ pub fn run() {
             #[cfg(debug_assertions)]
             println!("[Boot] Starting Email Scheduler...");
             scheduler::start_email_scheduler(app_handle.clone(), db.clone());
+
+            // System tray
+            #[cfg(debug_assertions)]
+            println!("[Boot] Setting up system tray...");
+            tray::setup(app_handle).expect("failed to setup system tray");
+
+            // Remove legacy AppleScript login item (fire-and-forget)
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("osascript")
+                    .args(["-e", "tell application \"System Events\" to delete login item \"OutreachOS\""])
+                    .output();
+            }
+
+            // If launched with --background flag (via LaunchAgent), hide the main window
+            if std::env::args().any(|a| a == "--background") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
 
             #[cfg(debug_assertions)]
             println!("[Boot] Setup complete, managing state.");
@@ -570,8 +623,19 @@ pub fn run() {
             delete_contact_file,
             open_contact_file,
             utils::open_external_url,
-            check_for_update
+            check_for_update,
+            enable_background_service,
+            disable_background_service,
+            is_background_service_enabled
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if !tray::should_exit() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

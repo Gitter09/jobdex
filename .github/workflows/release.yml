@@ -11,15 +11,78 @@ env:
   SQLX_SQLITE_USE_SQLCIPHER: "1"
 
 jobs:
-  release:
+  # macOS: custom DMG build (skips Tauri's DMG, builds our own)
+  release-macos:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install SQLCipher
+        run: brew install sqlcipher
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Verify changelog is up to date
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const content = fs.readFileSync('src/changelog.ts', 'utf8');
+            const match = content.match(/version:\s*['\"]([^'\"]+)['\"]/)
+            const version = match ? match[1] : null;
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+            if (version !== tag) {
+              console.error('changelog.ts version (' + version + ') does not match release tag (' + tag + '). Add a new entry to src/changelog.ts before releasing.');
+              process.exit(1);
+            }
+            console.log('Changelog version matches tag:', version);
+          "
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - name: Build app and create DMG
+        run: npm run build:mac
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload DMG to release
+        run: |
+          TAG="${{ github.ref_name }}"
+          DMG_FILE=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
+          gh release create "$TAG" --draft --title "OutreachOS $TAG" --notes "See the assets to download this version and install." 2>/dev/null || true
+          gh release upload "$TAG" "$DMG_FILE" --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Linux & Windows: use tauri-action (handles release creation + asset upload)
+  release-other:
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            os: macos-latest
           - platform: ubuntu-22.04
             os: ubuntu-22.04
           - platform: windows-latest
@@ -52,10 +115,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsqlcipher-dev rpm
-
-      - name: Install SQLCipher (macOS only)
-        if: matrix.platform == 'macos-latest'
-        run: brew install sqlcipher
 
       - name: Install SQLCipher (Windows only)
         if: matrix.platform == 'windows-latest'
