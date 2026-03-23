@@ -3,13 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Mail, Calendar, Loader2, Trash2, RefreshCw, AlertCircle } from "lucide-react";
+import { Mail, Calendar, Loader2, Trash2, RefreshCw, AlertCircle, ArrowUpRight, ArrowDownLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { useErrors } from "@/hooks/use-errors";
-import { ScheduledEmail } from "@/types/crm";
+import { ScheduledEmail, EmailMessage } from "@/types/crm";
 import { format, isPast } from "date-fns";
 import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmailBody } from "@/components/email/EmailBody";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,6 +30,9 @@ export function EmailsPage() {
     const [scheduled, setScheduled] = useState<ScheduledEmail[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<ScheduledEmail | null>(null);
+    const [inbox, setInbox] = useState<EmailMessage[]>([]);
+    const [inboxLoading, setInboxLoading] = useState(true);
+    const [inboxFilter, setInboxFilter] = useState<"all" | "received" | "sent">("all");
 
     const fetchScheduled = useCallback(async () => {
         setLoading(true);
@@ -41,9 +46,26 @@ export function EmailsPage() {
         }
     }, []);
 
+    const fetchInbox = useCallback(async (filter: "all" | "received" | "sent") => {
+        setInboxLoading(true);
+        try {
+            const data = await invoke<EmailMessage[]>("get_all_emails", {
+                statusFilter: filter === "all" ? null : filter,
+                limit: 100,
+                offset: 0,
+            });
+            setInbox(data);
+        } catch (err) {
+            handleError(err, "Failed to load inbox");
+        } finally {
+            setInboxLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchScheduled();
-    }, [fetchScheduled]);
+        fetchInbox("all");
+    }, [fetchScheduled, fetchInbox]);
 
     const handleCancel = async () => {
         if (!cancelTarget) return;
@@ -129,27 +151,58 @@ export function EmailsPage() {
                     )}
                 </div>
 
-                {/* Inbox placeholder */}
+                {/* Inbox */}
                 <div>
-                    <div className="mb-4">
-                        <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-                            <Mail className="h-5 w-5 text-muted-foreground" />
-                            Inbox
-                        </h2>
-                        <p className="text-sm text-muted-foreground mt-0.5">View and manage your email conversations.</p>
-                    </div>
-                    <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center justify-center py-14 text-center">
-                            <Mail className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                            <h3 className="text-base font-medium">Real email sync is coming.</h3>
-                            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                                In the meantime, email threads live on each contact's page.
-                            </p>
-                            <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/people")}>
-                                Go to People
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+                                <Mail className="h-5 w-5 text-muted-foreground" />
+                                Inbox
+                            </h2>
+                            <p className="text-sm text-muted-foreground mt-0.5">All synced email conversations.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Tabs value={inboxFilter} onValueChange={(v) => {
+                                const f = v as "all" | "received" | "sent";
+                                setInboxFilter(f);
+                                fetchInbox(f);
+                            }}>
+                                <TabsList className="h-8">
+                                    <TabsTrigger value="all" className="text-xs px-3 h-6">All</TabsTrigger>
+                                    <TabsTrigger value="received" className="text-xs px-3 h-6">Received</TabsTrigger>
+                                    <TabsTrigger value="sent" className="text-xs px-3 h-6">Sent</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                            <Button variant="ghost" size="sm" onClick={() => fetchInbox(inboxFilter)} disabled={inboxLoading}>
+                                <RefreshCw className={`h-4 w-4 ${inboxLoading ? "animate-spin" : ""}`} />
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
+
+                    {inboxLoading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : inbox.length === 0 ? (
+                        <Card className="border-dashed">
+                            <CardContent className="flex flex-col items-center justify-center py-14 text-center">
+                                <Mail className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                                <h3 className="text-base font-medium">No emails yet</h3>
+                                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                                    Connect a Gmail account and sync to see your email history here.
+                                </p>
+                                <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/settings")}>
+                                    Go to Settings
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="rounded-lg border divide-y">
+                            {inbox.map((email) => (
+                                <InboxEmailRow key={email.id} email={email} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -172,6 +225,43 @@ export function EmailsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+        </div>
+    );
+}
+
+function InboxEmailRow({ email }: { email: EmailMessage }) {
+    const [expanded, setExpanded] = useState(false);
+    const isOutbound = email.status === "sent";
+
+    return (
+        <div className="bg-card hover:bg-muted/20 transition-colors">
+            <button
+                className="w-full flex items-start gap-3 px-4 py-3 text-left"
+                onClick={() => setExpanded((v) => !v)}
+            >
+                <div className={`mt-0.5 h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${isOutbound ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
+                    {isOutbound ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownLeft className="h-3.5 w-3.5" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium text-sm truncate">{email.subject || "(No Subject)"}</span>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                            {email.sent_at ? format(new Date(email.sent_at), "MMM d, yyyy") : ""}
+                        </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {isOutbound ? `To: ${email.to_email}` : `From: ${email.from_email}`}
+                    </p>
+                </div>
+                <div className="shrink-0 mt-1 text-muted-foreground">
+                    {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </div>
+            </button>
+            {expanded && (
+                <div className="px-4 pb-4 pl-14">
+                    <EmailBody email={email} />
+                </div>
+            )}
         </div>
     );
 }

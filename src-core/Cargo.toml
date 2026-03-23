@@ -1,5 +1,5 @@
 [package]
-name = "outreach-core"
+name = "jobdex-core"
 version = "0.1.3"
 edition = "2021"
 
@@ -27,3 +27,4 @@ hex = "0.4"
 sha2 = "0.10"
 pbkdf2 = { version = "0.12", features = ["simple"] }
 tracing = "0.1"
+mail-parser = "0.9"

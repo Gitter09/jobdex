@@ -1,4 +1,4 @@
-use outreach_core::Db;
+use jobdex_core::Db;
 use tauri::Manager;
 
 mod error;
@@ -27,8 +27,8 @@ fn greet(name: &str) -> String {
 #[derive(serde::Serialize)]
 struct ContactWithTags {
     #[serde(flatten)]
-    contact: outreach_core::models::Contact,
-    tags: Vec<outreach_core::models::Tag>,
+    contact: jobdex_core::models::Contact,
+    tags: Vec<jobdex_core::models::Tag>,
 }
 
 #[tauri::command]
@@ -36,7 +36,7 @@ async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, 
     let pool = db.pool();
 
     // 1. Fetch Contacts
-    let contacts = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
+    let contacts = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Contact>(
         r#"
         SELECT 
             c.*, 
@@ -87,13 +87,13 @@ async fn get_contacts(db: tauri::State<'_, Db>) -> Result<Vec<ContactWithTags>, 
 
     // 3. Group Tags by Contact ID
     use std::collections::HashMap;
-    let mut tags_by_contact: HashMap<String, Vec<outreach_core::models::Tag>> = HashMap::new();
+    let mut tags_by_contact: HashMap<String, Vec<jobdex_core::models::Tag>> = HashMap::new();
 
     for a in assignments {
         tags_by_contact
             .entry(a.contact_id)
             .or_default()
-            .push(outreach_core::models::Tag {
+            .push(jobdex_core::models::Tag {
                 id: a.id,
                 name: a.name,
                 color: a.color,
@@ -120,7 +120,7 @@ async fn get_contact_by_id(
 ) -> Result<ContactWithTags, AppError> {
     let pool = db.pool();
 
-    let contact = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
+    let contact = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Contact>(
         r#"
         SELECT 
             c.*, 
@@ -149,7 +149,7 @@ async fn get_contact_by_id(
     .map_err(|e: sqlx::Error| e.to_string())?
     .ok_or_else(|| AppError::Validation(format!("Contact '{}' not found", id)))?;
 
-    let tags = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Tag>(
+    let tags = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Tag>(
         r#"
         SELECT t.*
         FROM tags t
@@ -168,9 +168,9 @@ async fn get_contact_by_id(
 #[tauri::command]
 async fn get_statuses(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::models::Status>, AppError> {
+) -> Result<Vec<jobdex_core::models::Status>, AppError> {
     let pool = db.pool();
-    let statuses = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Status>(
+    let statuses = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Status>(
         "SELECT id, label, color, position, is_default FROM statuses ORDER BY position ASC",
     )
     .fetch_all(pool)
@@ -484,7 +484,7 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle();
             #[cfg(debug_assertions)]
-            println!("[Boot] Starting OutreachOS production diagnostics...");
+            println!("[Boot] Starting JobDex production diagnostics...");
 
             let app_dir = app_handle
                 .path()
@@ -508,7 +508,7 @@ pub fn run() {
                 })
                 .expect("failed to create app data dir");
 
-            let db_path = app_dir.join("outreach.db");
+            let db_path = app_dir.join("jobdex.db");
             let db_path_str = db_path.to_str().expect("invalid path");
             #[cfg(debug_assertions)]
             println!("[Boot] Database Path: {}", db_path_str);
@@ -542,7 +542,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 let _ = std::process::Command::new("osascript")
-                    .args(["-e", "tell application \"System Events\" to delete login item \"OutreachOS\""])
+                    .args(["-e", "tell application \"System Events\" to delete login item \"JobDex\""])
                     .output();
             }
 
@@ -577,6 +577,9 @@ pub fn run() {
             delete_email_account,
             email_schedule,
             get_emails_for_contact,
+            get_all_emails,
+            get_attachments_for_message,
+            open_attachment,
             get_contact_events,
             get_contact_activity,
             create_contact_event,
@@ -737,8 +740,8 @@ async fn delete_contact(db: tauri::State<'_, Db>, id: String) -> Result<(), AppE
 #[tauri::command]
 async fn get_email_accounts(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::models::EmailAccount>, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+) -> Result<Vec<jobdex_core::models::EmailAccount>, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .list_accounts()
         .await
@@ -750,7 +753,7 @@ async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     use std::net::TcpListener;
     use std::thread;
 
-    let client = outreach_core::gmail::GmailClient::new();
+    let client = jobdex_core::gmail::GmailClient::new();
 
     // Bind to ephemeral port FIRST to prevent port hijacking
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -775,7 +778,7 @@ async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
         .map_err(|e| e.to_string())?;
 
     // Exchange code (must use the same port for redirect_uri)
-    let client = outreach_core::gmail::GmailClient::new();
+    let client = jobdex_core::gmail::GmailClient::new();
     let tokens = client
         .exchange_code(code, pkce_verifier, port)
         .await
@@ -788,7 +791,7 @@ async fn gmail_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
         .map_err(|e| e.to_string())?;
 
     // Save to DB
-    let service = outreach_core::EmailService::new(db.inner().clone());
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .register_account(
             "gmail",
@@ -808,7 +811,7 @@ async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     use std::net::TcpListener;
     use std::thread;
 
-    let client = outreach_core::outlook::OutlookClient::new();
+    let client = jobdex_core::outlook::OutlookClient::new();
 
     // Bind to ephemeral port FIRST to prevent port hijacking
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -829,7 +832,7 @@ async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
         .map_err(|_| "OAuth callback thread panicked".to_string())?
         .map_err(|e| e.to_string())?;
 
-    let client = outreach_core::outlook::OutlookClient::new();
+    let client = jobdex_core::outlook::OutlookClient::new();
     let tokens = client
         .exchange_code(code, pkce_verifier, port)
         .await
@@ -840,7 +843,7 @@ async fn outlook_connect(db: tauri::State<'_, Db>) -> Result<String, AppError> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let service = outreach_core::EmailService::new(db.inner().clone());
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .register_account(
             "outlook",
@@ -864,7 +867,7 @@ async fn email_send(
     subject: String,
     body: String,
 ) -> Result<String, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     let result = service
         .send_email(&account_id, &to, &subject, &body)
         .await
@@ -899,7 +902,7 @@ async fn email_schedule(
     body: String,
     scheduled_at: i64,
 ) -> Result<String, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     let result = service
         .schedule_email(&account_id, &contact_id, &subject, &body, scheduled_at)
         .await
@@ -1174,10 +1177,45 @@ async fn update_scheduled_email(
 async fn get_emails_for_contact(
     db: tauri::State<'_, Db>,
     contact_id: String,
-) -> Result<Vec<outreach_core::models::EmailMessage>, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+) -> Result<Vec<jobdex_core::models::EmailMessage>, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .get_emails_for_contact(&contact_id)
+        .await
+        .map_err(|e| e.to_string().into())
+}
+
+#[tauri::command]
+async fn get_attachments_for_message(
+    db: tauri::State<'_, Db>,
+    message_id: String,
+) -> Result<Vec<jobdex_core::models::EmailAttachment>, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
+    service
+        .get_attachments_for_message(&message_id)
+        .await
+        .map_err(|e| e.to_string().into())
+}
+
+#[tauri::command]
+fn open_attachment(file_path: String) -> Result<(), AppError> {
+    open::that(&file_path).map_err(|e| format!("Failed to open attachment: {}", e).into())
+}
+
+#[tauri::command]
+async fn get_all_emails(
+    db: tauri::State<'_, Db>,
+    status_filter: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<jobdex_core::models::EmailMessage>, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
+    service
+        .get_all_emails(
+            status_filter.as_deref(),
+            limit.unwrap_or(100),
+            offset.unwrap_or(0),
+        )
         .await
         .map_err(|e| e.to_string().into())
 }
@@ -1187,7 +1225,7 @@ async fn delete_email_account(
     db: tauri::State<'_, Db>,
     account_id: String,
 ) -> Result<(), AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .delete_account(&account_id)
         .await
@@ -1197,8 +1235,8 @@ async fn delete_email_account(
 #[tauri::command]
 async fn sync_email_accounts(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::SyncResult>, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+) -> Result<Vec<jobdex_core::SyncResult>, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .sync_all_accounts()
         .await
@@ -1209,8 +1247,8 @@ async fn sync_email_accounts(
 async fn sync_email_account(
     db: tauri::State<'_, Db>,
     account_id: String,
-) -> Result<outreach_core::SyncResult, AppError> {
-    let service = outreach_core::EmailService::new(db.inner().clone());
+) -> Result<jobdex_core::SyncResult, AppError> {
+    let service = jobdex_core::EmailService::new(db.inner().clone());
     service
         .sync_account(&account_id)
         .await
@@ -1250,7 +1288,7 @@ async fn save_api_key(
 ) -> Result<(), AppError> {
     #[cfg(debug_assertions)]
     println!("--- [DB Debug] Saving key for service: {} ---", service);
-    let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let manager = jobdex_core::settings::SettingsManager::new(db.pool().clone());
     manager
         .set(&service, &key)
         .await
@@ -1266,7 +1304,7 @@ async fn save_api_key(
 async fn get_settings(
     db: tauri::State<'_, Db>,
 ) -> Result<std::collections::HashMap<String, String>, AppError> {
-    let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let manager = jobdex_core::settings::SettingsManager::new(db.pool().clone());
     manager.get_all().await.map_err(|e| e.to_string().into())
 }
 
@@ -1294,19 +1332,19 @@ async fn clear_all_data(db: tauri::State<'_, Db>) -> Result<(), AppError> {
 async fn export_all_data(db: tauri::State<'_, Db>) -> Result<String, AppError> {
     let pool = db.pool();
 
-    let contacts = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Contact>(
+    let contacts = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Contact>(
         "SELECT id, company_id, first_name, last_name, email, linkedin_url, title, company, location, company_website, status, status_id, status_label, status_color, intelligence_summary, last_interaction_at, last_contacted_date, next_contact_date, NULL as effective_next_date, NULL as next_contact_event, cadence_stage, created_at, updated_at FROM contacts"
     )
     .fetch_all(pool)
     .await?;
 
-    let statuses = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Status>(
+    let statuses = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Status>(
         "SELECT id, label, color, position, is_default FROM statuses",
     )
     .fetch_all(pool)
     .await?;
 
-    let settings_map = outreach_core::settings::SettingsManager::new(pool.clone())
+    let settings_map = jobdex_core::settings::SettingsManager::new(pool.clone())
         .get_all()
         .await?;
 
@@ -1329,12 +1367,12 @@ async fn save_setting(
 ) -> Result<(), AppError> {
     // Intercept sensitive keys and store them in OS keychain
     if key == "outlook_client_id" {
-        outreach_core::crypto::store_secret("outlook_client_id", &value)
+        jobdex_core::crypto::store_secret("outlook_client_id", &value)
             .map_err(|e| AppError::Internal(e.to_string()))?;
         return Ok(());
     }
 
-    let manager = outreach_core::settings::SettingsManager::new(db.pool().clone());
+    let manager = jobdex_core::settings::SettingsManager::new(db.pool().clone());
     manager
         .set(&key, &value)
         .await
@@ -1344,7 +1382,7 @@ async fn save_setting(
 // ===== Import Commands =====
 
 #[tauri::command]
-fn get_import_headers(file_path: String) -> Result<outreach_core::import::ImportPreview, AppError> {
+fn get_import_headers(file_path: String) -> Result<jobdex_core::import::ImportPreview, AppError> {
     // HIGH-4: Validate file path to prevent path traversal
     if file_path.contains("..") {
         return Err(AppError::Validation(
@@ -1360,7 +1398,7 @@ fn get_import_headers(file_path: String) -> Result<outreach_core::import::Import
             ))
         }
     }
-    outreach_core::import::preview_file(&file_path).map_err(|e| e.to_string().into())
+    jobdex_core::import::preview_file(&file_path).map_err(|e| e.to_string().into())
 }
 
 #[derive(serde::Serialize)]
@@ -1384,9 +1422,9 @@ struct ContactIdentity {
 async fn analyze_import(
     db: tauri::State<'_, Db>,
     file_path: String,
-    mapping: outreach_core::import::ColumnMapping,
+    mapping: jobdex_core::import::ColumnMapping,
 ) -> Result<ImportAnalysis, AppError> {
-    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)?;
+    let contacts = jobdex_core::import::parse_file_with_mapping(&file_path, &mapping)?;
 
     // Fetch existing identifiers for comparison
     let pool = db.pool();
@@ -1452,10 +1490,10 @@ async fn analyze_import(
 async fn import_contacts(
     db: tauri::State<'_, Db>,
     file_path: String,
-    mapping: outreach_core::import::ColumnMapping,
+    mapping: jobdex_core::import::ColumnMapping,
     mode: String, // "skip", "merge", "none"
 ) -> Result<usize, AppError> {
-    let contacts = outreach_core::import::parse_file_with_mapping(&file_path, &mapping)?;
+    let contacts = jobdex_core::import::parse_file_with_mapping(&file_path, &mapping)?;
 
     let pool = db.pool();
 
@@ -1625,9 +1663,9 @@ async fn update_contacts_status_bulk(
 // ===== Tag Commands =====
 
 #[tauri::command]
-async fn get_tags(db: tauri::State<'_, Db>) -> Result<Vec<outreach_core::models::Tag>, AppError> {
+async fn get_tags(db: tauri::State<'_, Db>) -> Result<Vec<jobdex_core::models::Tag>, AppError> {
     let pool = db.pool();
-    let tags = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::Tag>(
+    let tags = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::Tag>(
         "SELECT id, name, color, created_at FROM tags ORDER BY name ASC",
     )
     .fetch_all(pool)
@@ -1764,9 +1802,9 @@ async fn unassign_tag(
 #[tauri::command]
 async fn get_email_templates(
     db: tauri::State<'_, Db>,
-) -> Result<Vec<outreach_core::models::EmailTemplate>, AppError> {
+) -> Result<Vec<jobdex_core::models::EmailTemplate>, AppError> {
     let pool = db.pool();
-    let templates = sqlx::query_as::<sqlx::Sqlite, outreach_core::models::EmailTemplate>(
+    let templates = sqlx::query_as::<sqlx::Sqlite, jobdex_core::models::EmailTemplate>(
         "SELECT id, name, subject, body, created_at, updated_at FROM email_templates ORDER BY name ASC",
     )
     .fetch_all(pool)
@@ -1827,8 +1865,8 @@ struct EmailCredentialStatus {
 #[tauri::command]
 async fn check_email_credentials() -> Result<EmailCredentialStatus, AppError> {
     Ok(EmailCredentialStatus {
-        gmail_configured: outreach_core::crypto::has_credentials("gmail"),
-        outlook_configured: outreach_core::crypto::has_credentials("outlook"),
+        gmail_configured: jobdex_core::crypto::has_credentials("gmail"),
+        outlook_configured: jobdex_core::crypto::has_credentials("outlook"),
     })
 }
 
@@ -1838,9 +1876,9 @@ async fn save_email_credentials(
     client_id: String,
     client_secret: String,
 ) -> Result<(), AppError> {
-    outreach_core::crypto::store_credential(&provider, "client_id", &client_id)
+    jobdex_core::crypto::store_credential(&provider, "client_id", &client_id)
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    outreach_core::crypto::store_credential(&provider, "client_secret", &client_secret)
+    jobdex_core::crypto::store_credential(&provider, "client_secret", &client_secret)
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(())
 }
@@ -1849,10 +1887,10 @@ async fn save_email_credentials(
 
 #[tauri::command]
 async fn set_lock_pin(db: tauri::State<'_, Db>, pin: String) -> Result<(), AppError> {
-    use outreach_core::settings::SettingsManager;
+    use jobdex_core::settings::SettingsManager;
 
     let manager = SettingsManager::new(db.pool().clone());
-    let stored = outreach_core::crypto::create_pin_data(&pin);
+    let stored = jobdex_core::crypto::create_pin_data(&pin);
 
     manager
         .set("app_lock_pin_hash", &stored)
@@ -1864,7 +1902,7 @@ async fn set_lock_pin(db: tauri::State<'_, Db>, pin: String) -> Result<(), AppEr
 
 #[tauri::command]
 async fn verify_lock_pin(db: tauri::State<'_, Db>, pin: String) -> Result<bool, AppError> {
-    use outreach_core::settings::SettingsManager;
+    use jobdex_core::settings::SettingsManager;
 
     let manager = SettingsManager::new(db.pool().clone());
     let stored = manager
@@ -1873,14 +1911,14 @@ async fn verify_lock_pin(db: tauri::State<'_, Db>, pin: String) -> Result<bool, 
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     match stored {
-        Some(hash) => Ok(outreach_core::crypto::verify_pin_against_hash(&pin, &hash)),
+        Some(hash) => Ok(jobdex_core::crypto::verify_pin_against_hash(&pin, &hash)),
         None => Err(AppError::Internal("No PIN configured".to_string())),
     }
 }
 
 #[tauri::command]
 async fn has_lock_pin(db: tauri::State<'_, Db>) -> Result<bool, AppError> {
-    use outreach_core::settings::SettingsManager;
+    use jobdex_core::settings::SettingsManager;
 
     let manager = SettingsManager::new(db.pool().clone());
     let stored = manager
@@ -1908,10 +1946,10 @@ async fn remove_lock_pin(db: tauri::State<'_, Db>) -> Result<(), AppError> {
 async fn get_contact_events(
     db: tauri::State<'_, Db>,
     contact_id: String,
-) -> Result<Vec<outreach_core::models::ContactEvent>, AppError> {
+) -> Result<Vec<jobdex_core::models::ContactEvent>, AppError> {
     let pool = db.pool();
     // Only return user-created events (meetings, calls, etc.) — NOT system activity
-    let events = sqlx::query_as::<_, outreach_core::models::ContactEvent>(
+    let events = sqlx::query_as::<_, jobdex_core::models::ContactEvent>(
         "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'user_event' ORDER BY event_at ASC",
     )
     .bind(contact_id)
@@ -1924,10 +1962,10 @@ async fn get_contact_events(
 async fn get_contact_activity(
     db: tauri::State<'_, Db>,
     contact_id: String,
-) -> Result<Vec<outreach_core::models::ContactEvent>, AppError> {
+) -> Result<Vec<jobdex_core::models::ContactEvent>, AppError> {
     let pool = db.pool();
     // Only return system-generated activity events for the Activity tab
-    let events = sqlx::query_as::<_, outreach_core::models::ContactEvent>(
+    let events = sqlx::query_as::<_, jobdex_core::models::ContactEvent>(
         "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'activity' ORDER BY event_at DESC",
     )
     .bind(contact_id)
@@ -2015,12 +2053,12 @@ async fn check_for_update() -> Result<String, AppError> {
     println!("[update] checking GitHub for latest release...");
 
     let client = reqwest::Client::builder()
-        .user_agent("OutreachOS")
+        .user_agent("JobDex")
         .build()
         .map_err(|e| AppError::Network(e.to_string()))?;
 
     let res = client
-        .get("https://api.github.com/repos/Gitter09/outreach-os/releases/latest")
+        .get("https://api.github.com/repos/Gitter09/jobdex/releases/latest")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await

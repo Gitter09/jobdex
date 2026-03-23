@@ -338,9 +338,9 @@
 
   /* ── OS-AWARE DOWNLOAD BUTTONS ── */
   (function () {
-    var GITHUB_API = 'https://api.github.com/repos/Gitter09/outreach-os/releases/latest';
-    var RELEASES_URL = 'https://github.com/Gitter09/outreach-os/releases';
-    var CACHE_KEY = 'outreachos_release';
+    var GITHUB_API = 'https://api.github.com/repos/Gitter09/jobdex/releases/latest';
+    var RELEASES_URL = 'https://github.com/Gitter09/jobdex/releases';
+    var CACHE_KEY = 'jobdex_release';
 
     function detectOS() {
       var ua = navigator.userAgent || '';

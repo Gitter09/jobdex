@@ -26,7 +26,7 @@ export const useErrors = () => {
             if (errorCode) {
                 // Unexpected backend error — show error code so the user can report it
                 toast.error(title, {
-                    description: `Error code: ${errorCode} · If this keeps happening, report it at github.com/harshitsinghcode/outreachos`,
+                    description: `Error code: ${errorCode} · If this keeps happening, report it at github.com/harshitsinghcode/jobdex`,
                     duration: 6000,
                 });
             } else {

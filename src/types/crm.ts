@@ -70,6 +70,16 @@ export interface EmailMessage {
     created_at: string;
 }
 
+export interface EmailAttachment {
+    id: string;
+    messageId: string;
+    filename: string;
+    contentType: string;
+    fileSize: number;
+    filePath: string;
+    createdAt: string;
+}
+
 export interface ContactEvent {
     id: string;
     contact_id: string;

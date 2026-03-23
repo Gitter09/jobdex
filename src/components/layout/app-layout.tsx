@@ -109,7 +109,7 @@ export function AppLayout() {
                     <div className="flex items-center gap-4">
                         <button
                             className="underline underline-offset-2 hover:opacity-80 transition-opacity font-medium"
-                            onClick={() => invoke("open_external_url", { url: "https://github.com/Gitter09/outreach-os/releases/latest" })}
+                            onClick={() => invoke("open_external_url", { url: "https://github.com/Gitter09/jobdex/releases/latest" })}
                         >
                             Get it
                         </button>

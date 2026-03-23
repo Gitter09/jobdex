@@ -28,7 +28,7 @@ export function AboutTab() {
                 <div className="space-y-6">
                     <div className="space-y-3">
                         <div className="flex items-baseline gap-3">
-                            <span className="text-2xl font-bold tracking-tight">OutreachOS</span>
+                            <span className="text-2xl font-bold tracking-tight">JobDex</span>
                             <span className="text-sm text-muted-foreground font-mono">v{version}</span>
                         </div>
                         <p className="text-sm text-foreground/80 leading-relaxed">
@@ -44,7 +44,7 @@ export function AboutTab() {
 
                     <div className="flex items-center gap-4">
                         <button
-                            onClick={() => invoke("open_external_url", { url: "https://github.com/Gitter09/outreach-os" })}
+                            onClick={() => invoke("open_external_url", { url: "https://github.com/Gitter09/jobdex" })}
                             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                             <Github className="h-4 w-4" />

@@ -207,6 +207,86 @@ impl EmailService {
         Ok(emails)
     }
 
+    /// Write raw attachment bytes to `~/.jobdex/attachments/<message_id>/` and insert metadata.
+    async fn save_attachments(
+        &self,
+        message_id: &str,
+        attachments: Vec<crate::gmail::RawAttachment>,
+    ) -> anyhow::Result<()> {
+        let base_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".jobdex")
+            .join("attachments")
+            .join(message_id);
+        tokio::fs::create_dir_all(&base_dir).await?;
+
+        for attachment in attachments {
+            // Sanitize filename to avoid path traversal
+            let safe_name = attachment
+                .filename
+                .replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+            let file_path = base_dir.join(&safe_name);
+            tokio::fs::write(&file_path, &attachment.data).await?;
+
+            let attachment_id = uuid::Uuid::new_v4().to_string();
+            let path_str = file_path.to_string_lossy().to_string();
+            sqlx::query(
+                "INSERT OR IGNORE INTO email_attachments (id, message_id, filename, content_type, file_size, file_path) \
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            )
+            .bind(&attachment_id)
+            .bind(message_id)
+            .bind(&safe_name)
+            .bind(&attachment.content_type)
+            .bind(attachment.data.len() as i64)
+            .bind(&path_str)
+            .execute(self.db.pool())
+            .await?;
+        }
+        Ok(())
+    }
+
+    /// Retrieve attachment metadata for a given email message.
+    pub async fn get_attachments_for_message(
+        &self,
+        message_id: &str,
+    ) -> anyhow::Result<Vec<crate::db::models::EmailAttachment>> {
+        let attachments = sqlx::query_as::<_, crate::db::models::EmailAttachment>(
+            "SELECT id, message_id, filename, content_type, file_size, file_path, created_at FROM email_attachments WHERE message_id = ? ORDER BY created_at ASC"
+        )
+        .bind(message_id)
+        .fetch_all(self.db.pool())
+        .await?;
+        Ok(attachments)
+    }
+
+    /// Get all synced emails across all contacts, ordered by most recent first.
+    pub async fn get_all_emails(
+        &self,
+        status_filter: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<crate::db::models::EmailMessage>> {
+        let emails = match status_filter {
+            Some(status) => sqlx::query_as::<_, crate::db::models::EmailMessage>(
+                "SELECT id, thread_id, from_email, to_email, subject, body, html_body, sent_at, status, provider_message_id, manually_assigned, created_at FROM email_messages WHERE status = ? ORDER BY sent_at DESC LIMIT ? OFFSET ?"
+            )
+            .bind(status)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?,
+            None => sqlx::query_as::<_, crate::db::models::EmailMessage>(
+                "SELECT id, thread_id, from_email, to_email, subject, body, html_body, sent_at, status, provider_message_id, manually_assigned, created_at FROM email_messages ORDER BY sent_at DESC LIMIT ? OFFSET ?"
+            )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.db.pool())
+            .await?,
+        };
+        Ok(emails)
+    }
+
     /// Send an email via the provider API.
     /// NOTE: No local logging — the sync will pick up sent emails from the provider's Sent folder.
     pub async fn send_email(
@@ -321,6 +401,7 @@ impl EmailService {
                             msg.body,
                             msg.html_body,
                             msg.sent_at,
+                            msg.attachments,
                         )),
                         Err(e) => eprintln!("Failed to fetch Gmail message {}: {}", stub.id, e),
                     }
@@ -357,6 +438,7 @@ impl EmailService {
                             m.body,
                             m.html_body,
                             m.sent_at,
+                            Vec::new(), // Outlook attachment support: future work
                         )
                     })
                     .collect()
@@ -366,7 +448,7 @@ impl EmailService {
 
         // 5. Process each message
 
-        for (provider_msg_id, from_email, to_email, subject, body, html_body, sent_at) in
+        for (provider_msg_id, from_email, to_email, subject, body, html_body, sent_at, raw_attachments) in
             messages_result
         {
             let from_lower = from_email.to_lowercase();
@@ -448,6 +530,12 @@ impl EmailService {
 
             if insert_result.rows_affected() > 0 {
                 synced_count += 1;
+                // Save any attachments to disk and record metadata in DB
+                if !raw_attachments.is_empty() {
+                    if let Err(e) = self.save_attachments(&msg_id, raw_attachments).await {
+                        eprintln!("[sync] Failed to save attachments for {}: {}", msg_id, e);
+                    }
+                }
             } else {
                 // Row already existed — backfill body if it was previously empty
                 if !body.is_empty() {

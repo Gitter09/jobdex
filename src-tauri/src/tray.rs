@@ -17,8 +17,8 @@ pub fn should_exit() -> bool {
 /// Build and attach the system tray icon + menu.
 /// Call this once inside `.setup()`.
 pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let show = MenuItemBuilder::with_id("show", "Show OutreachOS").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit OutreachOS").build(app)?;
+    let show = MenuItemBuilder::with_id("show", "Show JobDex").build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", "Quit JobDex").build(app)?;
 
     let menu = MenuBuilder::new(app)
         .item(&show)
@@ -33,7 +33,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .icon(icon)
         .icon_as_template(true)
         .menu(&menu)
-        .tooltip("OutreachOS")
+        .tooltip("JobDex")
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "show" => {
                 show_main_window(app);

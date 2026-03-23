@@ -8,7 +8,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-const KEYRING_SERVICE: &str = "com.outreachos.app";
+const KEYRING_SERVICE: &str = "com.jobdex.desktop";
 const KEYRING_USER: &str = "encryption-key";
 const KEYRING_DB_KEY_USER: &str = "db-encryption-key";
 const MASTER_SECRET_USER: &str = "master-secret";

@@ -145,7 +145,7 @@ pub fn get_success_html(service: &str) -> String {
         </div>
         <div class="service-badge">{service} Connected</div>
         <h1>You're connected.</h1>
-        <p>Head back to OutreachOS — your account is good to go.</p>
+        <p>Head back to JobDex — your account is good to go.</p>
         <button class="btn" onclick="window.close()">Close this tab</button>
         <p class="fallback">If this doesn't close, you can close the tab manually.</p>
     </div>
@@ -302,7 +302,7 @@ pub fn get_error_html(error: &str) -> String {
         </div>
         <div class="error-badge">Connection failed</div>
         <h1>That didn't work.</h1>
-        <p>{error}<br><br>Close this tab and try connecting again from OutreachOS.</p>
+        <p>{error}<br><br>Close this tab and try connecting again from JobDex.</p>
         <button class="btn" onclick="window.close()">Close this tab</button>
         <p class="fallback">If this doesn't close, you can close the tab manually.</p>
     </div>

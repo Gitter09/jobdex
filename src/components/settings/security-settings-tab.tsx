@@ -54,7 +54,7 @@ export function SecuritySettingsTab() {
             setShowPinDialog(false);
             setPin("");
             setConfirmPin("");
-            toast.success("PIN saved. OutreachOS will now ask for it on startup.");
+            toast.success("PIN saved. JobDex will now ask for it on startup.");
         } catch (error) {
             handleError(error, "Couldn't save your PIN.");
         } finally {
@@ -127,7 +127,7 @@ export function SecuritySettingsTab() {
                         <div>
                             <CardTitle className="text-base">App Lock</CardTitle>
                             <CardDescription className="text-xs">
-                                Require a PIN to access OutreachOS on startup.
+                                Require a PIN to access JobDex on startup.
                             </CardDescription>
                         </div>
                     </div>

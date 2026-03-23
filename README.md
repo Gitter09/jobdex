@@ -1,10 +1,10 @@
-# OutreachOS
+# JobDex
  
 **I built my own CRM instead of paying for one.**
  
 Streak's free trial expired. I refused to pay for features I knew I could build. So I built them. This is that product.
  
-OutreachOS is a privacy-first, offline-capable personal CRM for students doing cold email outreach — internship hunting, job searching, or anyone who needs to systematically manage relationships without a $50/month subscription hanging over their head.
+JobDex is a privacy-first, offline-capable personal CRM for students doing cold email outreach — internship hunting, job searching, or anyone who needs to systematically manage relationships without a $50/month subscription hanging over their head.
  
 Everything runs locally on your machine. No cloud. No telemetry. No vendor lock-in.
  
@@ -14,7 +14,7 @@ Everything runs locally on your machine. No cloud. No telemetry. No vendor lock-
  
 - **People & Pipeline** — A clean contact database with a drag-and-drop Kanban board. Track every relationship from first email to offer.
 - **Contact Intelligence** — A living profile for every contact. Write your own notes, track interaction history, see exactly where things stand before you hit send.
-- **Email Integration** — Connect Gmail or Outlook via OAuth and send directly from OutreachOS. Mail merge templates with variables. Schedule sends. Full email history per contact.
+- **Email Integration** — Connect Gmail or Outlook via OAuth and send directly from JobDex. Mail merge templates with variables. Schedule sends. Full email history per contact.
 - **Two-Step Import** — Drag in a LinkedIn CSV export and map columns in two clicks. Smart duplicate detection handles the rest.
 - **Templates** — Reusable email templates with merge variables (`{{firstName}}`, `{{company}}`, `{{role}}`). Write once, personalise at scale.
 - **Privacy by default** — SQLite database encrypted with SQLCipher AES-256. OAuth tokens encrypted with AES-256-GCM. Master key in your OS Keychain. Your data never leaves your machine.
@@ -33,7 +33,7 @@ So I built it myself.
  
 ## Download
  
-Grab the latest build from [GitHub Releases](https://github.com/Gitter09/outreach-os/releases):
+Grab the latest build from [GitHub Releases](https://github.com/Gitter09/jobdex/releases):
  
 | Platform | Format |
 |---|---|
@@ -75,7 +75,7 @@ bun run tauri build
 These are the things I'm actively thinking about or working toward. No timelines — this is a passion project.
  
 **Coming next:**
-- Multi-step email campaigns — set up a sequence, OutreachOS handles the follow-ups
+- Multi-step email campaigns — set up a sequence, JobDex handles the follow-ups
 - Email open & click tracking — know when someone actually read your message
 - Full pipeline configuration — custom stages, colors, ordering
 - Dashboard — a real one, with actual data
@@ -103,7 +103,7 @@ These are the things I'm actively thinking about or working toward. No timelines
  
 ## License
  
-OutreachOS is source-available and free to use. You can read the code, fork it, build on it, and share it. You just can't sell it or build a paid product on top of it without talking to me first.
+JobDex is source-available and free to use. You can read the code, fork it, build on it, and share it. You just can't sell it or build a paid product on top of it without talking to me first.
  
 ---
  

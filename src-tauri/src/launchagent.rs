@@ -3,9 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-const PLIST_LABEL: &str = "com.outreachos.desktop";
+const PLIST_LABEL: &str = "com.jobdex.desktop";
 
-/// Returns `~/Library/LaunchAgents/com.outreachos.desktop.plist`
+/// Returns `~/Library/LaunchAgents/com.jobdex.desktop.plist`
 fn plist_path() -> Result<PathBuf, AppError> {
     let home = dirs::home_dir()
         .ok_or_else(|| AppError::Internal("Cannot determine home directory".into()))?;
@@ -14,13 +14,13 @@ fn plist_path() -> Result<PathBuf, AppError> {
 }
 
 /// Resolves the `.app` bundle path from the current executable.
-/// e.g. `/Applications/OutreachOS.app/Contents/MacOS/outreachos` → `/Applications/OutreachOS.app`
+/// e.g. `/Applications/JobDex.app/Contents/MacOS/jobdex` → `/Applications/JobDex.app`
 fn get_app_bundle_path() -> Result<PathBuf, AppError> {
     let exe = std::env::current_exe().map_err(AppError::Io)?;
     let bundle = exe
         .parent() // MacOS
         .and_then(|p| p.parent()) // Contents
-        .and_then(|p| p.parent()) // OutreachOS.app
+        .and_then(|p| p.parent()) // JobDex.app
         .ok_or_else(|| AppError::Internal("Cannot resolve app bundle path".into()))?;
 
     if bundle.extension().map(|e| e == "app").unwrap_or(false) {

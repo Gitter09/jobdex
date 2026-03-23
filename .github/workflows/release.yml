@@ -70,7 +70,7 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           DMG_FILE=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
-          gh release create "$TAG" --draft --title "OutreachOS $TAG" --notes "See the assets to download this version and install." 2>/dev/null || true
+          gh release create "$TAG" --draft --title "JobDex $TAG" --notes "See the assets to download this version and install." 2>/dev/null || true
           gh release upload "$TAG" "$DMG_FILE" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -147,7 +147,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'OutreachOS v__VERSION__'
+          releaseName: 'JobDex v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false

@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TAURI_CONF="$SCRIPT_DIR/../src-tauri/tauri.conf.json"
 TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/../src-tauri/target}"
-APP_PATH="$TARGET_DIR/release/bundle/macos/OutreachOS.app"
+APP_PATH="$TARGET_DIR/release/bundle/macos/JobDex.app"
 DMG_DIR="$TARGET_DIR/release/bundle/dmg"
 
 if [ ! -d "$APP_PATH" ]; then
@@ -15,18 +15,18 @@ if [ ! -d "$APP_PATH" ]; then
     exit 1
 fi
 
-# Build DMG filename: OutreachOS_<version>_<arch>.dmg (matches Tauri's pattern)
+# Build DMG filename: JobDex_<version>_<arch>.dmg (matches Tauri's pattern)
 VERSION=$(grep -o '"version": *"[^"]*"' "$TAURI_CONF" | head -1 | cut -d'"' -f4)
 ARCH=$(uname -m)
 mkdir -p "$DMG_DIR"
-DMG_FILE="$DMG_DIR/OutreachOS_${VERSION}_${ARCH}.dmg"
+DMG_FILE="$DMG_DIR/JobDex_${VERSION}_${ARCH}.dmg"
 
 # Remove any existing DMG with same name
 [ -f "$DMG_FILE" ] && rm "$DMG_FILE"
 echo "fix-dmg: creating $DMG_FILE"
 
-# Eject any existing OutreachOS volumes to avoid "OutreachOS 2" naming
-for vol in /Volumes/OutreachOS*; do
+# Eject any existing JobDex volumes to avoid "JobDex 2" naming
+for vol in /Volumes/JobDex*; do
     [ -d "$vol" ] && hdiutil detach "$vol" -quiet 2>/dev/null || true
 done
 
@@ -36,7 +36,7 @@ DMG_SIZE_MB=$((APP_SIZE_MB + 20))
 
 # 1. Create writable DMG
 TEMP_DMG="${DMG_FILE%.dmg}_temp.dmg"
-hdiutil create -size "${DMG_SIZE_MB}m" -fs HFS+ -volname "OutreachOS" "$TEMP_DMG"
+hdiutil create -size "${DMG_SIZE_MB}m" -fs HFS+ -volname "JobDex" "$TEMP_DMG"
 
 # 2. Mount visible to Finder (no -nobrowse) so AppleScript can set icon positions
 MOUNT_OUTPUT=$(hdiutil attach "$TEMP_DMG")
@@ -76,7 +76,7 @@ tell application "Finder"
         end tell
 
         -- Position ONLY visible items
-        set position of item "OutreachOS.app" to {150, 180}
+        set position of item "JobDex.app" to {150, 180}
         set position of item "Applications" to {450, 180}
 
         close

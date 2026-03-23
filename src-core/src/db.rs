@@ -225,6 +225,18 @@ pub mod models {
     }
 
     #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+    #[serde(rename_all = "camelCase")]
+    pub struct EmailAttachment {
+        pub id: String,
+        pub message_id: String,
+        pub filename: String,
+        pub content_type: String,
+        pub file_size: i64,
+        pub file_path: String,
+        pub created_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
     pub struct ScheduledEmail {
         pub id: String,
         pub contact_id: String,

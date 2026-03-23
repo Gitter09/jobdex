@@ -25,7 +25,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const SIDEBAR_COLLAPSED_KEY = "outreachos_sidebar_collapsed";
+const SIDEBAR_COLLAPSED_KEY = "jobdex_sidebar_collapsed";
 
 interface NavItem {
     label: string;
@@ -52,7 +52,7 @@ const settingsSubItems: NavItem[] = [
     { label: "About", icon: Info, path: "/settings/about" },
 ];
 
-function OutreachMark({ className }: { className?: string }) {
+function JobDexMark({ className }: { className?: string }) {
     return (
         <svg viewBox="0 0 600 600" fill="none" className={className} aria-hidden="true">
             <path d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z" fill="currentColor" />
@@ -97,9 +97,9 @@ export function AppSidebar() {
                 <div className="flex items-center justify-between h-[60px] px-4 border-b shrink-0">
                     {!collapsed && (
                         <div className="flex items-center gap-2 min-w-0">
-                            <OutreachMark className="h-5 w-5 shrink-0 text-foreground" />
+                            <JobDexMark className="h-5 w-5 shrink-0 text-foreground" />
                             <h1 className="text-sm font-bold tracking-tight truncate">
-                                OutreachOS
+                                JobDex
                             </h1>
                         </div>
                     )}

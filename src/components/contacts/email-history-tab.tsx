@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Mail, ArrowUpRight, ArrowDownLeft, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { EmailBody } from "@/components/email/EmailBody";
 
 
 
@@ -36,9 +37,7 @@ function EmailMessageItem({ email, contact }: { email: EmailMessage, contact: Co
                     </div>
 
                 </div>
-                <div className="text-xs text-muted-foreground mt-3 font-mono bg-muted/30 p-3 rounded-md border border-muted/20 leading-relaxed max-h-[120px] overflow-hidden">
-                    {email.body || "(No Body Content)"}
-                </div>
+                <EmailBody email={email} className="mt-2" />
             </div>
         </div>
     );
@@ -47,13 +46,7 @@ function EmailMessageItem({ email, contact }: { email: EmailMessage, contact: Co
 export function EmailHistoryTab({ contact }: EmailHistoryTabProps) {
     const [emails, setEmails] = useState<EmailMessage[]>([]);
     const [loading, setLoading] = useState(true);
-    const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem("email-sync-banner-dismissed") === "true");
     const { handleError } = useErrors();
-
-    function dismissBanner() {
-        localStorage.setItem("email-sync-banner-dismissed", "true");
-        setBannerDismissed(true);
-    }
 
     useEffect(() => {
         const fetchEmails = async () => {
@@ -76,40 +69,25 @@ export function EmailHistoryTab({ contact }: EmailHistoryTabProps) {
         return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>;
     }
 
-    const banner = !bannerDismissed && (
-        <div className="flex justify-between items-start gap-2 text-xs text-muted-foreground bg-muted/30 border rounded-md px-3 py-2 mx-4 mt-4">
-            <span className="leading-relaxed">
-                Email sync is here, but it's not perfect yet. Some threads might show up mangled, clipped, or out of order. Gmail's format is genuinely weird to parse from the outside. I'm working on a proper fix. For anything important, the email lives in Gmail exactly as you'd expect.
-            </span>
-            <button onClick={dismissBanner} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5" aria-label="Dismiss">✕</button>
-        </div>
-    );
-
     if (emails.length === 0) {
         return (
-            <>
-                {banner}
-                <div className="flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg border border-dashed h-[300px]">
-                    <Mail className="h-8 w-8 text-muted-foreground mb-3 opacity-50" />
-                    <h3 className="font-medium text-sm text-foreground">No email history</h3>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
-                        Emails sent to or received from this contact will appear here.
-                    </p>
-                </div>
-            </>
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg border border-dashed h-[300px]">
+                <Mail className="h-8 w-8 text-muted-foreground mb-3 opacity-50" />
+                <h3 className="font-medium text-sm text-foreground">No email history</h3>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                    Emails sent to or received from this contact will appear here.
+                </p>
+            </div>
         );
     }
 
     return (
-        <>
-            {banner}
-            <ScrollArea className="h-[400px]">
-                <div className="space-y-4 p-6">
-                    {emails.map((email) => (
-                        <EmailMessageItem key={email.id} email={email} contact={contact} />
-                    ))}
-                </div>
-            </ScrollArea>
-        </>
+        <ScrollArea className="h-[400px]">
+            <div className="space-y-4 p-6">
+                {emails.map((email) => (
+                    <EmailMessageItem key={email.id} email={email} contact={contact} />
+                ))}
+            </div>
+        </ScrollArea>
     );
 }

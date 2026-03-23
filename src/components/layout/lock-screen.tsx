@@ -72,7 +72,7 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
                         <Lock className={cn("h-8 w-8 text-primary transition-transform duration-300", error && "animate-shake")} />
                     </div>
                     <div className="space-y-1">
-                        <h2 className="text-xl font-bold tracking-tight">OutreachOS Locked</h2>
+                        <h2 className="text-xl font-bold tracking-tight">JobDex Locked</h2>
                         <p className="text-sm text-muted-foreground">Enter your security PIN to continue</p>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use outreach_core::db::Db;
-use outreach_core::email_service::EmailService;
+use jobdex_core::db::Db;
+use jobdex_core::email_service::EmailService;
 use sqlx::Row;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};

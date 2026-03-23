@@ -60,7 +60,7 @@ export function SettingsPage() {
             } else {
                 await invoke("enable_background_service");
                 setAutostart(true);
-                toast.success("OutreachOS will run in the background on login");
+                toast.success("JobDex will run in the background on login");
             }
         } catch (error) {
             handleError(error, "Failed to toggle background service");
@@ -91,7 +91,7 @@ export function SettingsPage() {
         <div className="space-y-8">
             <div>
                 <h3 className="text-lg font-medium">Appearance</h3>
-                <p className="text-sm text-muted-foreground">Customize how OutreachOS looks and feels.</p>
+                <p className="text-sm text-muted-foreground">Customize how JobDex looks and feels.</p>
             </div>
 
             <Separator />
@@ -135,7 +135,7 @@ export function SettingsPage() {
                         <div>
                             <p className="text-sm font-medium">Start on login</p>
                             <p className="text-xs text-muted-foreground">
-                                Launch OutreachOS in the background when you start your computer.
+                                Launch JobDex in the background when you start your computer.
                                 Scheduled emails will send even when the window is closed.
                             </p>
                         </div>
@@ -160,7 +160,7 @@ export function SettingsPage() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `outreach-os-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `jobdex-export-${new Date().toISOString().split('T')[0]}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -229,7 +229,7 @@ export function SettingsPage() {
                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Privacy Note</p>
                     <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-normal">
-                        Your data is stored locally in an SQLite database. OutreachOS does not upload your contacts to any server.
+                        Your data is stored locally in an SQLite database. JobDex does not upload your contacts to any server.
                     </p>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a reproducible bug in OutreachOS
+about: Report a reproducible bug in JobDex
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -22,7 +22,7 @@ What actually happened.
 
 ## Environment
 - OS: [e.g. macOS 14.5 / Windows 11]
-- OutreachOS version: [e.g. v0.1.3]
+- JobDex version: [e.g. v0.1.3]
 - Email provider affected (if relevant): [Gmail / Outlook / N/A]
 
 ## Screenshots or Logs

@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use base64::prelude::*;
+use mail_parser::MimeHeaders;
 use oauth2::{
     basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
     PkceCodeVerifier, RedirectUrl, Scope, TokenUrl,
@@ -367,7 +368,7 @@ impl GmailClient {
     /// Fetch full message details by ID
     pub async fn get_message(&self, access_token: &str, message_id: &str) -> Result<GmailMessage> {
         let url = format!(
-            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{}?format=full",
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/{}?format=raw",
             message_id
         );
 
@@ -384,82 +385,79 @@ impl GmailClient {
         }
 
         let json: serde_json::Value = response.json().await?;
-        let headers = &json["payload"]["headers"];
+        let raw_b64 = json["raw"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing raw field in Gmail message {}", message_id))?;
+        let raw_bytes = BASE64_URL_SAFE_NO_PAD.decode(raw_b64)?;
 
-        let get_header = |name: &str| -> String {
-            headers
-                .as_array()
-                .and_then(|arr| {
-                    arr.iter().find(|h| {
-                        h["name"]
-                            .as_str()
-                            .map(|n| n.eq_ignore_ascii_case(name))
-                            .unwrap_or(false)
-                    })
+        let message = mail_parser::MessageParser::default()
+            .parse(&raw_bytes)
+            .ok_or_else(|| anyhow!("Failed to parse email message {}", message_id))?;
+
+        let from_email = message
+            .from()
+            .and_then(|a| a.first())
+            .and_then(|a| a.address.as_deref())
+            .unwrap_or("")
+            .to_string();
+
+        let to_email = message
+            .to()
+            .and_then(|a| a.first())
+            .and_then(|a| a.address.as_deref())
+            .unwrap_or("")
+            .to_string();
+
+        let subject = message.subject().unwrap_or("").to_string();
+
+        let sent_at = message
+            .date()
+            .and_then(|d| chrono::DateTime::<chrono::Utc>::from_timestamp_secs(d.to_timestamp()))
+            .unwrap_or_else(chrono::Utc::now);
+
+        let body = message
+            .body_text(0)
+            .map(|t| t.to_string())
+            .unwrap_or_default();
+        let html_body = message.body_html(0).map(|t| t.to_string());
+
+        let mut attachments = Vec::new();
+        for attachment in message.attachments() {
+            let filename = attachment
+                .attachment_name()
+                .unwrap_or("attachment")
+                .to_string();
+            let content_type = attachment
+                .content_type()
+                .map(|ct: &mail_parser::ContentType| {
+                    let sub = ct.subtype().unwrap_or("octet-stream");
+                    format!("{}/{}", ct.ctype(), sub)
                 })
-                .and_then(|h| h["value"].as_str())
-                .unwrap_or("")
-                .to_string()
-        };
-
-        let from_email = extract_email_address(&get_header("From"));
-        let to_email = extract_email_address(&get_header("To"));
-        let subject = get_header("Subject");
-        let date_str = get_header("Date");
-
-        // Parse date
-        let sent_at = chrono::DateTime::parse_from_rfc2822(&date_str)
-            .map(|d| d.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| chrono::Utc::now());
-
-        // Extract body: prefer text/plain, fall back to text/html
-        let payload = &json["payload"];
-
-        // DEBUG: print MIME structure so we can diagnose empty bodies
-        eprintln!(
-            "[gmail::get_message] id={} mimeType={:?}",
-            message_id,
-            payload["mimeType"].as_str()
-        );
-        if let Some(parts) = payload["parts"].as_array() {
-            for (i, part) in parts.iter().enumerate() {
-                eprintln!(
-                    "  part[{}] mimeType={:?} bodySize={:?}",
-                    i,
-                    part["mimeType"].as_str(),
-                    part["body"]["size"].as_i64()
-                );
-                // Also log nested parts (e.g. multipart/alternative inside multipart/mixed)
-                if let Some(sub_parts) = part["parts"].as_array() {
-                    for (j, sp) in sub_parts.iter().enumerate() {
-                        eprintln!(
-                            "    sub_part[{}] mimeType={:?} bodySize={:?}",
-                            j,
-                            sp["mimeType"].as_str(),
-                            sp["body"]["size"].as_i64()
-                        );
-                    }
-                }
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+            let data = match &attachment.body {
+                mail_parser::PartType::Binary(bytes)
+                | mail_parser::PartType::InlineBinary(bytes) => bytes.as_ref().to_vec(),
+                mail_parser::PartType::Text(text) => text.as_bytes().to_vec(),
+                _ => continue,
+            };
+            if !data.is_empty() {
+                attachments.push(RawAttachment {
+                    filename,
+                    content_type,
+                    data,
+                });
             }
         }
 
-        let body = extract_gmail_body(payload);
-        let html_body = extract_gmail_raw_html(payload);
-
-        eprintln!(
-            "[gmail::get_message] extracted body length={} preview={:?}",
-            body.len(),
-            &body.chars().take(120).collect::<String>()
-        );
-
         Ok(GmailMessage {
-            id: json["id"].as_str().unwrap_or("").to_string(),
+            id: json["id"].as_str().unwrap_or(message_id).to_string(),
             from_email,
             to_email,
             subject,
             body,
             html_body,
             sent_at,
+            attachments,
         })
     }
 }
@@ -481,148 +479,17 @@ pub struct GmailMessage {
     pub body: String,
     pub html_body: Option<String>,
     pub sent_at: chrono::DateTime<chrono::Utc>,
+    pub attachments: Vec<RawAttachment>,
 }
 
-/// Extract bare email address from "Name <email@example.com>" format
-fn extract_email_address(header_value: &str) -> String {
-    if let Some(start) = header_value.find('<') {
-        if let Some(end) = header_value.find('>') {
-            return header_value[start + 1..end].trim().to_string();
-        }
-    }
-    header_value.trim().to_string()
+/// A raw attachment extracted from a MIME message before it is written to disk.
+#[derive(Debug)]
+pub struct RawAttachment {
+    pub filename: String,
+    pub content_type: String,
+    pub data: Vec<u8>,
 }
 
-/// Recursively extract body from Gmail message payload.
-/// Prefers text/plain; falls back to text/html (with tags stripped).
-fn extract_gmail_body(payload: &serde_json::Value) -> String {
-    extract_gmail_body_inner(payload, false)
-        .or_else(|| extract_gmail_body_inner(payload, true))
-        .unwrap_or_default()
-}
-
-/// Extract raw HTML body from Gmail message payload (no stripping).
-fn extract_gmail_raw_html(payload: &serde_json::Value) -> Option<String> {
-    let mime_type = payload["mimeType"].as_str().unwrap_or("");
-    if mime_type == "text/html" {
-        if let Some(data) = payload["body"]["data"].as_str() {
-            if let Ok(decoded) = BASE64_URL_SAFE_NO_PAD.decode(data) {
-                return Some(String::from_utf8_lossy(&decoded).to_string());
-            }
-        }
-    }
-
-    if let Some(parts) = payload["parts"].as_array() {
-        for part in parts {
-            if let Some(result) = extract_gmail_raw_html(part) {
-                return Some(result);
-            }
-        }
-    }
-    None
-}
-
-/// Inner recursive extractor.
-/// If `allow_html` is false, only returns text/plain content.
-/// If `allow_html` is true, returns text/html content (tags stripped).
-fn extract_gmail_body_inner(payload: &serde_json::Value, allow_html: bool) -> Option<String> {
-    let mime_type = payload["mimeType"].as_str().unwrap_or("");
-
-    let target_mime = if allow_html {
-        "text/html"
-    } else {
-        "text/plain"
-    };
-
-    if mime_type == target_mime {
-        if let Some(data) = payload["body"]["data"].as_str() {
-            if let Ok(decoded) = BASE64_URL_SAFE_NO_PAD.decode(data) {
-                let text = String::from_utf8_lossy(&decoded).to_string();
-                let result = if allow_html {
-                    strip_html_tags(&text)
-                } else {
-                    text
-                };
-                if !result.trim().is_empty() {
-                    return Some(result);
-                }
-            }
-        }
-    }
-
-    // Recurse into parts
-    if let Some(parts) = payload["parts"].as_array() {
-        for part in parts {
-            if let Some(result) = extract_gmail_body_inner(part, allow_html) {
-                return Some(result);
-            }
-        }
-    }
-
-    None
-}
-
-/// Strip HTML tags and decode common HTML entities for readable plain text.
-fn strip_html_tags(html: &str) -> String {
-    // Remove <style> and <script> blocks entirely
-    let mut text = html.to_string();
-    for tag in &["style", "script"] {
-        while let Some(start) = text.find(&format!("<{}", tag)) {
-            if let Some(end) = text[start..].find(&format!("</{}>", tag)) {
-                text.replace_range(start..start + end + tag.len() + 3, "");
-            } else {
-                break;
-            }
-        }
-    }
-
-    // Replace block-level tags with newlines
-    for tag in &[
-        "</p>", "<br>", "<br/>", "<br />", "</div>", "</li>", "</tr>",
-    ] {
-        text = text.replace(tag, "\n");
-    }
-
-    // Strip remaining tags
-    let mut result = String::new();
-    let mut in_tag = false;
-    for ch in text.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(ch),
-            _ => {}
-        }
-    }
-
-    // Decode common HTML entities
-    let result = result
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ");
-
-    // Collapse excessive blank lines
-    let lines: Vec<&str> = result.lines().collect();
-    let mut collapsed = String::new();
-    let mut blank_count = 0usize;
-    for line in lines {
-        if line.trim().is_empty() {
-            blank_count += 1;
-            if blank_count <= 1 {
-                collapsed.push('\n');
-            }
-        } else {
-            blank_count = 0;
-            collapsed.push_str(line.trim());
-            collapsed.push('\n');
-        }
-    }
-
-    collapsed.trim().to_string()
-}
 
 fn extract_code_and_state_from_request(request_line: &str) -> Option<(String, String)> {
     let url_part = request_line.split_whitespace().nth(1)?;
