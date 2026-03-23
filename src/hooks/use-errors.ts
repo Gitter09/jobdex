@@ -13,6 +13,10 @@ const ERROR_CODE_MAP: Partial<Record<AppError["code"], string>> = {
     SERIALIZATION: "ERR-SER",
 };
 
+const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+};
+
 export const useErrors = () => {
     const handleError = (error: unknown, fallbackMessage?: string) => {
         console.error("App Error:", error);
@@ -26,24 +30,47 @@ export const useErrors = () => {
             if (errorCode) {
                 // Unexpected backend error — show error code so the user can report it
                 toast.error(title, {
-                    description: `Error code: ${errorCode} · If this keeps happening, report it at github.com/harshitsinghcode/jobdex`,
+                    description: `Error code: ${errorCode} · If this keeps happening, report it at github.com/Gitter09/jobdex`,
                     duration: 6000,
+                    action: {
+                        label: "Copy",
+                        onClick: () => copyToClipboard(`${errorCode}: ${title}`),
+                    },
                 });
             } else {
                 // Validation / Network / IO — message is already user-readable
-                toast.error(title, { duration: 4000 });
+                toast.error(title, {
+                    duration: 4000,
+                    action: {
+                        label: "Copy",
+                        onClick: () => copyToClipboard(title),
+                    },
+                });
             }
             return;
         }
 
         // Plain string error
         if (typeof error === "string") {
-            toast.error(error, { duration: 4000 });
+            toast.error(error, {
+                duration: 4000,
+                action: {
+                    label: "Copy",
+                    onClick: () => copyToClipboard(error),
+                },
+            });
             return;
         }
 
         // Default fallback
-        toast.error(fallbackMessage ?? "Something unexpected happened.", { duration: 4000 });
+        const message = fallbackMessage ?? "Something unexpected happened.";
+        toast.error(message, {
+            duration: 4000,
+            action: {
+                label: "Copy",
+                onClick: () => copyToClipboard(message),
+            },
+        });
     };
 
     return { handleError };

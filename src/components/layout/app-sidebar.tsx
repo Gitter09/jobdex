@@ -37,7 +37,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "People", icon: Users, path: "/people" },
-    { label: "Emails", icon: Mail, path: "/emails", soon: true },
+    { label: "Emails", icon: Mail, path: "/emails" },
     { label: "Tasks", icon: CheckSquare, path: "/tasks", soon: true },
     { label: "Templates", icon: FileText, path: "/templates" },
 ];
