@@ -388,7 +388,7 @@ impl GmailClient {
         let raw_b64 = json["raw"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing raw field in Gmail message {}", message_id))?;
-        let raw_bytes = BASE64_URL_SAFE_NO_PAD.decode(raw_b64)?;
+        let raw_bytes = BASE64_URL_SAFE_NO_PAD.decode(raw_b64.trim_end_matches('='))?;
 
         let message = mail_parser::MessageParser::default()
             .parse(&raw_bytes)

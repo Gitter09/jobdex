@@ -542,7 +542,10 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 let _ = std::process::Command::new("osascript")
-                    .args(["-e", "tell application \"System Events\" to delete login item \"JobDex\""])
+                    .args([
+                        "-e",
+                        "tell application \"System Events\" to delete login item \"JobDex\"",
+                    ])
                     .output();
             }
 

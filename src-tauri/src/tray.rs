@@ -26,8 +26,8 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .item(&quit)
         .build()?;
 
-    let icon = Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
-        .expect("bundled tray icon");
+    let icon =
+        Image::from_bytes(include_bytes!("../icons/tray-icon.png")).expect("bundled tray icon");
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)

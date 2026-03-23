@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TAURI_CONF="$SCRIPT_DIR/../src-tauri/tauri.conf.json"
-TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/../src-tauri/target}"
+TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/../target}"
 APP_PATH="$TARGET_DIR/release/bundle/macos/JobDex.app"
 DMG_DIR="$TARGET_DIR/release/bundle/dmg"
 
