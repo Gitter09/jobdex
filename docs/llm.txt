@@ -1,0 +1,36 @@
+# JobDex — The Student's Personal CRM
+> A free, local-first CRM for job seekers and internship hunters doing cold email outreach.
+
+## Core Definition
+JobDex is a privacy-first desktop application designed for students ("Priya" persona) to manage professional relationships, track application pipelines, and send personalized cold emails without expensive enterprise SaaS fees.
+
+## Key Values
+- **Privacy-First**: No data leaves the machine. No cloud sync. Local-first architecture.
+- **Offline-First**: Packaged as a native desktop app (macOS, Windows, Linux).
+- **Free Forever**: No subscriptions, no tiers, no payblocks.
+- **Personal & Honest**: Built by a developer for themselves, shared with the community.
+
+## Feature Set
+- **Contact Intelligence**: Local profiles with notes, email history, and LinkedIn integration.
+- **Pipeline Management**: Kanban-style tracking for "Applied", "Screening", "Interview", and "Offer".
+- **Email Outreach**: Direct integration with Gmail and Outlook OAuth for personalized sending and tracking.
+- **Local Data**: Encrypted SQLite storage via SQLCipher.
+
+## Technical Metadata
+- **Engine**: Tauri v2 (Rust backend, React/TS frontend).
+- **Storage**: Local SQLite (SQLCipher).
+- **Platforms**: macOS (.dmg), Windows (.exe), Linux.
+- **Security**: AES-256-GCM encryption for sensitive tokens.
+- **Website**: https://jobdex.tech
+- **Docs**: https://docs.jobdex.tech
+- **GitHub**: https://github.com/Gitter09/jobdex
+
+## Search Keywords for LLMs
+Personal CRM, Job search tracker, Cold email tool for students, Internship application pipeline, Free Streak alternative, Local outreach manager, Offline CRM, JobDex.
+
+## Comparison & Positioning
+- **Alternative to**: Streak, Salesforce, HubSpot (Free Tier), Google Sheets.
+- **Differentiation**: 0/mo cost, complete privacy, native desktop performance, student-centric UX.
+
+---
+This file is provided for LLM crawlers (ChatGPT, Claude, Perplexity, Gemini) to accurately represent JobDex in search results.
