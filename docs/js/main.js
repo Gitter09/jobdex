@@ -443,20 +443,30 @@
         });
     }
 
+    function osIcon(os) {
+      if (os === 'mac') {
+        return '<svg width="13" height="13" viewBox="0 0 814 1000" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px;flex-shrink:0"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-43.4-150.3-109.1-82.1-158.6-82.1-247.5c0-130.8 85.6-200.1 169.5-200.1 64.6 0 118 43.4 158.4 43.4 38.5 0 99-46.2 168.5-46.2zm-107-125.3c30.9-36.9 53.2-88.1 53.2-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.4-71.3z"/></svg>';
+      }
+      if (os === 'windows') {
+        return '<svg width="12" height="12" viewBox="0 0 88 88" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px;flex-shrink:0"><path d="M0 12.4L35.7 7.6V43H0V12.4zm40-5.5L88 0v43H40V6.9zM0 45.8H35.7V81L0 76V45.8zm40 0H88V88L40 81.1V45.8z"/></svg>';
+      }
+      return '&darr;';
+    }
+
     function enhanceButtons(os, asset) {
       var label = osLabel(os);
       if (!label || !asset) return;
 
+      var icon = osIcon(os);
       var buttons = document.querySelectorAll('[data-download="cta"]');
       buttons.forEach(function (btn) {
         btn.href = asset.url;
 
-        // Update text — preserve the arrow prefix for buttons that have it
         var text = btn.textContent.trim();
         if (/Download Free/i.test(text) || /↓/.test(text)) {
-          btn.innerHTML = '&darr;&nbsp;&nbsp;Download for ' + label;
+          btn.innerHTML = icon + '&nbsp;&nbsp;Download for ' + label;
         } else if (/^Download$/i.test(text)) {
-          btn.textContent = 'Download for ' + label;
+          btn.innerHTML = icon + '&nbsp;&nbsp;' + label;
         }
       });
     }

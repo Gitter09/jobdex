@@ -277,8 +277,8 @@ h2 {
   left: 50%;
   transform: translateX(-50%);
   z-index: 500;
-  width: calc(100% - 32px);
-  max-width: 1000px;
+  width: calc(100% - 48px);
+  max-width: 1200px;
   border-radius: var(--r-md);
   background: transparent;
   border: 1px solid transparent;
