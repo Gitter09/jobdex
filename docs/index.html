@@ -70,9 +70,9 @@
         </button>
       </div>
 
-      <a href="#" class="navbar__brand" aria-label="JobDex Home">
+      <a href="index.html" class="navbar__brand" aria-label="JobDex Home">
         <div class="navbar__logo">
-          <svg width="22" height="22" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="22" height="22" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path
               d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z"
               fill="#000000" />
@@ -123,7 +123,7 @@
       <li><a href="contact.html" class="mobile-nav__link">Contact</a></li>
     </ul>
     <div class="mobile-nav__footer">
-      <a href="https://github.com/Gitter09/jobdex/releases" class="btn btn-primary btn-lg" style="width: 100%;" data-download="cta">
+      <a href="https://github.com/Gitter09/jobdex/releases" class="btn btn-primary btn-lg mobile-nav__cta" data-download="cta">
         &darr;&nbsp;&nbsp;Download Free
       </a>
     </div>
@@ -266,9 +266,9 @@
         <div class="feat-visual wide reveal d2">
           <div class="feat-mock feat-scale">
             <div class="feat-mock-chrome">
-              <span class="fm-dot" style="background:#ff5f57"></span>
-              <span class="fm-dot" style="background:#febc2e"></span>
-              <span class="fm-dot" style="background:#28c840"></span>
+              <span class="fm-dot fm-dot--close"></span>
+              <span class="fm-dot fm-dot--minimize"></span>
+              <span class="fm-dot fm-dot--expand"></span>
             </div>
             <!-- Mock Content 1 -->
             <div class="fd-layout">
@@ -291,7 +291,7 @@
                 </div>
 
                 <!-- NEW: Socials -->
-                <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 8px;">
+                <div class="fd-links-section">
                   <div class="fd-sec" style="font-size: 8.5px; opacity: 0.8;">Links</div>
                   <div class="fd-r"><span class="fd-rk">LinkedIn</span><span class="fd-rv" style="color: #0A66C2;">↗
                       Profile</span></div>
@@ -300,18 +300,16 @@
                 </div>
 
                 <!-- NEW: Active Deals -->
-                <div
-                  style="margin-top: 24px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px dashed rgba(255,255,255,0.08);">
-                  <div
-                    style="font-size: 9px; font-weight: 600; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;">
+                <div class="fd-role-card">
+                  <div class="fd-role-label">
                     Target Role</div>
                   <div style="font-size: 11px; color: var(--text); font-weight: 500;">SWE Intern, Summer 2026</div>
                   <div style="font-size: 10px; color: #28c840; margin-top: 4px;">Referral secured</div>
                 </div>
               </div>
-              <div class="fd-right" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 32px;">
+              <div class="fd-right fd-right--grid">
                 <!-- Column 1: Core Intelligence -->
-                <div class="fd-col-props" style="display: flex; flex-direction: column; gap: 24px;">
+                <div class="fd-col-props">
                   <div>
                     <div class="fd-sec">✦ Highlights</div>
                     <div id="fd-summary-text" class="fd-summary">Connected via alumni network. She manages university
@@ -330,31 +328,27 @@
                   </div>
                   <div>
                     <div class="fd-sec">Key Properties</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+                    <div class="fd-props-grid">
                       <!-- Existing 2 -->
-                      <div
-                        style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size: 9px; color: var(--text-3); text-transform: uppercase;">Source</div>
-                        <div style="font-size: 11px; color: var(--text); margin-top: 4px;">Alumni Database</div>
+                      <div class="fd-prop-card">
+                        <div class="fd-prop-label">Source</div>
+                        <div class="fd-prop-value">Alumni Database</div>
                       </div>
-                      <div
-                        style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size: 9px; color: var(--text-3); text-transform: uppercase;">Location
+                      <div class="fd-prop-card">
+                        <div class="fd-prop-label">Location
                           Preference</div>
-                        <div style="font-size: 11px; color: var(--text); margin-top: 4px;">Seattle / SF</div>
+                        <div class="fd-prop-value">Seattle / SF</div>
                       </div>
                       <!-- Expanded 2 -->
-                      <div
-                        style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size: 9px; color: var(--text-3); text-transform: uppercase;">Action Required
+                      <div class="fd-prop-card">
+                        <div class="fd-prop-label">Action Required
                         </div>
-                        <div style="font-size: 11px; color: var(--text); margin-top: 4px;">Complete HackerRank</div>
+                        <div class="fd-prop-value">Complete HackerRank</div>
                       </div>
-                      <div
-                        style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size: 9px; color: var(--text-3); text-transform: uppercase;">Confidence Level
+                      <div class="fd-prop-card">
+                        <div class="fd-prop-label">Confidence Level
                         </div>
-                        <div style="font-size: 11px; color: #ffbc2e; margin-top: 4px;">Medium (Competitive)</div>
+                        <div class="fd-prop-value" style="color: #ffbc2e;">Medium (Competitive)</div>
                       </div>
                     </div>
                   </div>
@@ -363,13 +357,11 @@
                   <div>
                     <div class="fd-sec">Attached Files</div>
                     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                      <div
-                        style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);">
+                      <div class="fd-file-row">
                         <span style="font-size: 12px;">📄</span>
                         <span style="font-size: 10.5px; color: var(--text-2);">Harshit_Resume_v4_Stripe.pdf</span>
                       </div>
-                      <div
-                        style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);">
+                      <div class="fd-file-row">
                         <span style="font-size: 12px;">📄</span>
                         <span
                           style="font-size: 10.5px; color: var(--text-2);">Fall_2025_Unofficial_Transcript.pdf</span>
@@ -379,76 +371,75 @@
                 </div>
 
                 <!-- Column 2: Interaction Thread (Linear style) -->
-                <div class="fd-col-timeline"
-                  style="background: rgba(255,255,255,0.02); border-left: 1px solid rgba(255,255,255,0.04); padding-left: 32px; display: flex; flex-direction: column; gap: 20px;">
+                <div class="fd-col-timeline">
                   <div class="fd-sec" style="margin-bottom: 0px;">Timeline</div>
 
                   <!-- Existing 1 -->
-                  <div style="display: flex; gap: 12px;">
-                    <div
-                      style="width: 24px; height: 24px; border-radius: 50%; background: #28c840; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                  <div class="fd-tl-entry">
+                    <div class="fd-tl-icon"
+                      style="border-radius: 50%; background: #28c840;">
                       ✓</div>
                     <div>
-                      <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">Phone Screen completed <span
-                          style="font-weight: 400; color: var(--text-3); font-size: 10px; margin-left: 4px;">Today at
+                      <div class="fd-tl-title">Phone Screen completed <span
+                          class="fd-tl-time">Today at
                           9:00 AM</span></div>
-                      <div style="margin-top: 6px; font-size: 10.5px; color: var(--text-2); line-height: 1.5;">Call with
+                      <div class="fd-tl-body" style="margin-top: 6px;">Call with
                         Sarah went perfectly. She is moving me to the technical assessment round.</div>
                     </div>
                   </div>
 
                   <!-- NEW -->
-                  <div style="display: flex; gap: 12px;">
-                    <div
-                      style="width: 24px; height: 24px; border-radius: 8px; background: rgba(254,188,46,0.2); border: 1px solid rgba(254,188,46,0.4); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                  <div class="fd-tl-entry">
+                    <div class="fd-tl-icon"
+                      style="border-radius: 8px; background: rgba(254,188,46,0.2); border: 1px solid rgba(254,188,46,0.4);">
                       💬</div>
                     <div>
-                      <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">LinkedIn Message <span
-                          style="font-weight: 400; color: var(--text-3); font-size: 10px; margin-left: 4px;">Yesterday,
+                      <div class="fd-tl-title">LinkedIn Message <span
+                          class="fd-tl-time">Yesterday,
                           9:00 AM</span></div>
-                      <div style="margin-top: 4px; font-size: 10.5px; color: var(--text-2);">"Hi Sarah, dropping a quick
+                      <div class="fd-tl-body">"Hi Sarah, dropping a quick
                         note here. Really enjoyed the Stripe engineering blog post you shared."</div>
                     </div>
                   </div>
 
                   <!-- NEW -->
-                  <div style="display: flex; gap: 12px;">
-                    <div
-                      style="width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                  <div class="fd-tl-entry">
+                    <div class="fd-tl-icon"
+                      style="border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2);">
                       📎</div>
                     <div>
-                      <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">Cold Email Sent <span
-                          style="font-weight: 400; color: var(--text-3); font-size: 10px; margin-left: 4px;">Jan
+                      <div class="fd-tl-title">Cold Email Sent <span
+                          class="fd-tl-time">Jan
                           15th</span></div>
-                      <div style="margin-top: 4px; font-size: 10.5px; color: var(--text-3);">Attached
+                      <div class="fd-tl-body" style="color: var(--text-3);">Attached
                         Harshit_Resume_v4_Stripe.pdf via automated university outreach sequence.</div>
                     </div>
                   </div>
 
                   <!-- Existing 3 -->
-                  <div style="display: flex; gap: 12px; opacity: 0.6;">
-                    <div
-                      style="width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                  <div class="fd-tl-entry" style="opacity: 0.6;">
+                    <div class="fd-tl-icon"
+                      style="border-radius: 50%; background: rgba(255,255,255,0.05);">
                       📝</div>
                     <div>
-                      <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">Note added <span
-                          style="font-weight: 400; color: var(--text-3); font-size: 10px; margin-left: 4px;">Jan
+                      <div class="fd-tl-title">Note added <span
+                          class="fd-tl-time">Jan
                           12th</span></div>
-                      <div style="margin-top: 6px; font-size: 10.5px; color: var(--text-2); line-height: 1.5;">Found her
+                      <div class="fd-tl-body" style="margin-top: 6px;">Found her
                         email using Hunter.io. Added to target list for Tier 1 comp.</div>
                     </div>
                   </div>
 
                   <!-- NEW -->
-                  <div style="display: flex; gap: 12px; opacity: 0.4;">
-                    <div
-                      style="width: 24px; height: 24px; border-radius: 4px; background: rgba(255,95,87,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                  <div class="fd-tl-entry" style="opacity: 0.4;">
+                    <div class="fd-tl-icon"
+                      style="border-radius: 4px; background: rgba(255,95,87,0.2);">
                       #️⃣</div>
                     <div>
-                      <div style="font-size: 11.5px; color: var(--text); font-weight: 500;">Added to List <span
-                          style="font-weight: 400; color: var(--text-3); font-size: 10px; margin-left: 4px;">Jan
+                      <div class="fd-tl-title">Added to List <span
+                          class="fd-tl-time">Jan
                           10th</span></div>
-                      <div style="margin-top: 4px; font-size: 10.5px; color: var(--text-3);">Contact tagged as "Stripe"
+                      <div class="fd-tl-body" style="color: var(--text-3);">Contact tagged as "Stripe"
                         and "University Recruiter".</div>
                     </div>
                   </div>
@@ -484,9 +475,9 @@
         <div class="feat-visual wide reveal d2">
           <div class="feat-mock feat-scale">
             <div class="feat-mock-chrome">
-              <span class="fm-dot" style="background:#ff5f57"></span>
-              <span class="fm-dot" style="background:#febc2e"></span>
-              <span class="fm-dot" style="background:#28c840"></span>
+              <span class="fm-dot fm-dot--close"></span>
+              <span class="fm-dot fm-dot--minimize"></span>
+              <span class="fm-dot fm-dot--expand"></span>
             </div>
             <!-- Mock Content 2 -->
             <div class="fk-board">
@@ -713,9 +704,9 @@
         <div class="feat-visual wide reveal d2">
           <div class="feat-mock feat-scale">
             <div class="feat-mock-chrome">
-              <span class="fm-dot" style="background:#ff5f57"></span>
-              <span class="fm-dot" style="background:#febc2e"></span>
-              <span class="fm-dot" style="background:#28c840"></span>
+              <span class="fm-dot fm-dot--close"></span>
+              <span class="fm-dot fm-dot--minimize"></span>
+              <span class="fm-dot fm-dot--expand"></span>
             </div>
             <div class="fe-layout" style="display: flex; height: 100%;">
               <!-- Side Inbox Pane -->
@@ -959,7 +950,7 @@
         <div class="footer-left">
           <div class="footer-logo">
             <div class="footer-logo-mark">
-              <svg width="17" height="17" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="17" height="17" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path
                   d="M300 120C344.057 120 384.415 135.83 415.702 162.11L353.568 236.159C339.829 219.991 320.9 210 300 210C258.026 210 224 250.294 224 300C224 349.706 258.026 390 300 390C341.974 390 376 349.706 376 300C376 283.896 372.427 268.78 366.17 255.702L449.59 199.857C468.794 228.488 480 262.935 480 300C480 399.411 399.411 480 300 480C200.589 480 120 399.411 120 300C120 200.589 200.589 120 300 120Z"
                   fill="#000000" />

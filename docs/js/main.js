@@ -7,17 +7,25 @@
   const mobileNav = document.getElementById('mobile-nav');
   const mobileLinks = document.querySelectorAll('.mobile-nav__link');
 
+  function closeMenu() {
+    header.classList.remove('is-menu-open');
+    mobileNav.classList.remove('is-open');
+    navToggle.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    mobileNav.setAttribute('inert', 'true');
+  }
+
   // Toggle mobile menu
   navToggle?.addEventListener('click', () => {
     const isExpanded = navToggle.getAttribute('aria-expanded') === 'true';
     navToggle.setAttribute('aria-expanded', !isExpanded);
     header.classList.toggle('is-menu-open');
     mobileNav.classList.toggle('is-open');
-    
+
     // Toggle proper scrolling & inert attribute for accessibility
     if (mobileNav.classList.contains('is-open')) {
       document.body.style.overflow = 'hidden';
-      // If browsers support inert, remove it when open
+      // Remove inert when menu opens
       if (mobileNav.hasAttribute('inert')) mobileNav.removeAttribute('inert');
     } else {
       document.body.style.overflow = '';
@@ -27,13 +35,7 @@
 
   // Close menu on link click
   mobileLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      header.classList.remove('is-menu-open');
-      mobileNav.classList.remove('is-open');
-      navToggle.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = '';
-      mobileNav.setAttribute('inert', 'true');
-    });
+    link.addEventListener('click', () => closeMenu());
   });
 
 
@@ -53,15 +55,15 @@
   const revealEls = document.querySelectorAll('.reveal');
 
   const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       if (entry.isIntersecting) {
         // stagger siblings inside the same parent
         const parent = entry.target.parentElement;
         const siblings = Array.from(parent.querySelectorAll('.reveal:not(.in)'));
-        siblings.forEach(el => {
+        siblings.forEach((el) => {
           const base = parseFloat(getComputedStyle(el).transitionDelay) || 0;
           const extra = siblings.indexOf(el) * 0.07;
-          el.style.transitionDelay = (base + extra) + 's';
+          el.style.transitionDelay = `${base + extra}s`;
           requestAnimationFrame(() => el.classList.add('in'));
         });
         // always trigger the observed element too
@@ -71,7 +73,7 @@
     });
   }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-  revealEls.forEach(el => observer.observe(el));
+  revealEls.forEach((el) => observer.observe(el));
 
 
   /* ── ENGINE BODY TEXT: WORD-BY-WORD SCROLL REVEAL ── */
@@ -81,13 +83,13 @@
     if (!engineSection || !engineBody) return;
 
     // Split text into word spans
-    var rawText = engineBody.textContent.replace(/\s+/g, ' ').trim();
-    var words = rawText.split(' ');
+    const rawText = engineBody.textContent.replace(/\s+/g, ' ').trim();
+    const words = rawText.split(' ');
     engineBody.textContent = '';
 
-    var wordEls = [];
-    words.forEach(function (word, i) {
-      var span = document.createElement('span');
+    const wordEls = [];
+    words.forEach((word, i) => {
+      const span = document.createElement('span');
       span.className = 'engine-word';
       span.textContent = word;
       engineBody.appendChild(span);
@@ -97,17 +99,17 @@
       }
     });
 
-    var totalWords = wordEls.length;
+    const totalWords = wordEls.length;
 
     function updateEngineText() {
-      var rect = engineSection.getBoundingClientRect();
-      var scrollable = engineSection.offsetHeight - window.innerHeight;
+      const rect = engineSection.getBoundingClientRect();
+      const scrollable = engineSection.offsetHeight - window.innerHeight;
       if (scrollable <= 0) return;
-      var scrolled = -rect.top;
-      var progress = Math.max(0, Math.min(1, scrolled / scrollable));
-      var litCount = Math.round(progress * totalWords);
+      const scrolled = -rect.top;
+      const progress = Math.max(0, Math.min(1, scrolled / scrollable));
+      const litCount = Math.round(progress * totalWords);
 
-      for (var i = 0; i < totalWords; i++) {
+      for (let i = 0; i < totalWords; i++) {
         if (i < litCount) {
           if (!wordEls[i].classList.contains('is-lit')) {
             wordEls[i].classList.add('is-lit');
@@ -145,8 +147,8 @@
 
     const allHeadlines = [];
 
-    HEADLINE_SELECTORS.forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => {
+    HEADLINE_SELECTORS.forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
         wrapHeadline(el);
         allHeadlines.push(el.parentElement);
       });
@@ -163,8 +165,8 @@
       }, delay);
     }
 
-    const clipObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
+    const clipObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           revealClip(entry.target);
           clipObserver.unobserve(entry.target);
@@ -172,7 +174,7 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-    allHeadlines.forEach(wrapper => clipObserver.observe(wrapper));
+    allHeadlines.forEach((wrapper) => clipObserver.observe(wrapper));
 
     const h1Spans = [
       document.querySelector('.h1-sm'),
@@ -205,8 +207,6 @@
       fireHeroReveal();
     }
   })();
-
-
 
 
   /* ── TYPEWRITER — CONTACT INTELLIGENCE MOCKUP ── */
@@ -270,8 +270,8 @@
     // Target the parent feat-mock element for a more reliable trigger area
     const triggerEl = summaryEl.closest('.feat-mock') || summaryEl;
 
-    const typeObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
+    const typeObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           runTypewriter();
           typeObserver.unobserve(entry.target);
@@ -297,7 +297,7 @@
       // Lock the chip's width to its final rendered width BEFORE clearing text
       // This prevents layout reflow during scramble
       const finalWidth = chip.offsetWidth;
-      chip.style.minWidth = finalWidth + 'px';
+      chip.style.minWidth = `${finalWidth}px`;
 
       // Make visible and fade in
       chip.classList.add('decrypt-active');
@@ -374,8 +374,8 @@
     const chipsContainer = document.querySelector('.privacy-chips');
     if (!chipsContainer) return;
 
-    const decryptObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
+    const decryptObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           runDecryptSequence();
           decryptObserver.unobserve(entry.target);
@@ -389,13 +389,12 @@
 
   /* ── OS-AWARE DOWNLOAD BUTTONS ── */
   (function () {
-    var GITHUB_API = 'https://api.github.com/repos/Gitter09/jobdex/releases/latest';
-    var RELEASES_URL = 'https://github.com/Gitter09/jobdex/releases';
-    var CACHE_KEY = 'jobdex_release';
+    const GITHUB_API = 'https://api.github.com/repos/Gitter09/jobdex/releases/latest';
+    const CACHE_KEY = 'jobdex_release';
 
     function detectOS() {
-      var ua = navigator.userAgent || '';
-      var platform = navigator.platform || '';
+      const ua = navigator.userAgent || '';
+      const platform = navigator.platform || '';
       if (/Mac|iPhone|iPad|iPod/i.test(platform) || /Macintosh/i.test(ua)) return 'mac';
       if (/Win/i.test(platform) || /Windows/i.test(ua)) return 'windows';
       return 'other';
@@ -403,11 +402,11 @@
 
     function getRecommendedAsset(os, assets) {
       if (!assets || !assets.length) return null;
-      var match = null;
+      let match = null;
       if (os === 'mac') {
-        match = assets.find(function (a) { return /_aarch64\.dmg$/.test(a.name); });
+        match = assets.find((a) => /_aarch64\.dmg$/.test(a.name));
       } else if (os === 'windows') {
-        match = assets.find(function (a) { return /_x64-setup\.exe$/.test(a.name); });
+        match = assets.find((a) => /_x64-setup\.exe$/.test(a.name));
       }
       return match || null;
     }
@@ -421,78 +420,78 @@
     function fetchLatestRelease() {
       // Check sessionStorage cache first
       try {
-        var cached = sessionStorage.getItem(CACHE_KEY);
+        const cached = sessionStorage.getItem(CACHE_KEY);
         if (cached) return Promise.resolve(JSON.parse(cached));
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* sessionStorage unavailable */ }
 
       return fetch(GITHUB_API)
-        .then(function (r) {
+        .then((r) => {
           if (!r.ok) throw new Error(r.status);
           return r.json();
         })
-        .then(function (data) {
-          var result = {
+        .then((data) => {
+          const result = {
             tag: data.tag_name,
             version: (data.tag_name || '').replace(/^v/, ''),
-            assets: (data.assets || []).map(function (a) {
-              return { name: a.name, url: a.browser_download_url, size: a.size };
-            })
+            assets: (data.assets || []).map((a) => ({
+              name: a.name, url: a.browser_download_url, size: a.size
+            }))
           };
-          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch (e) { /* ignore */ }
+          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch (e) { /* sessionStorage unavailable */ }
           return result;
         });
     }
 
     function osIcon(os) {
       if (os === 'mac') {
-        return '<svg width="13" height="13" viewBox="0 0 814 1000" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px;flex-shrink:0"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-43.4-150.3-109.1-82.1-158.6-82.1-247.5c0-130.8 85.6-200.1 169.5-200.1 64.6 0 118 43.4 158.4 43.4 38.5 0 99-46.2 168.5-46.2zm-107-125.3c30.9-36.9 53.2-88.1 53.2-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.4-71.3z"/></svg>';
+        return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>';
       }
       if (os === 'windows') {
-        return '<svg width="12" height="12" viewBox="0 0 88 88" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-1px;flex-shrink:0"><path d="M0 12.4L35.7 7.6V43H0V12.4zm40-5.5L88 0v43H40V6.9zM0 45.8H35.7V81L0 76V45.8zm40 0H88V88L40 81.1V45.8z"/></svg>';
+        return '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><path d="M3 12V6.5l8-1.1V12H3zm0 .5h8v6.6l-8-1.1V12.5zM11.5 5.3l9.5-1.3v8h-9.5V5.3zm0 7.2h9.5v8l-9.5-1.3v-6.7z"/></svg>';
       }
-      return '&darr;';
+      return '<span>↓</span>';
     }
 
     function enhanceButtons(os, asset) {
-      var label = osLabel(os);
+      const label = osLabel(os);
       if (!label || !asset) return;
 
-      var icon = osIcon(os);
-      var buttons = document.querySelectorAll('[data-download="cta"]');
-      buttons.forEach(function (btn) {
+      const icon = osIcon(os);
+      const buttons = document.querySelectorAll('[data-download="cta"]');
+      buttons.forEach((btn) => {
         btn.href = asset.url;
-
-        var text = btn.textContent.trim();
-        if (/Download Free/i.test(text) || /↓/.test(text)) {
-          btn.innerHTML = icon + '&nbsp;&nbsp;Download for ' + label;
-        } else if (/^Download$/i.test(text)) {
-          btn.innerHTML = icon + '&nbsp;&nbsp;' + label;
-        }
+        btn.innerHTML = `${icon}&nbsp;&nbsp;Download for ${label}`;
       });
     }
 
     // Enhance version badges on download page
     function enhanceDownloadPage(release, os) {
-      var versionEls = document.querySelectorAll('[data-download="version"]');
-      versionEls.forEach(function (el) { el.textContent = 'v' + release.version; });
+      const versionEls = document.querySelectorAll('[data-download="version"]');
+      versionEls.forEach((el) => { el.textContent = `v${release.version}`; });
 
-      var label = osLabel(os);
-      var asset = getRecommendedAsset(os, release.assets);
+      const label = osLabel(os);
+      const asset = getRecommendedAsset(os, release.assets);
 
       // Recommended section
-      var recSection = document.getElementById('dl-recommended');
-      var recFallback = document.getElementById('dl-fallback');
-      if (recSection && asset && label) {
-        recSection.style.display = '';
-        if (recFallback) recFallback.style.display = 'none';
+      const recSection = document.getElementById('dl-recommended');
+      const recFallback = document.getElementById('dl-fallback');
 
-        var recBtn = recSection.querySelector('[data-download="rec-btn"]');
-        var recLabel = recSection.querySelector('[data-download="rec-label"]');
-        var recNote = recSection.querySelector('[data-download="rec-note"]');
-        var recIcon = recSection.querySelector('[data-download="rec-icon"]');
+      function showRecommended(visible) {
+        if (!recSection) return;
+        recSection.style.display = visible ? '' : 'none';
+        if (recFallback) recFallback.style.display = visible ? 'none' : '';
+      }
+
+      if (recSection && asset && label) {
+        showRecommended(true);
+
+        const recBtn = recSection.querySelector('[data-download="rec-btn"]');
+        const recLabel = recSection.querySelector('[data-download="rec-label"]');
+        const recNote = recSection.querySelector('[data-download="rec-note"]');
+        const recIcon = recSection.querySelector('[data-download="rec-icon"]');
         if (recBtn) {
           recBtn.href = asset.url;
-          recBtn.innerHTML = '&darr;&nbsp;&nbsp;Download for ' + label;
+          recBtn.innerHTML = `&darr;&nbsp;&nbsp;Download for ${label}`;
         }
         if (recLabel) recLabel.textContent = label;
         if (recNote) {
@@ -500,15 +499,14 @@
         }
         if (recIcon) recIcon.setAttribute('data-os', os);
       } else if (recSection) {
-        recSection.style.display = 'none';
-        if (recFallback) recFallback.style.display = '';
+        showRecommended(false);
       }
 
       // All platforms grid
-      var grid = document.getElementById('dl-grid');
+      const grid = document.getElementById('dl-grid');
       if (!grid) return;
 
-      var assetMap = {
+      const assetMap = {
         'mac-dmg': { pattern: /_aarch64\.dmg$/, label: 'macOS (Apple Silicon)', note: '.dmg · M1+' },
         'win-exe': { pattern: /_x64-setup\.exe$/, label: 'Windows (64-bit)', note: '.exe installer' },
         'win-msi': { pattern: /_x64_en-US\.msi$/, label: 'Windows (64-bit)', note: '.msi installer' },
@@ -517,13 +515,13 @@
         'linux-appimage': { pattern: /_amd64\.AppImage$/, label: 'Linux (Universal)', note: '.AppImage' }
       };
 
-      Object.keys(assetMap).forEach(function (key) {
-        var slot = grid.querySelector('[data-asset="' + key + '"]');
+      Object.keys(assetMap).forEach((key) => {
+        const slot = grid.querySelector(`[data-asset="${key}"]`);
         if (!slot) return;
-        var info = assetMap[key];
-        var found = release.assets.find(function (a) { return info.pattern.test(a.name); });
+        const info = assetMap[key];
+        const found = release.assets.find((a) => info.pattern.test(a.name));
         if (found) {
-          var link = slot.querySelector('a');
+          const link = slot.querySelector('a');
           if (link) link.href = found.url;
           slot.style.display = '';
         } else {
@@ -533,14 +531,14 @@
     }
 
     // Run
-    var os = detectOS();
+    const os = detectOS();
     fetchLatestRelease()
-      .then(function (release) {
-        var asset = getRecommendedAsset(os, release.assets);
+      .then((release) => {
+        const asset = getRecommendedAsset(os, release.assets);
         enhanceButtons(os, asset);
         enhanceDownloadPage(release, os);
       })
-      .catch(function () {
+      .catch(() => {
         // Graceful degradation — buttons keep their GitHub Releases fallback href
       });
   })();
