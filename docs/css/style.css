@@ -1797,19 +1797,6 @@ footer {
     gap: 20px;
   }
 
-  #contact-hero {
-    padding: 130px 24px 64px;
-    min-height: auto;
-  }
-
-  .cards-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .contact-card {
-    padding: 32px 28px;
-  }
-
   #dl-hero {
     padding: 130px 24px 56px;
     min-height: auto;
@@ -1903,14 +1890,6 @@ footer {
   /* Decisions grid: center on small phones */
   .decisions-grid {
     max-width: 360px;
-  }
-
-  #contact-hero {
-    padding: 110px 20px 56px;
-  }
-
-  .contact-card {
-    padding: 28px 20px;
   }
 
   #dl-hero {
@@ -2205,6 +2184,79 @@ footer {
   opacity: 1;
   transform: translateX(0);
 }
+
+/* ── Contact cards — responsive ── */
+
+@media (max-width: 768px) {
+  #contact-hero {
+    padding: 130px 24px 64px;
+    min-height: auto;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "label  label"
+      "title  links"
+      "body   links"
+      "cta    cta";
+    column-gap: 0;
+    row-gap: 0;
+    padding: 32px 28px;
+  }
+
+  .contact-card__label {
+    grid-area: label;
+    text-align: center;
+  }
+
+  .contact-card__title {
+    grid-area: title;
+    align-self: end;
+    margin-bottom: 0;
+  }
+
+  .contact-card__body {
+    grid-area: body;
+    align-self: start;
+    margin-bottom: 0;
+  }
+
+  .contact-divider {
+    display: none;
+  }
+
+  .contact-links {
+    grid-area: links;
+    align-self: center;
+    border-left: 1px solid var(--border);
+    padding-left: 20px;
+    margin-left: 20px;
+  }
+
+  .contact-card__cta {
+    grid-area: cta;
+    width: 100%;
+    justify-content: center;
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  #contact-hero {
+    padding: 110px 20px 56px;
+  }
+
+  .contact-card {
+    padding: 28px 20px;
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    DOWNLOAD PAGE
 ════════════════════════════════════════════════════ */
