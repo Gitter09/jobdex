@@ -297,12 +297,11 @@ async fn add_contact(db: tauri::State<'_, Db>, args: AddContactArgs) -> Result<S
             None => return Err(format!("Status '{}' does not exist.", sid).into()),
         }
     } else {
-        let default_status: Option<(String, String)> = sqlx::query_as(
-            "SELECT id, label FROM statuses ORDER BY position ASC LIMIT 1",
-        )
-        .fetch_optional(pool)
-        .await
-        .map_err(|e: sqlx::Error| e.to_string())?;
+        let default_status: Option<(String, String)> =
+            sqlx::query_as("SELECT id, label FROM statuses ORDER BY position ASC LIMIT 1")
+                .fetch_optional(pool)
+                .await
+                .map_err(|e: sqlx::Error| e.to_string())?;
 
         match default_status {
             Some((id, label)) => (id, label),
@@ -691,12 +690,11 @@ async fn fix_orphan_contacts(db: tauri::State<'_, Db>) -> Result<String, AppErro
         .map_err(|e| e.to_string())?;
 
     // Determine the fallback status (default or first by position)
-    let fallback: Option<String> = sqlx::query_scalar(
-        "SELECT id FROM statuses ORDER BY position ASC LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e: sqlx::Error| e.to_string())?;
+    let fallback: Option<String> =
+        sqlx::query_scalar("SELECT id FROM statuses ORDER BY position ASC LIMIT 1")
+            .fetch_optional(pool)
+            .await
+            .map_err(|e: sqlx::Error| e.to_string())?;
 
     if let Some(ref fallback_id) = fallback {
         // Fix NULL status_id
@@ -933,7 +931,14 @@ async fn email_schedule(
 ) -> Result<String, AppError> {
     let service = jobdex_core::EmailService::new(db.inner().clone());
     let result = service
-        .schedule_email(&account_id, &contact_id, &subject, &body, scheduled_at, attachment_paths)
+        .schedule_email(
+            &account_id,
+            &contact_id,
+            &subject,
+            &body,
+            scheduled_at,
+            attachment_paths,
+        )
         .await
         .map_err(|e| AppError::from(e.to_string()))?;
 
@@ -1403,7 +1408,7 @@ async fn export_all_data(db: tauri::State<'_, Db>) -> Result<String, AppError> {
             c.cadence_stage, c.created_at, c.updated_at
         FROM contacts c
         LEFT JOIN statuses s ON c.status_id = s.id
-        "#
+        "#,
     )
     .fetch_all(pool)
     .await?;
@@ -1724,11 +1729,10 @@ async fn import_all_data(
                     continue;
                 }
 
-                let exists: bool =
-                    sqlx::query_scalar("SELECT COUNT(*) > 0 FROM tags WHERE id = ?")
-                        .bind(&id)
-                        .fetch_one(&mut *tx)
-                        .await?;
+                let exists: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM tags WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&mut *tx)
+                    .await?;
 
                 if !exists {
                     sqlx::query(
@@ -1814,14 +1818,8 @@ async fn import_all_data(
                 contacts_updated += 1;
             } else {
                 // INSERT new contact preserving id
-                let created_at = c["created_at"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-                let updated_at = c["updated_at"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
+                let created_at = c["created_at"].as_str().unwrap_or("").to_string();
+                let updated_at = c["updated_at"].as_str().unwrap_or("").to_string();
 
                 sqlx::query(
                     "INSERT INTO contacts (
@@ -1845,8 +1843,16 @@ async fn import_all_data(
                 .bind(c["last_contacted_date"].as_str())
                 .bind(c["next_contact_date"].as_str())
                 .bind(c["cadence_stage"].as_i64().map(|n| n as i32))
-                .bind(if created_at.is_empty() { chrono::Utc::now().to_rfc3339() } else { created_at })
-                .bind(if updated_at.is_empty() { chrono::Utc::now().to_rfc3339() } else { updated_at })
+                .bind(if created_at.is_empty() {
+                    chrono::Utc::now().to_rfc3339()
+                } else {
+                    created_at
+                })
+                .bind(if updated_at.is_empty() {
+                    chrono::Utc::now().to_rfc3339()
+                } else {
+                    updated_at
+                })
                 .execute(&mut *tx)
                 .await?;
                 contacts_added += 1;
@@ -1901,10 +1907,11 @@ async fn import_all_data(
             let event_type = ev["event_type"].as_str().unwrap_or("activity").to_string();
             let created_at = ev["created_at"].as_str().unwrap_or("").to_string();
 
-            let exists: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM contact_events WHERE id = ?")
-                .bind(&id)
-                .fetch_one(&mut *tx)
-                .await?;
+            let exists: bool =
+                sqlx::query_scalar("SELECT COUNT(*) > 0 FROM contact_events WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&mut *tx)
+                    .await?;
 
             if !exists {
                 sqlx::query(
@@ -1936,10 +1943,11 @@ async fn import_all_data(
             let body = t["body"].as_str().unwrap_or("").to_string();
             let attachment_paths = t["attachment_paths"].as_str().unwrap_or("[]").to_string();
 
-            let exists: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM email_templates WHERE id = ?")
-                .bind(&id)
-                .fetch_one(&mut *tx)
-                .await?;
+            let exists: bool =
+                sqlx::query_scalar("SELECT COUNT(*) > 0 FROM email_templates WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&mut *tx)
+                    .await?;
 
             if !exists {
                 sqlx::query(
@@ -1967,20 +1975,19 @@ async fn import_all_data(
             }
             let content = s["content"].as_str().unwrap_or("").to_string();
 
-            let exists: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM email_signatures WHERE id = ?")
-                .bind(&id)
-                .fetch_one(&mut *tx)
-                .await?;
+            let exists: bool =
+                sqlx::query_scalar("SELECT COUNT(*) > 0 FROM email_signatures WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&mut *tx)
+                    .await?;
 
             if !exists {
-                sqlx::query(
-                    "INSERT INTO email_signatures (id, name, content) VALUES (?, ?, ?)",
-                )
-                .bind(&id)
-                .bind(&name)
-                .bind(&content)
-                .execute(&mut *tx)
-                .await?;
+                sqlx::query("INSERT INTO email_signatures (id, name, content) VALUES (?, ?, ?)")
+                    .bind(&id)
+                    .bind(&name)
+                    .bind(&content)
+                    .execute(&mut *tx)
+                    .await?;
                 signatures_restored += 1;
             }
         }
@@ -2002,10 +2009,11 @@ async fn import_all_data(
             let error_message = s["error_message"].as_str().map(|s| s.to_string());
             let attachment_paths = s["attachment_paths"].as_str().unwrap_or("[]").to_string();
 
-            let exists: bool = sqlx::query_scalar("SELECT COUNT(*) > 0 FROM scheduled_emails WHERE id = ?")
-                .bind(&id)
-                .fetch_one(&mut *tx)
-                .await?;
+            let exists: bool =
+                sqlx::query_scalar("SELECT COUNT(*) > 0 FROM scheduled_emails WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&mut *tx)
+                    .await?;
 
             if !exists {
                 sqlx::query(
@@ -2276,7 +2284,10 @@ async fn import_contacts(
                     merged += 1;
                 } else {
                     failed += 1;
-                    errors.push(format!("Failed to merge contact: {} {}", contact.first_name, contact.last_name));
+                    errors.push(format!(
+                        "Failed to merge contact: {} {}",
+                        contact.first_name, contact.last_name
+                    ));
                 }
             } else {
                 skipped += 1;
@@ -2284,12 +2295,11 @@ async fn import_contacts(
         } else {
             // Insert New - use position-based default status (top of the list)
             let id = uuid::Uuid::new_v4().to_string();
-            let default_status: Option<(String, String)> = sqlx::query_as(
-                "SELECT id, label FROM statuses ORDER BY position ASC LIMIT 1",
-            )
-            .fetch_optional(pool)
-            .await
-            .map_err(|e: sqlx::Error| e.to_string())?;
+            let default_status: Option<(String, String)> =
+                sqlx::query_as("SELECT id, label FROM statuses ORDER BY position ASC LIMIT 1")
+                    .fetch_optional(pool)
+                    .await
+                    .map_err(|e: sqlx::Error| e.to_string())?;
 
             let (status_label, status_id) = match default_status {
                 Some((id, label)) => (label, id),
@@ -2317,12 +2327,21 @@ async fn import_contacts(
                 imported += 1;
             } else {
                 failed += 1;
-                errors.push(format!("Failed to import contact: {} {}", contact.first_name, contact.last_name));
+                errors.push(format!(
+                    "Failed to import contact: {} {}",
+                    contact.first_name, contact.last_name
+                ));
             }
         }
     }
 
-    Ok(ImportResult { imported, skipped, merged, failed, errors })
+    Ok(ImportResult {
+        imported,
+        skipped,
+        merged,
+        failed,
+        errors,
+    })
 }
 
 #[tauri::command]
@@ -2355,20 +2374,23 @@ async fn update_contacts_status_bulk(
     let mut tx = pool.begin().await?;
 
     // Fetch the label for the given status_id to keep legacy 'status' column in sync
-    let status_label: Option<String> = sqlx::query_scalar("SELECT label FROM statuses WHERE id = ?")
-        .bind(&status_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+    let status_label: Option<String> =
+        sqlx::query_scalar("SELECT label FROM statuses WHERE id = ?")
+            .bind(&status_id)
+            .fetch_optional(&mut *tx)
+            .await?;
 
     let mut affected_count = 0;
 
     for id in ids {
-        let result = sqlx::query("UPDATE contacts SET status_id = ?, status = COALESCE(?, status) WHERE id = ?")
-            .bind(&status_id)
-            .bind(&status_label)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
+        let result = sqlx::query(
+            "UPDATE contacts SET status_id = ?, status = COALESCE(?, status) WHERE id = ?",
+        )
+        .bind(&status_id)
+        .bind(&status_label)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         affected_count += result.rows_affected();
     }
 
@@ -2803,7 +2825,9 @@ const UPDATE_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(360
 async fn check_for_update() -> Result<String, AppError> {
     // Return cached result if still valid
     {
-        let cache = UPDATE_CACHE.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let cache = UPDATE_CACHE
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some((cached_tag, timestamp)) = cache.as_ref() {
             if timestamp.elapsed() < UPDATE_CACHE_TTL {
                 #[cfg(debug_assertions)]
@@ -2857,7 +2881,9 @@ async fn check_for_update() -> Result<String, AppError> {
 
     // Cache the result
     {
-        let mut cache = UPDATE_CACHE.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let mut cache = UPDATE_CACHE
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         *cache = Some((tag.clone(), std::time::Instant::now()));
     }
 

@@ -86,7 +86,9 @@ async fn check_and_send_scheduled_emails(
             subject: row.get("subject"),
             body: row.get("body"),
             to_email: row.get("to_email"),
-            attachment_paths: row.get::<Option<String>, _>("attachment_paths").unwrap_or_else(|| "[]".to_string()),
+            attachment_paths: row
+                .get::<Option<String>, _>("attachment_paths")
+                .unwrap_or_else(|| "[]".to_string()),
         })
         .collect();
 
@@ -120,10 +122,15 @@ async fn check_and_send_scheduled_emails(
         };
 
         // 2. Attempt to send
-        let paths: Vec<String> =
-            serde_json::from_str(&email.attachment_paths).unwrap_or_default();
+        let paths: Vec<String> = serde_json::from_str(&email.attachment_paths).unwrap_or_default();
         match email_service
-            .send_email(&email.account_id, &to_email, &email.subject, &email.body, paths)
+            .send_email(
+                &email.account_id,
+                &to_email,
+                &email.subject,
+                &email.body,
+                paths,
+            )
             .await
         {
             Ok(_message_id) => {
