@@ -62,18 +62,20 @@ impl OutlookClient {
         }
     }
 
-    fn load_credentials(&self) -> Result<(String, String)> {
+    fn load_credentials(&self) -> Result<(String, Option<String>)> {
         // Try to load from keychain first (user override)
         let client_id = crate::crypto::get_credential("outlook", "client_id")
             .unwrap_or_else(|_| DEFAULT_OUTLOOK_CLIENT_ID.to_string());
 
-        let client_secret = crate::crypto::get_credential("outlook", "client_secret")
-            .unwrap_or_else(|_| DEFAULT_OUTLOOK_CLIENT_SECRET.to_string());
-
-        if client_id == "PLACEHOLDER_OUTLOOK_CLIENT_ID"
-            || client_secret == "PLACEHOLDER_OUTLOOK_CLIENT_SECRET"
-        {
+        if client_id == "PLACEHOLDER_OUTLOOK_CLIENT_ID" || client_id.trim().is_empty() {
             return Err(anyhow!("Outlook credentials not configured. Standard login is currently disabled while in beta."));
+        }
+
+        let mut client_secret = crate::crypto::get_credential("outlook", "client_secret").ok();
+        if let Some(ref sec) = client_secret {
+            if sec == "PLACEHOLDER_OUTLOOK_CLIENT_SECRET" || sec.trim().is_empty() {
+                client_secret = None;
+            }
         }
 
         Ok((client_id, client_secret))
@@ -85,11 +87,14 @@ impl OutlookClient {
 
         let redirect_url = format!("http://localhost:{}", port);
 
-        let client = BasicClient::new(ClientId::new(client_id))
-            .set_client_secret(ClientSecret::new(client_secret))
+        let mut client = BasicClient::new(ClientId::new(client_id))
             .set_auth_uri(AuthUrl::new(MS_AUTH_URL.to_string())?)
             .set_token_uri(TokenUrl::new(MS_TOKEN_URL.to_string())?)
             .set_redirect_uri(RedirectUrl::new(redirect_url)?);
+
+        if let Some(secret) = client_secret {
+            client = client.set_client_secret(ClientSecret::new(secret));
+        }
 
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -157,14 +162,17 @@ impl OutlookClient {
         let (client_id, client_secret) = self.load_credentials()?;
         let redirect_url = format!("http://localhost:{}", port);
 
-        let params = [
+        let mut params = vec![
             ("client_id", client_id.as_str()),
-            ("client_secret", client_secret.as_str()),
             ("code", code.as_str()),
             ("code_verifier", pkce_verifier.secret()),
             ("grant_type", "authorization_code"),
             ("redirect_uri", redirect_url.as_str()),
         ];
+        
+        if let Some(ref sec) = client_secret {
+            params.push(("client_secret", sec.as_str()));
+        }
 
         let response = self
             .http_client
@@ -191,12 +199,15 @@ impl OutlookClient {
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthTokenResponse> {
         let (client_id, client_secret) = self.load_credentials()?;
 
-        let params = [
+        let mut params = vec![
             ("client_id", client_id.as_str()),
-            ("client_secret", client_secret.as_str()),
             ("refresh_token", refresh_token),
             ("grant_type", "refresh_token"),
         ];
+
+        if let Some(ref sec) = client_secret {
+            params.push(("client_secret", sec.as_str()));
+        }
 
         let response = self
             .http_client

@@ -82,8 +82,13 @@ export function EmailSettingsTab() {
     }, []);
 
     const handleSaveCredentials = async () => {
-        if (!setupProvider || !clientId.trim() || !clientSecret.trim()) {
-            handleError("Please fill in all fields");
+        if (!setupProvider || !clientId.trim()) {
+            handleError("Please provide a Client ID");
+            return;
+        }
+
+        if (setupProvider === "gmail" && !clientSecret.trim()) {
+            handleError("Gmail requires a Client Secret");
             return;
         }
 
@@ -113,7 +118,7 @@ export function EmailSettingsTab() {
             fetchAccounts();
         } catch (e: unknown) {
             // Check if it's a "not configured" error
-            const errorStr = String(e);
+            const errorStr = (typeof e === "object" && e !== null && "message" in e) ? String(e.message) : String(e);
             if (errorStr.includes("credentials not configured") || errorStr.includes("disabled while in beta")) {
                 setSetupProvider(provider);
             } else {
@@ -521,11 +526,13 @@ export function EmailSettingsTab() {
                                         />
                                     </div>
                                     <div>
-                                        <Label htmlFor="client-secret">Client Secret</Label>
+                                        <Label htmlFor="client-secret">
+                                            Client Secret {setupProvider === "outlook" && <span className="text-muted-foreground font-normal">(Optional - leave blank if Public Client)</span>}
+                                        </Label>
                                         <Input
                                             id="client-secret"
                                             type="password"
-                                            placeholder="Enter your OAuth Client Secret"
+                                            placeholder={setupProvider === "outlook" ? "Leave blank for Mobile/Desktop apps" : "Enter your OAuth Client Secret"}
                                             value={clientSecret}
                                             onChange={(e) => setClientSecret(e.target.value)}
                                         />
