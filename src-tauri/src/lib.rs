@@ -2588,7 +2588,7 @@ async fn upsert_email_template(
     let pool = db.pool();
     let template_id = id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let paths_json = serde_json::to_string(&attachment_paths.unwrap_or_default())
-        .map_err(|e| AppError::Serialization(e))?;
+        .map_err(AppError::Serialization)?;
 
     sqlx::query(
         r#"
