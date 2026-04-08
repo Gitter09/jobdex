@@ -93,22 +93,23 @@ rm -rf "$VOLPATH/.fseventsd"
 # 6. Unmount
 sync
 echo "fix-dmg: Finder configuration done"
-# Force Finder to finalize icon rendering
-echo "fix-dmg: forcing Finder to resolve icons..."
+# Tell Finder to close the window then eject the volume cleanly
+osascript <<EOF
+tell application "Finder"
+    try
+        close window "$VOLNAME"
+    end try
+    try
+        eject disk "$VOLNAME"
+    end try
+end tell
+EOF
 
-# Open the volume in Finder (critical)
-open "$VOLPATH"
-
-# Give Finder time to render icons
-sleep 3
-
-# Force .DS_Store write
-touch "$VOLPATH"
-
-# Extra delay for safety
+# Give Finder a moment to release the volume fully
 sleep 2
-sleep 1
-hdiutil detach "$VOLPATH" -quiet
+
+# Fallback detach in case AppleScript eject didn't fire
+hdiutil detach "$VOLPATH" -quiet 2>/dev/null || true
 
 # 7. Convert to compressed read-only UDZO
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_FILE" -quiet
