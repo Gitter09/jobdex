@@ -11,7 +11,7 @@ env:
   SQLX_SQLITE_USE_SQLCIPHER: "1"
 
 jobs:
-  # macOS: custom DMG build (skips Tauri's DMG, builds our own)
+  # macOS: build DMG using Tauri's native bundler
   release-macos:
     permissions:
       contents: write
