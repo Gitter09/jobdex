@@ -76,9 +76,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Tauri App (Linux/Windows)
-        if: matrix.platform != 'macos-latest'
+      - name: Build Tauri App (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
         run: bun run tauri build
+
+      - name: Build Tauri App (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: bun run tauri build --bundles nsis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

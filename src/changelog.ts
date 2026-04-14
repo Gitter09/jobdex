@@ -12,15 +12,15 @@ export interface Release {
 export const CHANGELOG: Release[] = [
     {
         version: "0.2.0",
-        date: "April 3, 2026",
+        date: "April 14, 2026",
         entries: [
             {
-                label: "Onboarding",
-                detail: "First-time users now get a proper welcome. A short walkthrough explains what JobDex is and gets you set up.",
+                label: "Fully functional email inbox",
+                detail: "A dedicated Emails page with full email reading, formatting, sending, scheduling, and timestamp sync.",
             },
             {
                 label: "Keyboard shortcuts",
-                detail: "Cmd+N for new contact, Cmd+Shift+C to compose, Cmd+1–5 to jump between pages, Cmd+/ to see all shortcuts.",
+                detail: "Cmd+N for new contact, Cmd+Shift+C to compose, Cmd+1–5 to jump between pages, Cmd+/ to see all shortcuts. Global Command Palette (⌘K) is now available everywhere.",
             },
             {
                 label: "Pipeline settings",
@@ -35,12 +35,20 @@ export const CHANGELOG: Release[] = [
                 detail: "If you exported your data before, you can now bring it back. Contacts, statuses, and tags are merged — nothing gets overwritten.",
             },
             {
+                label: "Improved data imports",
+                detail: "CSV imports now automatically map the 'Company Website' column when adding contacts.",
+            },
+            {
+                label: "Outlook connection fixes",
+                detail: "Fixed major token parsing and server connectivity issues with Microsoft Outlook accounts.",
+            },
+            {
                 label: "Update checker",
                 detail: "JobDex now checks for new versions on launch and shows a banner if there's something newer available.",
             },
             {
                 label: "Lots of fixes",
-                detail: "Kanban +New now pre-selects the right stage. Tag assignment works properly. Error messages are human-readable. Toast spam is gone.",
+                detail: "Kanban +New now pre-selects the right stage. Error messages are much more helpful. Toast spam is gone.",
             },
         ],
     },

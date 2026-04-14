@@ -33,11 +33,11 @@ export function WhatsNewModal({ open, onOpenChange }: WhatsNewModalProps) {
                 </ul>
 
                 <p className="text-xs text-muted-foreground border-l-2 border-muted pl-3 leading-relaxed">
-                    One thing worth knowing: email sync works, but it's not great yet. Getting emails out of Gmail's format and into something readable is messier than it sounds. You'll see threads on contact pages — they're useful for a quick check — but don't be surprised if something looks off. A proper fix is on the roadmap.
+                    A quick note on email sync: the parsing logic is now much more robust. It handles almost all messages perfectly, though you might still see some quirks in very complex emails. If anything looks a bit off, a proper fix is already on the roadmap.
                 </p>
 
                 <p className="text-xs text-muted-foreground">
-                    Tasks, the email inbox, and a proper onboarding flow are still in progress — coming before long.
+                    Tasks are still in progress and will be coming in a future update before long.
                 </p>
 
                 <DialogFooter>

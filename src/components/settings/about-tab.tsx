@@ -9,7 +9,7 @@ export function AboutTab() {
     const [version, setVersion] = useState<string>("...");
 
     useEffect(() => {
-        getVersion().then(setVersion).catch(() => setVersion("0.1.3"));
+        getVersion().then(setVersion).catch(() => setVersion("0.2.0"));
     }, []);
 
     return (
@@ -32,13 +32,13 @@ export function AboutTab() {
                             <span className="text-sm text-muted-foreground font-mono">v{version}</span>
                         </div>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            I built this while tracking job applications in a spreadsheet that kept breaking. Everything else was enterprise software or a SaaS - very salesy. I didn't wanna pay for that.
+                            I built this while tracking job applications in a spreadsheet that kept breaking. Everything else was either complex enterprise software or a very "salesy" SaaS. I didn't want to pay for that.
                         </p>
                         <p className="text-sm text-foreground/80 leading-relaxed">
                             It's free, offline-first, and your data never leaves your machine. I'm sharing it in case it's useful to anyone else doing the same thing.
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            — Harshit Singh
+                            - Harshit Singh
                         </p>
                     </div>
 
@@ -77,7 +77,7 @@ export function AboutTab() {
                         ))}
                     </ul>
                     <p className="text-xs text-muted-foreground pt-1">
-                        Tasks, email inbox, pipeline config, onboarding, and a few other things are still in progress.
+                        Tasks are still in progress and will be coming in a future update before long.
                     </p>
                 </div>
             </div>

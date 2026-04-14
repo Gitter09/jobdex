@@ -10,6 +10,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] — 2026-04-14
+### Added
+- **First-Time Onboarding**: A short, warm walkthrough introduces JobDex to new users and helps them get set up.
+- **Fully Functional Email Inbox**: A dedicated Emails tab that supports reading, formatting, sending, scheduling, and synchronising email timestamps.
+- **Email Signatures & Attachments**: Create signatures in settings for reuse during composition. Attach files directly to your contacts.
+- **Activity Timeline**: Status changes, scheduled emails, and sent emails appear natively on a contact's profile. You can delete specific entries manually.
+- **Pipeline Settings**: Drag to reorder pipeline stages, rename them, edit their colours, or delete unused stages.
+- **Keyboard Shortcuts**: Global shortcuts implemented (`Cmd+N`, `Cmd+Shift+C`, `Cmd+1-5`, `Cmd+/`). The Command Palette (`⌘K`) is now accessible from everywhere.
+- **Tags & Tag Filtering**: Tags are fully functional. Filter the Contacts list and Kanban board using one or multiple tags seamlessly.
+- **Restore from Backup**: JSON data exports can be imported back into JobDex. Existing contacts, statuses, and tags are safely merged without overwriting.
+- **Update Checker & Release Modal**: JobDex checks for new versions upon startup and offers a What's New banner linking to these release notes.
+- **Background Service**: Re-engineered background processes effectively handle scheduled emails natively.
+
+### Fixed
+- **Outlook Connection Stability**: Fixed major token authentication parsing and server-side filtering faults specifically affecting Microsoft Outlook accounts.
+- **Data Imports**: CSV imports proactively map the 'Company Website' column if the data is present.
+- **Workflow & UI Hygiene**: Kanban '+ New' pre-selects the relevant stage, bulk status updates work predictably, variable chips work inside subject lines, and mobile layouts scale comfortably.
+- **Error Handling Pipeline**: Aggressive toast spam from network failures has been replaced with thoughtful, human-readable Rust error translations.
+
+---
+
 ## [0.1.3] — 2026-03-06
 ### Added
 - **Quick-Insert Chips**: Clickable shortcuts for inserting template variables in templates and emails.

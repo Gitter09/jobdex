@@ -85,8 +85,10 @@ jobs:
         include:
           - platform: ubuntu-22.04
             os: ubuntu-22.04
+            bundle_args: ''
           - platform: windows-latest
             os: windows-latest
+            bundle_args: '--bundles nsis'
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -151,3 +153,4 @@ jobs:
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.bundle_args }}
