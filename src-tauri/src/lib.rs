@@ -1,6 +1,7 @@
 use jobdex_core::Db;
 use tauri::Manager;
 
+mod api;
 mod error;
 use error::AppError;
 #[cfg(target_os = "macos")]
@@ -490,6 +491,17 @@ pub fn run() {
             println!("[Boot] Starting Email Scheduler...");
             scheduler::start_email_scheduler(app_handle.clone(), db.clone());
 
+            // Start the API server (if enabled)
+            let api_pool = db.pool().clone();
+            let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+            let shutdown_tx_for_close = shutdown_tx.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = api::start_server(api_pool, shutdown_rx).await {
+                    #[cfg(debug_assertions)]
+                    eprintln!("[API Error] Server error: {}", e);
+                }
+            });
+
             // System tray
             #[cfg(debug_assertions)]
             println!("[Boot] Setting up system tray...");
@@ -590,7 +602,9 @@ pub fn run() {
             check_for_update,
             enable_background_service,
             disable_background_service,
-            is_background_service_enabled
+            is_background_service_enabled,
+            generate_api_key,
+            get_api_status
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -2749,4 +2763,60 @@ async fn check_for_update() -> Result<String, AppError> {
     }
 
     Ok(tag)
+}
+
+// ===== API Key Commands =====
+
+#[tauri::command]
+async fn generate_api_key(db: tauri::State<'_, Db>) -> Result<String, AppError> {
+    let key = format!("jd_{}", hex::encode(&rand::random::<[u8; 24]>()));
+    let manager = jobdex_core::settings::SettingsManager::new(db.pool().clone());
+    manager
+        .set("api_key", &key)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    #[cfg(debug_assertions)]
+    println!("[API] Generated new API key");
+
+    Ok(key)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiStatus {
+    enabled: bool,
+    port: u16,
+    key_set: bool,
+}
+
+#[tauri::command]
+async fn get_api_status(db: tauri::State<'_, Db>) -> Result<ApiStatus, AppError> {
+    let manager = jobdex_core::settings::SettingsManager::new(db.pool().clone());
+
+    let enabled = manager
+        .get("api_enabled")
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .map(|v| v == "true")
+        .unwrap_or(false);
+
+    let port: u16 = manager
+        .get("api_port")
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(13420);
+
+    let key_set = manager
+        .get("api_key")
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .is_some();
+
+    Ok(ApiStatus {
+        enabled,
+        port,
+        key_set,
+    })
 }

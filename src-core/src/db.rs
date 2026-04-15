@@ -44,6 +44,10 @@ impl Db {
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
     }
+
+    pub fn from_pool(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
 }
 
 /// Opens (or creates) a SQLCipher-encrypted database at `db_path` using `hex_key`.
