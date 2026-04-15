@@ -4,100 +4,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Coming Soon — JobDex</title>
+  <title>Privacy Policy — JobDex</title>
   <meta name="description"
-    content="JobDex is releasing soon. Get on the waitlist to be notified when the final release is ready.">
+    content="JobDex is a free, privacy-first desktop CRM. We do not collect, store, or sell your data.">
+  <meta name="author" content="Harshit Singh">
+  <link rel="canonical" href="https://jobdex.tech/privacy.html">
   <meta name="theme-color" content="#000000">
   <link rel="icon" type="image/svg+xml" href="favicon-tab.svg">
   <link rel="icon" type="image/svg+xml" sizes="512x512" href="favicon-tab.svg">
   <link rel="apple-touch-icon" href="favicon-tab.svg">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* Scope specific styles to this page for the countdown since it's a unique element */
-    .countdown-container {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-      margin: 48px auto;
-      text-align: center;
+    /* Scoped document typography for legal/reading pages */
+    .doc-page {
+      padding-top: 120px;
+      padding-bottom: 80px;
+      max-width: 720px;
+      margin: 0 auto;
+      color: var(--text-2);
+      font-size: 1.1rem;
+      line-height: 1.7;
     }
-
-    .countdown-box {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 16px 20px;
-      min-width: 80px;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    .countdown-value {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 32px;
-      font-weight: 600;
+    
+    .doc-page h1 {
+      font-size: 3rem;
       color: var(--text);
-      line-height: 1;
-      margin-bottom: 8px;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
     }
 
-    .countdown-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
+    .doc-page .lead {
+      font-size: 1.25rem;
+      color: var(--text-2);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+
+    .doc-page h2 {
+      font-size: 1.5rem;
+      color: var(--text);
+      margin-top: 3rem;
+      margin-bottom: 1rem;
       font-weight: 500;
     }
 
-    .notify-form {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      max-width: 400px;
-      margin: 0 auto;
-      margin-top: 16px;
+    .doc-page p {
+      margin-bottom: 1.5rem;
     }
 
-    .notify-input {
-      flex: 1;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 6px;
-      padding: 12px 16px;
+    .doc-page a {
       color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      line-height: 1.5;
-      outline: none;
-      transition: border-color 0.2s ease, background 0.2s ease;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.3);
+      text-underline-offset: 4px;
+      transition: text-decoration-color 0.2s ease;
     }
 
-    .notify-input:focus {
-      border-color: rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.06);
+    .doc-page a:hover {
+      text-decoration-color: var(--text);
+    }
+    
+    /* Strong callout box for Google API compliance */
+    .compliance-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-left: 3px solid #3b82f6; /* Blue highlight */
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 2rem 0;
     }
 
-    .notify-input::placeholder {
-      color: var(--text-3);
-    }
-
-    @media (max-width: 480px) {
-      .countdown-container {
-        gap: 12px;
-      }
-
-      .countdown-box {
-        padding: 12px 14px;
-        min-width: 60px;
-      }
-
-      .countdown-value {
-        font-size: 24px;
-      }
-
-      .notify-form {
-        flex-direction: column;
-      }
+    .compliance-box strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 0.5rem;
     }
   </style>
 </head>
@@ -138,7 +119,7 @@
       <nav class="navbar__nav" aria-label="Desktop Navigation">
         <ul class="navbar__nav-links">
           <li><a href="index.html#features" class="nav-link">Features</a></li>
-          <li><a href="coming-soon.html" class="nav-link" aria-current="page">Downloads</a></li>
+          <li><a href="download.html" class="nav-link">Downloads</a></li>
           <li><a href="https://docs.jobdex.tech" target="_parent" rel="noopener noreferrer" class="nav-link">Docs</a>
           </li>
           <li><a href="https://github.com/Gitter09/jobdex/wiki" target="_blank" rel="noopener noreferrer"
@@ -148,81 +129,64 @@
       </nav>
 
       <div class="navbar__actions">
-        <a href="coming-soon.html" class="btn btn-primary navbar__cta" data-download="cta"
-          data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get
-          Notified</a>
+        <a href="coming-soon.html" class="btn btn-primary navbar__cta"
+          data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get Notified</a>
       </div>
 
     </nav>
   </header>
 
-  <!-- Mobile Navigation Overlay -->
+  <!-- Mobile Navigation Overlay (Moved outside header to prevent transform clipping) -->
   <div id="mobile-nav" class="mobile-nav" aria-hidden="true" inert>
     <ul class="mobile-nav__links">
       <li><a href="index.html#features" class="mobile-nav__link">Features</a></li>
-      <li><a href="coming-soon.html" class="mobile-nav__link">Downloads</a></li>
+      <li><a href="download.html" class="mobile-nav__link">Downloads</a></li>
       <li><a href="https://docs.jobdex.tech" target="_parent" rel="noopener noreferrer"
           class="mobile-nav__link">Docs</a></li>
       <li><a href="https://github.com/Gitter09/jobdex/wiki" target="_blank" rel="noopener noreferrer"
           class="mobile-nav__link">Developers</a></li>
-      <li><a href="https://github.com/Gitter09/jobdex" target="_blank" rel="noopener noreferrer"
-          class="mobile-nav__link">GitHub</a></li>
       <li><a href="contact.html" class="mobile-nav__link">Contact</a></li>
     </ul>
     <div class="mobile-nav__footer">
-      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta" data-download="cta"
-        data-fallback-href="https://github.com/Gitter09/jobdex/releases"
-        data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
-        &darr;&nbsp;&nbsp;Get Notified
+      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta"
+        data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
+        Get Notified
       </a>
     </div>
   </div>
 
+  <main class="container">
+    <article class="doc-page">
+      <h1>Privacy Policy</h1>
+      <p class="lead">We don't collect, store, or sell your data because we literally can't.</p>
 
-  <!-- ══════════════════════════════════════════
-     HERO
-══════════════════════════════════════════ -->
-  <section id="dl-hero" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
-    <div class="dl-hero-inner" style="margin-top: -60px;">
-      <h1 class="sr-only">Coming Soon — JobDex</h1>
-      <p class="s-label reveal">Teaser Release</p>
-      <h2 class="reveal d1">I'm refining the final release.</h2>
-      <p class="dl-hero-sub reveal d2" style="max-width: 580px; margin: 0 auto;">JobDex is nearly ready. I'm taking a
-        few extra days to squash bugs and polish the experience. Check back when the clock hits zero.</p>
+      <p>Last updated: April 16, 2026</p>
 
-      <!-- Countdown Timer -->
-      <div class="countdown-container reveal d3" id="launch-countdown">
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-days">--</div>
-          <div class="countdown-label">Days</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-hours">--</div>
-          <div class="countdown-label">Hours</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-minutes">--</div>
-          <div class="countdown-label">Minutes</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-seconds">--</div>
-          <div class="countdown-label">Seconds</div>
-        </div>
+      <h2>1. The Local-First Promise</h2>
+      <p>JobDex is built around a single foundational architectural decision: it is entirely local-first. We do not have servers, databases, or analytics engines in the cloud designed to ingest your data. Everything happens exclusively on your machine.</p>
+
+      <h2>2. Data Storage & Local Encryption</h2>
+      <p>100% of your contact records, pipelines, notes, and email history are stored locally in an encrypted SQLCipher AES-256 database residing internally within your operating system's application support directory. Nobody but you has access to it. If you uninstall the app and securely delete your local database, your data is gone forever—we possess no backup copies.</p>
+      
+      <h2>3. Google Workspace APIs & Exhaustive Data Usage Disclosure</h2>
+      <p>JobDex is a native desktop application that integrates directly with your Google or Microsoft email accounts to manage your job search outreach. To enable this, JobDex requests OAuth permission to read your email messages, create drafts, and send outgoing emails on your behalf.</p>
+      
+      <p>Because JobDex operates completely offline, <strong>this data is NEVER transmitted to any external server.</strong> It is fetched strictly from the OAuth provider's API directly to your local machine and stored solely within your locally encrypted SQLite database.</p>
+      
+      <p>Your Google Workspace and Microsoft OAuth access and refresh tokens are securely persisted utilizing AES-256-GCM encryption, managed natively by your OS's keychain wrapper (macOS Keychain or Windows Credential Manager). JobDex's creator, maintainers, and third-parties have precisely zero access to your credentials or email contents.</p>
+
+      <div class="compliance-box">
+        <strong>Google API Services User Data Policy (Limited Use Disclosure)</strong>
+        <p style="margin-bottom: 0;">JobDex's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. JobDex strictly abides by this policy. We do not use your Google data for serving personalized or non-personalized advertisements, we do not allow humans to read your data (there is no "we" to read it—it resides exclusively on your personal device), and we do not transfer your data to any third-party AI models, brokers, or analytics services under any circumstances.</p>
       </div>
 
-      <div class="reveal d4">
-        <form action="mailto:hello@jobdex.tech" method="GET" enctype="text/plain" id="notify-form" class="notify-form">
-          <input type="email" name="email" placeholder="Your best email" required aria-label="Email address"
-            class="notify-input">
-          <input type="hidden" name="subject" value="JobDex Waitlist Request">
-          <button type="submit" class="btn btn-primary">Get Notified</button>
-        </form>
-        <p style="margin-top: 14px; font-size: 11px; color: var(--text-3); text-align: center;">No spam, ever. Your data
-          stays yours.</p>
-      </div>
-    </div>
-  </section>
+      <h2>4. Tracking & Telemetry</h2>
+      <p>We do not utilize tracking pixels to monitor our users. We do not run Google Analytics, Mixpanel, PostHog, or any user-behavior tracking engines within the app. JobDex does not "phone home" to report product usage metrics.</p>
 
+      <h2>5. Contact & Support</h2>
+      <p>If you have further questions or require clarifications regarding your privacy, you can reach out via our <a href="contact.html">Contact Page</a>.</p>
+    </article>
+  </main>
 
   <!-- ══════════════════════════════════════════
      FOOTER
@@ -248,7 +212,7 @@
             </div>
             <span class="footer-logo-name">JobDex</span>
           </div>
-          <p class="footer-copy">Built by Harshit Singh · &copy; 2026 JobDex · Source-available · MIT + Commons Clause
+          <p class="footer-copy">Built by Harshit Singh · © 2026 JobDex · Source-available · MIT + Commons Clause
           </p>
         </div>
         <nav class="footer-links">

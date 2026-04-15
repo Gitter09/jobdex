@@ -4,100 +4,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Coming Soon — JobDex</title>
-  <meta name="description"
-    content="JobDex is releasing soon. Get on the waitlist to be notified when the final release is ready.">
+  <title>Terms of Service — JobDex</title>
+  <meta name="description" content="Terms of Service for JobDex.">
+  <meta name="author" content="Harshit Singh">
+  <link rel="canonical" href="https://jobdex.tech/terms.html">
   <meta name="theme-color" content="#000000">
   <link rel="icon" type="image/svg+xml" href="favicon-tab.svg">
   <link rel="icon" type="image/svg+xml" sizes="512x512" href="favicon-tab.svg">
   <link rel="apple-touch-icon" href="favicon-tab.svg">
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* Scope specific styles to this page for the countdown since it's a unique element */
-    .countdown-container {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-      margin: 48px auto;
-      text-align: center;
+    /* Scoped document typography for legal/reading pages */
+    .doc-page {
+      padding-top: 120px;
+      padding-bottom: 80px;
+      max-width: 720px;
+      margin: 0 auto;
+      color: var(--text-2);
+      font-size: 1.1rem;
+      line-height: 1.7;
     }
-
-    .countdown-box {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 16px 20px;
-      min-width: 80px;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    .countdown-value {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 32px;
-      font-weight: 600;
+    
+    .doc-page h1 {
+      font-size: 3rem;
       color: var(--text);
-      line-height: 1;
-      margin-bottom: 8px;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
     }
 
-    .countdown-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-3);
+    .doc-page .lead {
+      font-size: 1.25rem;
+      color: var(--text-2);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+
+    .doc-page h2 {
+      font-size: 1.5rem;
+      color: var(--text);
+      margin-top: 3rem;
+      margin-bottom: 1rem;
       font-weight: 500;
     }
 
-    .notify-form {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      max-width: 400px;
-      margin: 0 auto;
-      margin-top: 16px;
+    .doc-page p {
+      margin-bottom: 1.5rem;
+    }
+    
+    .doc-page ul {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    
+    .doc-page li {
+      margin-bottom: 0.5rem;
     }
 
-    .notify-input {
-      flex: 1;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 6px;
-      padding: 12px 16px;
+    .doc-page a {
       color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      line-height: 1.5;
-      outline: none;
-      transition: border-color 0.2s ease, background 0.2s ease;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.3);
+      text-underline-offset: 4px;
+      transition: text-decoration-color 0.2s ease;
     }
 
-    .notify-input:focus {
-      border-color: rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .notify-input::placeholder {
-      color: var(--text-3);
-    }
-
-    @media (max-width: 480px) {
-      .countdown-container {
-        gap: 12px;
-      }
-
-      .countdown-box {
-        padding: 12px 14px;
-        min-width: 60px;
-      }
-
-      .countdown-value {
-        font-size: 24px;
-      }
-
-      .notify-form {
-        flex-direction: column;
-      }
+    .doc-page a:hover {
+      text-decoration-color: var(--text);
     }
   </style>
 </head>
@@ -138,7 +111,7 @@
       <nav class="navbar__nav" aria-label="Desktop Navigation">
         <ul class="navbar__nav-links">
           <li><a href="index.html#features" class="nav-link">Features</a></li>
-          <li><a href="coming-soon.html" class="nav-link" aria-current="page">Downloads</a></li>
+          <li><a href="download.html" class="nav-link">Downloads</a></li>
           <li><a href="https://docs.jobdex.tech" target="_parent" rel="noopener noreferrer" class="nav-link">Docs</a>
           </li>
           <li><a href="https://github.com/Gitter09/jobdex/wiki" target="_blank" rel="noopener noreferrer"
@@ -148,81 +121,69 @@
       </nav>
 
       <div class="navbar__actions">
-        <a href="coming-soon.html" class="btn btn-primary navbar__cta" data-download="cta"
-          data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get
-          Notified</a>
+        <a href="coming-soon.html" class="btn btn-primary navbar__cta"
+          data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get Notified</a>
       </div>
 
     </nav>
   </header>
 
-  <!-- Mobile Navigation Overlay -->
+  <!-- Mobile Navigation Overlay (Moved outside header to prevent transform clipping) -->
   <div id="mobile-nav" class="mobile-nav" aria-hidden="true" inert>
     <ul class="mobile-nav__links">
       <li><a href="index.html#features" class="mobile-nav__link">Features</a></li>
-      <li><a href="coming-soon.html" class="mobile-nav__link">Downloads</a></li>
+      <li><a href="download.html" class="mobile-nav__link">Downloads</a></li>
       <li><a href="https://docs.jobdex.tech" target="_parent" rel="noopener noreferrer"
           class="mobile-nav__link">Docs</a></li>
       <li><a href="https://github.com/Gitter09/jobdex/wiki" target="_blank" rel="noopener noreferrer"
           class="mobile-nav__link">Developers</a></li>
-      <li><a href="https://github.com/Gitter09/jobdex" target="_blank" rel="noopener noreferrer"
-          class="mobile-nav__link">GitHub</a></li>
       <li><a href="contact.html" class="mobile-nav__link">Contact</a></li>
     </ul>
     <div class="mobile-nav__footer">
-      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta" data-download="cta"
-        data-fallback-href="https://github.com/Gitter09/jobdex/releases"
-        data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
-        &darr;&nbsp;&nbsp;Get Notified
+      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta"
+        data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
+        Get Notified
       </a>
     </div>
   </div>
 
+  <main class="container">
+    <article class="doc-page">
+      <h1>Terms of Service</h1>
+      <p class="lead">Plain English constraints for using a free, local-first tool.</p>
 
-  <!-- ══════════════════════════════════════════
-     HERO
-══════════════════════════════════════════ -->
-  <section id="dl-hero" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
-    <div class="dl-hero-inner" style="margin-top: -60px;">
-      <h1 class="sr-only">Coming Soon — JobDex</h1>
-      <p class="s-label reveal">Teaser Release</p>
-      <h2 class="reveal d1">I'm refining the final release.</h2>
-      <p class="dl-hero-sub reveal d2" style="max-width: 580px; margin: 0 auto;">JobDex is nearly ready. I'm taking a
-        few extra days to squash bugs and polish the experience. Check back when the clock hits zero.</p>
+      <p>Last updated: April 16, 2026</p>
 
-      <!-- Countdown Timer -->
-      <div class="countdown-container reveal d3" id="launch-countdown">
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-days">--</div>
-          <div class="countdown-label">Days</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-hours">--</div>
-          <div class="countdown-label">Hours</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-minutes">--</div>
-          <div class="countdown-label">Minutes</div>
-        </div>
-        <div class="countdown-box">
-          <div class="countdown-value" id="cd-seconds">--</div>
-          <div class="countdown-label">Seconds</div>
-        </div>
-      </div>
+      <h2>1. Acceptance of Terms</h2>
+      <p>By downloading, installing, or using the JobDex software application ("JobDex"), you agree to be bound by these Terms of Service. If you do not agree, do not use the application.</p>
 
-      <div class="reveal d4">
-        <form action="mailto:hello@jobdex.tech" method="GET" enctype="text/plain" id="notify-form" class="notify-form">
-          <input type="email" name="email" placeholder="Your best email" required aria-label="Email address"
-            class="notify-input">
-          <input type="hidden" name="subject" value="JobDex Waitlist Request">
-          <button type="submit" class="btn btn-primary">Get Notified</button>
-        </form>
-        <p style="margin-top: 14px; font-size: 11px; color: var(--text-3); text-align: center;">No spam, ever. Your data
-          stays yours.</p>
-      </div>
-    </div>
-  </section>
+      <h2>2. Description of Service</h2>
+      <p>JobDex is a free, local-first personal CRM application engineered as a desktop client to assist students and individuals with managing their job search pipelines and sending emails through their personal email accounts via OAuth integration.</p>
+      
+      <h2>3. Code Availability and Licensing</h2>
+      <p>JobDex is a source-available project. It is provided under a dual-license structure: MIT License combined with the Commons Clause. You may read, audit, and modify the source code for personal use. Selling the software or offering it as a managed service is expressly prohibited.</p>
 
+      <h2>4. User Responsibilities & Acceptable Use</h2>
+      <p>JobDex is a tool that runs locally on your machine. We do not intermediate your outgoing emails. Because of this, you are solely responsible for how you use the application.</p>
+      <ul>
+        <li>You agree not to use JobDex to send unsolicited spam, malicious software, or fraudulent communications.</li>
+        <li>You agree to comply with all applicable anti-spam laws in your jurisdiction (e.g., the CAN-SPAM Act in the United States, GDPR).</li>
+        <li>JobDex connects directly to your Google Workspace or Microsoft Outlook account. Your usage of these integrations must strictly comply with Google's and Microsoft's respective Terms of Service. If you abuse their services, they may suspend your email account. We are not liable for any actions taken against your connected email accounts.</li>
+      </ul>
+
+      <h2>5. NO WARRANTIES. PROVIDED "AS IS"</h2>
+      <p>JobDex is provided "AS IS", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. We specifically do not warrant that the software will be error-free, that data will not be lost (please backup your local files if needed), or that it will meet your specific requirements.</p>
+
+      <h2>6. Limitation of Liability</h2>
+      <p>In no event shall the creator, contributors, or maintainers of JobDex be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software.</p>
+
+      <h2>7. Revisions</h2>
+      <p>We may revise these Terms of Service from time to time. The most current version will always be prominently linked from our website.</p>
+
+      <h2>8. Contact</h2>
+      <p>If you have any questions regarding these Terms, please reach out via our <a href="contact.html">Contact Page</a>.</p>
+    </article>
+  </main>
 
   <!-- ══════════════════════════════════════════
      FOOTER
@@ -248,7 +209,7 @@
             </div>
             <span class="footer-logo-name">JobDex</span>
           </div>
-          <p class="footer-copy">Built by Harshit Singh · &copy; 2026 JobDex · Source-available · MIT + Commons Clause
+          <p class="footer-copy">Built by Harshit Singh · © 2026 JobDex · Source-available · MIT + Commons Clause
           </p>
         </div>
         <nav class="footer-links">
