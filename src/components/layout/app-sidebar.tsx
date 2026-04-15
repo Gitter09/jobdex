@@ -17,6 +17,7 @@ import {
     CheckSquare,
     Info,
     Keyboard,
+    Plug,
 } from "lucide-react";
 import {
     Tooltip,
@@ -48,6 +49,7 @@ const settingsSubItems: NavItem[] = [
     { label: "Email Integration", icon: Mail, path: "/settings/email" },
     { label: "Pipeline", icon: LayoutTemplate, path: "/settings/pipeline" },
     { label: "Security", icon: Shield, path: "/settings/security" },
+    { label: "API Access", icon: Plug, path: "/settings/api" },
     { label: "Data", icon: Database, path: "/settings/data" },
     { label: "About", icon: Info, path: "/settings/about" },
 ];

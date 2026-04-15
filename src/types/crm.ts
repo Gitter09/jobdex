@@ -179,3 +179,9 @@ export interface ScheduledEmail {
     createdAt: string;
     attachmentPaths?: string[];
 }
+
+export interface ApiStatus {
+    enabled: boolean;
+    port: number;
+    keySet: boolean;
+}

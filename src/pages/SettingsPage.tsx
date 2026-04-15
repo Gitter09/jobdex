@@ -7,6 +7,7 @@ import { SecuritySettingsTab } from "@/components/settings/security-settings-tab
 import { AboutTab } from "@/components/settings/about-tab";
 import { PipelineSettingsTab } from "@/components/settings/pipeline-settings-tab";
 import { KeyboardSettingsTab } from "@/components/settings/keyboard-settings-tab";
+import { ApiSettingsTab } from "@/components/settings/api-settings-tab";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -36,7 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 
-type SettingsTab = "email" | "appearance" | "pipeline" | "data" | "security" | "keyboard" | "about";
+type SettingsTab = "email" | "appearance" | "pipeline" | "data" | "security" | "keyboard" | "about" | "api";
 
 const tabTitles: Record<SettingsTab, string> = {
     email: "Email Integration",
@@ -46,6 +47,7 @@ const tabTitles: Record<SettingsTab, string> = {
     security: "Security",
     keyboard: "Shortcuts",
     about: "About",
+    api: "API Access",
 };
 
 export function SettingsPage() {
@@ -338,6 +340,7 @@ export function SettingsPage() {
             case "security": return <SecuritySettingsTab />;
             case "keyboard": return <KeyboardSettingsTab />;
             case "about": return <AboutTab />;
+            case "api": return <ApiSettingsTab />;
             default: return renderAppearanceContent();
         }
     };

@@ -494,7 +494,6 @@ pub fn run() {
             // Start the API server (if enabled)
             let api_pool = db.pool().clone();
             let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
-            let shutdown_tx_for_close = shutdown_tx.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = api::start_server(api_pool, shutdown_rx).await {
                     #[cfg(debug_assertions)]
@@ -528,6 +527,7 @@ pub fn run() {
             #[cfg(debug_assertions)]
             println!("[Boot] Setup complete, managing state.");
             app.manage(db);
+            app.manage(Mutex::new(shutdown_tx));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -613,6 +613,9 @@ pub fn run() {
                     let _ = window.hide();
                 } else {
                     scheduler::stop_email_scheduler();
+                    if let Some(shutdown_tx) = window.try_state::<Mutex<tokio::sync::broadcast::Sender<()>>>() {
+                        let _ = shutdown_tx.lock().unwrap().send(());
+                    }
                 }
             }
         })

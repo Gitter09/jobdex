@@ -39,7 +39,7 @@ export function EmailBody({ email, className }: EmailBodyProps) {
     useEffect(() => {
         invoke<EmailAttachment[]>("get_attachments_for_message", { messageId: email.id })
             .then(setAttachments)
-            .catch(() => {});
+            .catch((err) => console.error("Failed to load attachments:", err));
     }, [email.id]);
 
     const handleOpenAttachment = async (filePath: string) => {

@@ -2,5 +2,6 @@
 members = [
     "src-tauri",
     "src-core",
+    "src-mcp",
 ]
 resolver = "2"
