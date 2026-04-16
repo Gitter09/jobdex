@@ -43,3 +43,6 @@ tokio-stream = "0.1"
 futures = "0.3"
 async-stream = "0.3"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2.7"
+

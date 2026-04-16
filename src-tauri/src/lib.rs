@@ -1,5 +1,13 @@
+// Suppress warnings from objc 0.2.7's macros (msg_send!, class!, sel_impl!)
+// which use an unrecognized cfg(cargo-clippy). Upstream issue in unmaintained crate.
+#![cfg_attr(target_os = "macos", allow(unexpected_cfgs))]
+
 use jobdex_core::Db;
 use tauri::Manager;
+
+#[cfg(target_os = "macos")]
+#[macro_use]
+extern crate objc;
 
 mod api;
 mod error;
@@ -489,9 +497,9 @@ pub fn run() {
             let api_pool = db.pool().clone();
             let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = api::start_server(api_pool, shutdown_rx).await {
+                if let Err(_e) = api::start_server(api_pool, shutdown_rx).await {
                     #[cfg(debug_assertions)]
-                    eprintln!("[API Error] Server error: {}", e);
+                    eprintln!("[API Error] Server error: {}", _e);
                 }
             });
 
@@ -499,6 +507,12 @@ pub fn run() {
             #[cfg(debug_assertions)]
             println!("[Boot] Setting up system tray...");
             tray::setup(app_handle).expect("failed to setup system tray");
+
+            // macOS: Swizzle -[NSApplication terminate:] so Cmd+Q / dock Quit
+            // hides the window instead of killing the process. This keeps the
+            // background service (scheduler + REST API) alive.
+            #[cfg(target_os = "macos")]
+            tray::install_terminate_swizzle();
 
             // Remove legacy AppleScript login item (fire-and-forget)
             #[cfg(target_os = "macos")]
@@ -512,9 +526,14 @@ pub fn run() {
             }
 
             // If launched with --background flag (via LaunchAgent), hide the main window
+            // and switch to accessory mode (no dock icon — runs as a background service).
             if std::env::args().any(|a| a == "--background") {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 }
             }
 
@@ -615,8 +634,35 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            match event {
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => {
+                    // User clicked the dock icon — show the main window and
+                    // restore Regular activation policy (needed after --background
+                    // launch which starts in Accessory mode).
+                    tray::show_main_window(app);
+                }
+                tauri::RunEvent::ExitRequested { code, api, .. } => {
+                    // Safety net for non-macOS platforms or edge cases where all
+                    // windows are destroyed. On macOS, Cmd+Q is intercepted by
+                    // the terminate: swizzle (tray.rs) before this fires.
+                    if code.is_none() && !tray::should_exit() {
+                        api.prevent_exit();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.hide();
+                        }
+                        #[cfg(target_os = "macos")]
+                        {
+                            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        });
 }
 
 #[tauri::command]
