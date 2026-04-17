@@ -25,7 +25,7 @@
       font-size: 1.1rem;
       line-height: 1.7;
     }
-    
+
     .doc-page h1 {
       font-size: 3rem;
       color: var(--text);
@@ -64,21 +64,73 @@
     .doc-page a:hover {
       text-decoration-color: var(--text);
     }
-    
+
     /* Strong callout box for Google API compliance */
     .compliance-box {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-left: 3px solid #3b82f6; /* Blue highlight */
+      border-left: 3px solid #3b82f6;
+      /* Blue highlight */
       padding: 1.5rem;
       border-radius: 8px;
       margin: 2rem 0;
     }
 
+
+    .doc-page h3 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #3b82f6; /* Blue highlight */
+      margin-top: 3.5rem;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+
+    .doc-page ul {
+      margin-bottom: 2rem;
+      padding-left: 0;
+      list-style-type: none;
+    }
+
+    .doc-page li {
+      margin-bottom: 1.25rem;
+      padding-left: 0;
+    }
+
+    .doc-page li strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.95rem;
+    }
+
+    .doc-page code {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--text-1);
+    }
+
+    /* Strong callout box for Google API compliance */
+    .compliance-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-left: 3px solid #3b82f6;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 3rem 0;
+    }
+
     .compliance-box strong {
       color: var(--text);
       display: block;
-      margin-bottom: 0.5rem;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
     }
   </style>
 </head>
@@ -129,8 +181,9 @@
       </nav>
 
       <div class="navbar__actions">
-        <a href="coming-soon.html" class="btn btn-primary navbar__cta"
-          data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get Notified</a>
+        <a href="coming-soon.html" class="btn btn-primary navbar__cta" data-download="cta"
+          data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="Download">Get
+          Notified</a>
       </div>
 
     </nav>
@@ -148,8 +201,9 @@
       <li><a href="contact.html" class="mobile-nav__link">Contact</a></li>
     </ul>
     <div class="mobile-nav__footer">
-      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta"
-        data-download="cta" data-fallback-href="https://github.com/Gitter09/jobdex/releases" data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
+      <a href="coming-soon.html" class="btn btn-primary btn-lg mobile-nav__cta" data-download="cta"
+        data-fallback-href="https://github.com/Gitter09/jobdex/releases"
+        data-fallback-text="&darr;&nbsp;&nbsp;Download Free">
         Get Notified
       </a>
     </div>
@@ -163,28 +217,69 @@
       <p>Last updated: April 16, 2026</p>
 
       <h2>1. The Local-First Promise</h2>
-      <p>JobDex is built around a single foundational architectural decision: it is entirely local-first. We do not have servers, databases, or analytics engines in the cloud designed to ingest your data. Everything happens exclusively on your machine.</p>
+      <p>JobDex is built around a single foundational architectural decision: it is entirely local-first. We do not have
+        servers, databases, or analytics engines in the cloud designed to ingest your data. Everything happens
+        exclusively on your machine.</p>
 
       <h2>2. Data Storage & Local Encryption</h2>
-      <p>100% of your contact records, pipelines, notes, and email history are stored locally in an encrypted SQLCipher AES-256 database residing internally within your operating system's application support directory. Nobody but you has access to it. If you uninstall the app and securely delete your local database, your data is gone forever—we possess no backup copies.</p>
+      <p>100% of your contact records, pipelines, notes, and email history are stored locally in an encrypted SQLCipher
+        AES-256 database residing internally within your operating system's application support directory. Nobody but
+        you has access to it. If you uninstall the app and securely delete your local database, your data is gone
+        forever—we possess no backup copies.</p>
+
+      <h2>3. Google OAuth API — Exhaustive Disclosure</h2>
+      <p>JobDex is a native desktop application that integrates directly with your Google account to streamline your job search outreach. To provide this functionality, JobDex requests OAuth permission via the following scopes: <code>gmail.modify</code> and <code>userinfo.email</code>.</p>
       
-      <h2>3. Google Workspace APIs & Exhaustive Data Usage Disclosure</h2>
-      <p>JobDex is a native desktop application that integrates directly with your Google or Microsoft email accounts to manage your job search outreach. To enable this, JobDex requests OAuth permission to read your email messages, create drafts, and send outgoing emails on your behalf.</p>
-      
-      <p>Because JobDex operates completely offline, <strong>this data is NEVER transmitted to any external server.</strong> It is fetched strictly from the OAuth provider's API directly to your local machine and stored solely within your locally encrypted SQLite database.</p>
-      
-      <p>Your Google Workspace and Microsoft OAuth access and refresh tokens are securely persisted utilizing AES-256-GCM encryption, managed natively by your OS's keychain wrapper (macOS Keychain or Windows Credential Manager). JobDex's creator, maintainers, and third-parties have precisely zero access to your credentials or email contents.</p>
+      <h3>A. Data Accessed</h3>
+      <p>Through the requested permissions, JobDex interacts with the following specific types of Google user data:</p>
+      <ul>
+        <li><strong>Primary Email Address</strong>
+          We access your email address to identify your connected account and ensure outgoing messages are sent from the correct identity.</li>
+        <li><strong>Email Metadata</strong>
+          Subject lines, sender/recipient headers, and timestamps are accessed to match communications with your CRM contacts.</li>
+        <li><strong>Message Content</strong>
+          JobDex fetches the body text (HTML and plain text) of emails to display conversation history in your local timeline.</li>
+        <li><strong>Attachments</strong>
+          File attachments are accessed solely to allow you to view or manage them within the context of your outreach records.</li>
+      </ul>
+
+      <h3>B. Data Usage & Purpose</h3>
+      <p>Your Google user data is used exclusively for the following functionality within the application:</p>
+      <ul>
+        <li><strong>Interaction Timelines</strong>
+          To automatically sync and display your communication history with recruiters and hiring managers in your CRM.</li>
+        <li><strong>Personalized Outreach</strong>
+          To enable you to compose and send outreach emails directly through your own Google account.</li>
+        <li><strong>Local Organization</strong>
+          To categorize, filter, and search your outreach efforts within the application.</li>
+      </ul>
+
+      <h3>C. Data Storage, Sharing & AI Disclosure</h3>
+      <p>JobDex is built on a "Local-First" architecture. All processing of Google user data happens <strong>entirely on your local machine</strong>.</p>
+      <ul>
+        <li><strong>Local Encryption</strong>
+          Data fetched from Google APIs is stored exclusively in your locally encrypted SQLite database (SQLCipher AES-256) and is never transmitted to any external server.</li>
+        <li><strong>No Third-Party Sharing</strong>
+          We do not share, sell, or transfer your Google data to any third parties, including data brokers, advertising platforms, or analytics services.</li>
+        <li><strong>No AI/ML Training</strong>
+          We explicitly do not use Google Workspace data to train, tune, or refine any generalized AI or machine learning models.</li>
+        <li><strong>No Human Review</strong>
+          Because your data stays on your device, no human review of your email content is possible by the developers or any other party.</li>
+      </ul>
 
       <div class="compliance-box">
         <strong>Google API Services User Data Policy (Limited Use Disclosure)</strong>
-        <p style="margin-bottom: 0;">JobDex's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. JobDex strictly abides by this policy. We do not use your Google data for serving personalized or non-personalized advertisements, we do not allow humans to read your data (there is no "we" to read it—it resides exclusively on your personal device), and we do not transfer your data to any third-party AI models, brokers, or analytics services under any circumstances.</p>
+        <p style="margin-bottom: 0;">JobDex's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. JobDex strictly abides by this policy in its entirety.</p>
       </div>
 
       <h2>4. Tracking & Telemetry</h2>
-      <p>We do not utilize tracking pixels to monitor our users. We do not run Google Analytics, Mixpanel, PostHog, or any user-behavior tracking engines within the app. JobDex does not "phone home" to report product usage metrics.</p>
+      <p>We do not utilize tracking pixels to monitor our users. We do not run Google Analytics, Mixpanel, PostHog, or
+        any user-behavior tracking engines within the app. JobDex does not "phone home" to report product usage metrics.
+      </p>
 
       <h2>5. Contact & Support</h2>
-      <p>If you have further questions or require clarifications regarding your privacy, you can reach out via our <a href="contact.html">Contact Page</a>.</p>
+      <p>If you have further questions or require clarifications regarding your privacy, you can reach out via our <a
+          href="contact.html">Contact Page</a>.</p>
     </article>
   </main>
 
