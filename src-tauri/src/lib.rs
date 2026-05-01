@@ -553,7 +553,9 @@ pub fn run() {
                     // launch which starts in Accessory mode).
                     tray::show_main_window(app);
                 }
-                tauri::RunEvent::ExitRequested { code, api, .. } if code.is_none() && !tray::should_exit() => {
+                tauri::RunEvent::ExitRequested { code, api, .. }
+                    if code.is_none() && !tray::should_exit() =>
+                {
                     // Safety net for non-macOS platforms or edge cases where all
                     // windows are destroyed. On macOS, Cmd+Q is intercepted by
                     // the terminate: swizzle (tray.rs) before this fires.

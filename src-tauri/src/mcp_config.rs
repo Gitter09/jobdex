@@ -68,42 +68,65 @@ impl AiTool {
 
         #[cfg(target_os = "macos")]
         let path = match self {
-            AiTool::ClaudeDesktop => dirs::data_dir()
-                .map(|d| d.join("Claude").join("claude_desktop_config.json"))?,
+            AiTool::ClaudeDesktop => {
+                dirs::data_dir().map(|d| d.join("Claude").join("claude_desktop_config.json"))?
+            }
             AiTool::Cursor => home.join(".cursor").join("mcp.json"),
             AiTool::Windsurf => home
                 .join(".codeium")
                 .join("windsurf")
                 .join("mcp_config.json"),
             AiTool::ClaudeCode => home.join(".claude.json"),
-            AiTool::VSCode => dirs::data_dir()
-                .map(|d| d.join("Code").join("User").join("mcp.json"))?,
-            AiTool::GoogleAntigravity => home.join(".gemini").join("antigravity").join("mcp_config.json"),
+            AiTool::VSCode => {
+                dirs::data_dir().map(|d| d.join("Code").join("User").join("mcp.json"))?
+            }
+            AiTool::GoogleAntigravity => home
+                .join(".gemini")
+                .join("antigravity")
+                .join("mcp_config.json"),
         };
 
         #[cfg(target_os = "windows")]
         let path = match self {
-            AiTool::ClaudeDesktop => dirs::data_dir()
-                .map(|d| d.join("Claude").join("claude_desktop_config.json"))?,
+            AiTool::ClaudeDesktop => {
+                dirs::data_dir().map(|d| d.join("Claude").join("claude_desktop_config.json"))?
+            }
             AiTool::Cursor => home.join(".cursor").join("mcp.json"),
             AiTool::Windsurf => home
                 .join(".codeium")
                 .join("windsurf")
                 .join("mcp_config.json"),
             AiTool::ClaudeCode => home.join(".claude.json"),
-            AiTool::VSCode => dirs::data_dir()
-                .map(|d| d.join("Code").join("User").join("mcp.json"))?,
-            AiTool::GoogleAntigravity => home.join(".gemini").join("antigravity").join("mcp_config.json"),
+            AiTool::VSCode => {
+                dirs::data_dir().map(|d| d.join("Code").join("User").join("mcp.json"))?
+            }
+            AiTool::GoogleAntigravity => home
+                .join(".gemini")
+                .join("antigravity")
+                .join("mcp_config.json"),
         };
 
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         let path = match self {
-            AiTool::ClaudeDesktop => home.join(".config").join("Claude").join("claude_desktop_config.json"),
+            AiTool::ClaudeDesktop => home
+                .join(".config")
+                .join("Claude")
+                .join("claude_desktop_config.json"),
             AiTool::Cursor => home.join(".cursor").join("mcp.json"),
-            AiTool::Windsurf => home.join(".codeium").join("windsurf").join("mcp_config.json"),
+            AiTool::Windsurf => home
+                .join(".codeium")
+                .join("windsurf")
+                .join("mcp_config.json"),
             AiTool::ClaudeCode => home.join(".claude.json"),
-            AiTool::VSCode => home.join(".config").join("Code").join("User").join("mcp.json"),
-            AiTool::GoogleAntigravity => home.join(".gemini").join("antigravity").join("mcp_config.json"),
+            AiTool::VSCode => home
+                .join(".config")
+                .join("Code")
+                .join("User")
+                .join("mcp.json"),
+            AiTool::GoogleAntigravity => home
+                .join(".gemini")
+                .join("antigravity")
+                .join("mcp_config.json"),
         };
 
         Some(path)
@@ -139,7 +162,10 @@ pub fn get_sidecar_path() -> Option<PathBuf> {
     };
 
     // Production: binary is bundled alongside the main executable
-    if let Some(exe_dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_owned())) {
+    if let Some(exe_dir) = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|p| p.to_owned()))
+    {
         let prod_path = exe_dir.join(binary_name);
         if prod_path.exists() {
             return Some(prod_path);
@@ -149,9 +175,12 @@ pub fn get_sidecar_path() -> Option<PathBuf> {
     // Dev: look in src-mcp release build output relative to workspace root
     // Workspace root is two levels up from src-tauri/
     if let Some(manifest_dir) = option_env!("CARGO_MANIFEST_DIR") {
-        let dev_path = PathBuf::from(manifest_dir)
-            .parent()
-            .map(|root| root.join("src-mcp").join("target").join("release").join(binary_name))?;
+        let dev_path = PathBuf::from(manifest_dir).parent().map(|root| {
+            root.join("src-mcp")
+                .join("target")
+                .join("release")
+                .join(binary_name)
+        })?;
         if dev_path.exists() {
             return Some(dev_path);
         }
@@ -171,8 +200,7 @@ fn write_config(path: &PathBuf, value: &Value) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(AppError::Io)?;
     }
-    let json = serde_json::to_string_pretty(value)
-        .map_err(AppError::Serialization)?;
+    let json = serde_json::to_string_pretty(value).map_err(AppError::Serialization)?;
     std::fs::write(path, json).map_err(AppError::Io)?;
     Ok(())
 }
@@ -186,10 +214,7 @@ pub fn detect_all_tools() -> Vec<ToolStatus> {
             let config_path = tool.config_path();
             let detection_dir = tool.detection_dir();
 
-            let is_detected = detection_dir
-                .as_ref()
-                .map(|d| d.exists())
-                .unwrap_or(false);
+            let is_detected = detection_dir.as_ref().map(|d| d.exists()).unwrap_or(false);
 
             let is_configured = config_path
                 .as_ref()
@@ -221,11 +246,7 @@ pub fn detect_all_tools() -> Vec<ToolStatus> {
         .collect()
 }
 
-pub fn configure_tool(
-    tool: AiTool,
-    api_key: &str,
-    api_port: u16,
-) -> Result<(), AppError> {
+pub fn configure_tool(tool: AiTool, api_key: &str, api_port: u16) -> Result<(), AppError> {
     let config_path = tool
         .config_path()
         .ok_or_else(|| AppError::Internal("Cannot determine config path".into()))?;

@@ -159,7 +159,10 @@ pub async fn create_contact(
         .await?;
 
     #[cfg(debug_assertions)]
-    println!("[API] Created contact {} '{} {}'", id, body.first_name, body.last_name);
+    println!(
+        "[API] Created contact {} '{} {}'",
+        id, body.first_name, body.last_name
+    );
 
     Ok(Json(ApiResponse::ok(serde_json::json!({ "id": id }))))
 }
