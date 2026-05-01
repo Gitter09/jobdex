@@ -1,3 +1,12 @@
+export interface ToolStatus {
+    tool: string;
+    label: string;
+    isDetected: boolean;
+    isConfigured: boolean;
+    transport: "stdio" | "sse";
+    configPath?: string;
+}
+
 export interface Contact {
     id: string;
     // Base Info
