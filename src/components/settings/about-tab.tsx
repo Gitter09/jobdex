@@ -14,7 +14,6 @@ export function AboutTab() {
 
     return (
         <div className="space-y-8">
-            {/* Header */}
             <div>
                 <h3 className="text-lg font-medium">About</h3>
                 <p className="text-sm text-muted-foreground">Who built this and why.</p>
@@ -22,7 +21,6 @@ export function AboutTab() {
 
             <Separator />
 
-            {/* Two-column layout */}
             <div className="grid grid-cols-[2fr_3fr] gap-12 items-start">
                 {/* Left: identity */}
                 <div className="space-y-6">
@@ -84,7 +82,6 @@ export function AboutTab() {
 
             <Separator />
 
-            {/* Built with */}
             <p className="text-xs text-muted-foreground">
                 Built with Tauri · Rust · React
             </p>

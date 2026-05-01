@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { RotateCcw, MapPin, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
     Tooltip,
     TooltipContent,
@@ -207,22 +206,15 @@ export function KeyboardSettingsTab() {
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-start justify-between">
-                <div>
-                    <h3 className="text-lg font-medium">Shortcuts</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Click any shortcut to reassign it. Press Esc to cancel.
-                    </p>
-                </div>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Click any shortcut to reassign it. Press Esc to cancel.</p>
                 <Button variant="outline" size="sm" onClick={handleResetAll}>
                     Reset all
                 </Button>
             </div>
 
-            <Separator />
-
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {CATEGORIES.map((category) => {
                     const shortcuts = SHORTCUT_REGISTRY.filter(
                         (s) => s.category === category

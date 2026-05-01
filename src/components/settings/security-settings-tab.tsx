@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldCheck, Lock, Key, Trash2, ShieldAlert, Eye, EyeOff } from "lucide-react";
+import { Trash2, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { useErrors } from "@/hooks/use-errors";
+import { SettingRow, SettingSection } from "@/components/settings/setting-row";
 
 export function SecuritySettingsTab() {
     const { handleError } = useErrors();
@@ -46,7 +46,6 @@ export function SecuritySettingsTab() {
             toast.error("PINs do not match");
             return;
         }
-
         setLoading(true);
         try {
             await invoke("set_lock_pin", { pin });
@@ -78,7 +77,6 @@ export function SecuritySettingsTab() {
 
     const handleReAuthSubmit = async () => {
         if (currentPinInput.length < 4) return;
-
         setReAuthLoading(true);
         setReAuthError(false);
         try {
@@ -86,11 +84,8 @@ export function SecuritySettingsTab() {
             if (isValid) {
                 setShowReAuthDialog(false);
                 setCurrentPinInput("");
-                if (reAuthAction === 'change') {
-                    setShowPinDialog(true);
-                } else if (reAuthAction === 'remove') {
-                    await handleRemovePinConfirmed();
-                }
+                if (reAuthAction === 'change') setShowPinDialog(true);
+                else if (reAuthAction === 'remove') await handleRemovePinConfirmed();
             } else {
                 setReAuthError(true);
             }
@@ -113,220 +108,153 @@ export function SecuritySettingsTab() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-medium">Security</h3>
-                <p className="text-sm text-muted-foreground">Keep your data safe. Everything is encrypted and stays on your machine.</p>
-            </div>
-
-            <Card className="border-primary/10 bg-primary/5">
-                <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                            <Lock className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-base">App Lock</CardTitle>
-                            <CardDescription className="text-xs">
-                                Require a PIN to access JobDex on startup.
-                            </CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
-                        <div className="space-y-0.5">
-                            <Label className="text-sm font-medium">Startup PIN Protection</Label>
-                            <p className="text-[11px] text-muted-foreground">
-                                {hasPin
-                                    ? "Enabled — you'll need your PIN every time you open the app."
-                                    : "Disabled — anyone using this computer can see your contacts."}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {hasPin ? (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleInitiateChangePin}
-                                    >
-                                        Change PIN
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={handleInitiateRemovePin}
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Disable
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setShowPinDialog(true)}
-                                >
-                                    Enable App Lock
+            <SettingSection title="App lock">
+                <SettingRow
+                    label="Startup PIN protection"
+                    description={
+                        hasPin
+                            ? "Enabled — you'll need your PIN every time you open the app."
+                            : "Disabled — anyone using this computer can see your contacts."
+                    }
+                >
+                    <div className="flex items-center gap-2">
+                        {hasPin ? (
+                            <>
+                                <Button variant="outline" size="sm" onClick={handleInitiateChangePin}>
+                                    Change PIN
                                 </Button>
-                            )}
-                        </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={handleInitiateRemovePin}
+                                >
+                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Disable
+                                </Button>
+                            </>
+                        ) : (
+                            <Button size="sm" onClick={() => setShowPinDialog(true)}>
+                                Enable app lock
+                            </Button>
+                        )}
                     </div>
+                </SettingRow>
 
-                    {showPinDialog && (
-                        <div className="p-4 rounded-lg border bg-background space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                                <Key className="h-4 w-4 text-primary" />
-                                {hasPin ? "Change Security PIN" : "Set Security PIN"}
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="pin" className="text-xs">Enter PIN (4-8 digits)</Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="pin"
-                                            type={showPin ? "text" : "password"}
-                                            value={pin}
-                                            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                                            placeholder="••••"
-                                            className="pr-10"
-                                            autoComplete="off"
-                                            autoCorrect="off"
-                                            autoCapitalize="off"
-                                            spellCheck="false"
-                                            onPaste={(e) => e.preventDefault()}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPin(s => !s)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        >
-                                            {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="confirmPin" className="text-xs">Confirm PIN</Label>
+                {showPinDialog && (
+                    <div className="px-4 py-4 border-t bg-muted/20 space-y-4 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <p className="text-xs font-medium text-muted-foreground">
+                            {hasPin ? "Change security PIN" : "Set security PIN"}
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="pin" className="text-xs">PIN (4–8 digits)</Label>
+                                <div className="relative">
                                     <Input
-                                        id="confirmPin"
+                                        id="pin"
                                         type={showPin ? "text" : "password"}
-                                        value={confirmPin}
-                                        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                        value={pin}
+                                        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
                                         placeholder="••••"
+                                        className="pr-9"
                                         autoComplete="off"
                                         autoCorrect="off"
                                         autoCapitalize="off"
-                                        spellCheck="false"
+                                        spellCheck={false}
                                         onPaste={(e) => e.preventDefault()}
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPin(s => !s)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showPin ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        setShowPinDialog(false);
-                                        setPin("");
-                                        setConfirmPin("");
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={handleSetPin}
-                                    disabled={loading || pin.length < 4}
-                                >
-                                    {loading ? "Saving..." : "Save PIN"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Re-Authentication Dialog */}
-                    <Dialog open={showReAuthDialog} onOpenChange={setShowReAuthDialog}>
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                                <DialogTitle>Verify Current PIN</DialogTitle>
-                                <DialogDescription>
-                                    Enter your current PIN to {reAuthAction === 'remove' ? 'turn off app lock' : 'change it'}.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex flex-col space-y-4 py-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="confirmPin" className="text-xs">Confirm PIN</Label>
                                 <Input
+                                    id="confirmPin"
                                     type={showPin ? "text" : "password"}
-                                    value={currentPinInput}
-                                    onChange={(e) => {
-                                        setCurrentPinInput(e.target.value.replace(/\D/g, '').slice(0, 8));
-                                        setReAuthError(false);
-                                    }}
-                                    placeholder="••••••••"
-                                    className={reAuthError ? "border-destructive text-destructive" : ""}
+                                    value={confirmPin}
+                                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="••••"
                                     autoComplete="off"
                                     autoCorrect="off"
                                     autoCapitalize="off"
-                                    spellCheck="false"
+                                    spellCheck={false}
                                     onPaste={(e) => e.preventDefault()}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleReAuthSubmit();
-                                    }}
-                                    autoFocus
                                 />
-                                {reAuthError && (
-                                    <p className="text-sm text-destructive font-medium">Incorrect PIN.</p>
-                                )}
                             </div>
-                            <DialogFooter className="sm:justify-end">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => setShowReAuthDialog(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={handleReAuthSubmit}
-                                    disabled={reAuthLoading || currentPinInput.length < 4}
-                                >
-                                    {reAuthLoading ? "Verifying..." : "Verify"}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </CardContent>
-            </Card>
-
-            <div className="grid gap-6 sm:grid-cols-2">
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-green-500" />
-                            <CardTitle className="text-sm">Encryption</CardTitle>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            Your contacts and notes are fully encrypted with SQLCipher. Sensitive data like OAuth tokens are double-encrypted with AES-256-GCM before being saved to your disk.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center gap-2">
-                            <ShieldAlert className="h-4 w-4 text-orange-500" />
-                            <CardTitle className="text-sm">Local Storage</CardTitle>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setShowPinDialog(false); setPin(""); setConfirmPin(""); }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button size="sm" onClick={handleSetPin} disabled={loading || pin.length < 4}>
+                                {loading ? "Saving…" : "Save PIN"}
+                            </Button>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            Nothing leaves this computer unless you export it yourself. Your encryption keys are safely tucked away in your operating system's native keychain.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                )}
+            </SettingSection>
+
+            <SettingSection title="Storage">
+                <SettingRow
+                    label="Encryption"
+                    description="Contacts and notes are fully encrypted with SQLCipher. OAuth tokens are double-encrypted with AES-256-GCM."
+                />
+                <SettingRow
+                    label="Local only"
+                    description="Nothing leaves this computer unless you export it yourself. Encryption keys are stored in your OS keychain."
+                />
+            </SettingSection>
+
+            <Dialog open={showReAuthDialog} onOpenChange={setShowReAuthDialog}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Verify current PIN</DialogTitle>
+                        <DialogDescription>
+                            Enter your current PIN to {reAuthAction === 'remove' ? 'turn off app lock' : 'change it'}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col space-y-3 py-2">
+                        <Input
+                            type={showPin ? "text" : "password"}
+                            value={currentPinInput}
+                            onChange={(e) => {
+                                setCurrentPinInput(e.target.value.replace(/\D/g, '').slice(0, 8));
+                                setReAuthError(false);
+                            }}
+                            placeholder="••••••••"
+                            className={reAuthError ? "border-destructive" : ""}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            onPaste={(e) => e.preventDefault()}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleReAuthSubmit(); }}
+                            autoFocus
+                        />
+                        {reAuthError && (
+                            <p className="text-xs text-destructive">Incorrect PIN.</p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setShowReAuthDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={handleReAuthSubmit} disabled={reAuthLoading || currentPinInput.length < 4}>
+                            {reAuthLoading ? "Verifying…" : "Verify"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

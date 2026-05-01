@@ -7,17 +7,9 @@ import {
     Mail,
     FileText,
     Settings,
-    Shield,
     PanelLeftClose,
     PanelLeft,
-    ArrowLeft,
-    Palette,
-    Database,
-    LayoutTemplate,
     CheckSquare,
-    Info,
-    Keyboard,
-    Plug,
 } from "lucide-react";
 import {
     Tooltip,
@@ -43,16 +35,6 @@ const mainNavItems: NavItem[] = [
     { label: "Templates", icon: FileText, path: "/templates" },
 ];
 
-const settingsSubItems: NavItem[] = [
-    { label: "Appearance", icon: Palette, path: "/settings/appearance" },
-    { label: "Shortcuts", icon: Keyboard, path: "/settings/keyboard" },
-    { label: "Email Integration", icon: Mail, path: "/settings/email" },
-    { label: "Pipeline", icon: LayoutTemplate, path: "/settings/pipeline" },
-    { label: "Security", icon: Shield, path: "/settings/security" },
-    { label: "API Access", icon: Plug, path: "/settings/api" },
-    { label: "Data", icon: Database, path: "/settings/data" },
-    { label: "About", icon: Info, path: "/settings/about" },
-];
 
 function JobDexMark({ className }: { className?: string }) {
     return (
@@ -85,7 +67,7 @@ export function AppSidebar() {
         return location.pathname.startsWith(path);
     };
 
-    const navItems = isSettingsRoute ? settingsSubItems : mainNavItems;
+    const navItems = mainNavItems;
 
     return (
         <TooltipProvider delayDuration={0}>
@@ -120,35 +102,6 @@ export function AppSidebar() {
                         )}
                     </button>
                 </div>
-
-                {/* Settings Back Button */}
-                {isSettingsRoute && (
-                    <div className="p-2 border-b">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    onClick={() => navigate("/people")}
-                                    className={cn(
-                                        "w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium rounded-md transition-colors",
-                                        "text-muted-foreground hover:text-foreground hover:bg-muted",
-                                        collapsed && "justify-center"
-                                    )}
-                                >
-                                    <ArrowLeft className="h-4 w-4 shrink-0" />
-                                    {!collapsed && <span>Back</span>}
-                                </button>
-                            </TooltipTrigger>
-                            {collapsed && (
-                                <TooltipContent side="right">Back</TooltipContent>
-                            )}
-                        </Tooltip>
-                        {!collapsed && (
-                            <p className="px-2 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                Settings
-                            </p>
-                        )}
-                    </div>
-                )}
 
                 {/* Navigation Items */}
                 <nav className="flex-1 p-2 space-y-1 overflow-y-auto">

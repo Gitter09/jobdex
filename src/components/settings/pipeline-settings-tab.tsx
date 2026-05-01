@@ -18,7 +18,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Pencil, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -166,15 +165,8 @@ export function PipelineSettingsTab() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h3 className="text-lg font-medium">Pipeline</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage your job-search stages. Drag to reorder, edit names and colours, or add new ones.
-        </p>
-      </div>
-
-      <Separator />
+    <div className="space-y-6">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Stages</p>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={sorted.map((s) => s.id)} strategy={verticalListSortingStrategy}>

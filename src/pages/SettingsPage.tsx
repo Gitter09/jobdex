@@ -9,17 +9,7 @@ import { PipelineSettingsTab } from "@/components/settings/pipeline-settings-tab
 import { KeyboardSettingsTab } from "@/components/settings/keyboard-settings-tab";
 import { ApiSettingsTab } from "@/components/settings/api-settings-tab";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import {
-    Sun,
-    Moon,
-    Monitor,
-    Trash2,
-    Database,
-    Power,
-    Upload,
-} from "lucide-react";
+import { Sun, Moon, Monitor } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
@@ -36,19 +26,20 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/layout/page-header";
+import { SettingRow, SettingSection } from "@/components/settings/setting-row";
 
 type SettingsTab = "email" | "appearance" | "pipeline" | "data" | "security" | "keyboard" | "about" | "api";
 
-const tabTitles: Record<SettingsTab, string> = {
-    email: "Email Integration",
-    appearance: "Appearance",
-    pipeline: "Pipeline",
-    data: "Data",
-    security: "Security",
-    keyboard: "Shortcuts",
-    about: "About",
-    api: "API Access",
-};
+const NAV_ITEMS: { id: SettingsTab; label: string }[] = [
+    { id: "appearance", label: "General" },
+    { id: "email", label: "Email" },
+    { id: "pipeline", label: "Pipeline" },
+    { id: "security", label: "Security" },
+    { id: "data", label: "Data" },
+    { id: "keyboard", label: "Shortcuts" },
+    { id: "api", label: "API" },
+    { id: "about", label: "About" },
+];
 
 export function SettingsPage() {
     const { tab } = useParams<{ tab?: string }>();
@@ -61,6 +52,7 @@ export function SettingsPage() {
     const [autostart, setAutostart] = useState(false);
     const [pendingImportPath, setPendingImportPath] = useState<string | null>(null);
     const [importLoading, setImportLoading] = useState(false);
+    const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
     useEffect(() => {
         invoke<boolean>("is_background_service_enabled")
@@ -90,78 +82,6 @@ export function SettingsPage() {
         }
     }, [tab, navigate]);
 
-
-    const handleSettingChange = (key: string, value: string) => {
-        updateSetting(key, value);
-    };
-
-
-    const renderAppearanceContent = () => (
-        <div className="space-y-8">
-            <div>
-                <h3 className="text-lg font-medium">Appearance</h3>
-                <p className="text-sm text-muted-foreground">Customize how JobDex looks and feels.</p>
-            </div>
-
-            <Separator />
-
-            {/* Theme Mode */}
-            <div className="space-y-4">
-                <Label className="text-sm font-semibold">Theme Mode</Label>
-                <div className="grid grid-cols-3 gap-3">
-                    {[
-                        { id: "light", label: "Light", icon: Sun },
-                        { id: "dark", label: "Dark", icon: Moon },
-                        { id: "system", label: "System", icon: Monitor },
-                    ].map((t) => (
-                        <button
-                            key={t.id}
-                            onClick={() => handleSettingChange("theme_mode", t.id)}
-                            className={cn(
-                                "flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 transition-all",
-                                (settings["theme_mode"] || "system") === t.id
-                                    ? "border-primary bg-primary/5 shadow-sm"
-                                    : "border-transparent bg-muted/50 hover:bg-muted"
-                            )}
-                        >
-                            <t.icon className="h-5 w-5" />
-                            <span className="text-xs font-medium">{t.label}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <Separator />
-
-            {/* Background Service */}
-            <div className="space-y-4">
-                <Label className="text-sm font-semibold">Background Service</Label>
-                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-md">
-                            <Power className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium">Start on login</p>
-                            <p className="text-xs text-muted-foreground">
-                                Launch JobDex in the background when you start your computer.
-                                Scheduled emails will send even when the window is closed.
-                            </p>
-                        </div>
-                    </div>
-                    <Button
-                        variant={autostart ? "default" : "outline"}
-                        size="sm"
-                        onClick={handleAutostartToggle}
-                    >
-                        {autostart ? "Enabled" : "Disabled"}
-                    </Button>
-                </div>
-            </div>
-
-        </div>
-    );
-
     const handleExport = async () => {
         try {
             const filePath = await saveFileDialog({
@@ -175,8 +95,6 @@ export function SettingsPage() {
             handleError(error, "Failed to export data");
         }
     };
-
-    const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
     const handleClearDatabase = async () => {
         setClearDialogOpen(false);
@@ -218,7 +136,6 @@ export function SettingsPage() {
             if (result.templatesRestored > 0) parts.push(`${result.templatesRestored} templates restored`);
             if (result.signaturesRestored > 0) parts.push(`${result.signaturesRestored} signatures restored`);
             if (result.scheduledRestored > 0) parts.push(`${result.scheduledRestored} scheduled emails restored`);
-
             toast.success(`Import complete — ${parts.join(", ")}.`);
         } catch (error) {
             handleError(error, "Import failed. The file may be invalid or corrupted.");
@@ -228,61 +145,92 @@ export function SettingsPage() {
         }
     };
 
+    const renderAppearanceContent = () => (
+        <div className="space-y-6">
+            <SettingSection title="Theme">
+                <SettingRow label="Mode" description="Choose how JobDex looks.">
+                    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                        {[
+                            { id: "light", label: "Light", icon: Sun },
+                            { id: "dark", label: "Dark", icon: Moon },
+                            { id: "system", label: "System", icon: Monitor },
+                        ].map((t) => (
+                            <button
+                                key={t.id}
+                                onClick={() => updateSetting("theme_mode", t.id)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    (settings["theme_mode"] || "system") === t.id
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <t.icon className="h-3.5 w-3.5" />
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+                </SettingRow>
+            </SettingSection>
+
+            <SettingSection title="System">
+                <SettingRow
+                    label="Start on login"
+                    description="Launch JobDex in the background when you start your computer. Scheduled emails will send even when the window is closed."
+                >
+                    <Button
+                        variant={autostart ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleAutostartToggle}
+                    >
+                        {autostart ? "Enabled" : "Disabled"}
+                    </Button>
+                </SettingRow>
+            </SettingSection>
+        </div>
+    );
+
     const renderDataContent = () => (
-        <div className="space-y-8">
-            <div>
-                <h3 className="text-lg font-medium">Data Management</h3>
-                <p className="text-sm text-muted-foreground">Export your data for backup or clear the database to start fresh.</p>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border rounded-lg p-6 space-y-4 bg-muted/20">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-md">
-                            <Database className="h-5 w-5 text-primary" />
-                        </div>
-                        <h4 className="font-semibold">Export Data</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Download a full snapshot of your CRM data, including contacts, pipeline statuses, and application settings in JSON format.
-                    </p>
-                    <Button variant="outline" className="w-full" onClick={handleExport}>
-                        Generate Export
+        <div className="space-y-6">
+            <SettingSection title="Backup">
+                <SettingRow
+                    label="Export data"
+                    description="Download a full snapshot of your contacts, pipeline statuses, and settings as JSON."
+                >
+                    <Button variant="outline" size="sm" onClick={handleExport}>
+                        Generate export
                     </Button>
-                </div>
-
-                <div className="border rounded-lg p-6 space-y-4 bg-muted/20">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-md">
-                            <Upload className="h-5 w-5 text-primary" />
-                        </div>
-                        <h4 className="font-semibold">Restore from Backup</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Restore contacts, statuses, and tags from a previously exported backup file. Email templates and signatures are not included in backups.
-                    </p>
-                    <Button variant="outline" className="w-full" onClick={handleRestoreClick}>
-                        Choose backup file...
+                </SettingRow>
+                <SettingRow
+                    label="Restore from backup"
+                    description="Merge a previously exported backup file into your current data. Nothing is deleted."
+                >
+                    <Button variant="outline" size="sm" onClick={handleRestoreClick}>
+                        Choose file…
                     </Button>
-                </div>
+                </SettingRow>
+            </SettingSection>
 
-                <div className="border rounded-lg p-6 space-y-4 bg-destructive/5 border-destructive/20">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-destructive/10 rounded-md">
-                            <Trash2 className="h-5 w-5 text-destructive" />
-                        </div>
-                        <h4 className="font-semibold text-destructive">Factory Reset</h4>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Permanently delete all contacts, tags, custom statuses, email accounts, templates, signatures, and contact events. Your app settings and API keys will remain untouched.
-                    </p>
-                    <Button variant="destructive" className="w-full" onClick={() => setClearDialogOpen(true)}>
-                        Clear All Data
+            <SettingSection title="Danger zone">
+                <SettingRow
+                    label="Factory reset"
+                    description="Permanently delete all contacts, tags, statuses, email accounts, templates, and signatures. Settings and API keys are kept."
+                    className="text-destructive [&_p]:text-muted-foreground"
+                >
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:border-destructive"
+                        onClick={() => setClearDialogOpen(true)}
+                    >
+                        Clear all data
                     </Button>
-                </div>
-            </div>
+                </SettingRow>
+            </SettingSection>
+
+            <p className="text-xs text-muted-foreground px-1">
+                Your data is stored locally in an SQLite database. JobDex does not upload your contacts to any server.
+            </p>
 
             <AlertDialog open={!!pendingImportPath} onOpenChange={(open) => { if (!open) setPendingImportPath(null); }}>
                 <AlertDialogContent>
@@ -317,19 +265,8 @@ export function SettingsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
-            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex gap-3">
-                <Database className="h-5 w-5 text-blue-500 shrink-0" />
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Privacy Note</p>
-                    <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-normal">
-                        Your data is stored locally in an SQLite database. JobDex does not upload your contacts to any server.
-                    </p>
-                </div>
-            </div>
         </div>
     );
-
 
     const renderContent = () => {
         switch (activeTab) {
@@ -346,10 +283,35 @@ export function SettingsPage() {
     };
 
     return (
-        <div className="flex flex-col h-full relative">
-            <PageHeader title={tabTitles[activeTab] || "Settings"} />
-            <div className={`flex-1 overflow-auto p-6 w-full ${activeTab !== "about" ? "max-w-4xl" : ""}`}>
-                {renderContent()}
+        <div className="flex flex-col h-full">
+            <PageHeader title="Settings" />
+            <div className="flex flex-1 overflow-hidden">
+                {/* Left nav */}
+                <nav className="w-[160px] shrink-0 border-r px-2 py-4 overflow-y-auto">
+                    <div className="space-y-0.5">
+                        {NAV_ITEMS.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => navigate(`/settings/${item.id}`)}
+                                className={cn(
+                                    "w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors",
+                                    activeTab === item.id
+                                        ? "bg-muted text-foreground font-medium"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                )}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
+                </nav>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className={cn("px-8 py-6", activeTab !== "about" && "max-w-2xl")}>
+                        {renderContent()}
+                    </div>
+                </div>
             </div>
         </div>
     );
