@@ -2,6 +2,7 @@ pub mod auth;
 pub mod error;
 pub mod handlers;
 pub mod routes;
+pub mod scope;
 
 use handlers::sse::SessionMap;
 use sqlx::SqlitePool;

@@ -20,25 +20,225 @@ struct Args {
     log_level: String,
 }
 
+/// JSON-RPC error codes used by this server.
+const INVALID_PARAMS: i64 = -32602;
+const METHOD_NOT_FOUND: i64 = -32601;
+const INTERNAL_ERROR: i64 = -32000;
+
 fn log_err(msg: &str) {
     let _ = std::io::stderr().write_all(format!("[MCP Error] {}\n", msg).as_bytes());
 }
 
-#[allow(dead_code)]
-#[cfg(debug_assertions)]
-fn log_dbg(msg: &str) {
-    let _ = std::io::stderr().write_all(format!("[MCP] {}\n", msg).as_bytes());
+#[derive(Clone, Copy)]
+enum Method {
+    Get,
+    Post,
+    Patch,
+    Delete,
+}
+
+struct ApiCall {
+    method: Method,
+    url: String,
+    body: Option<Value>,
+}
+
+fn arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+    args.get(key).and_then(|v| v.as_str())
+}
+
+fn required<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    arg(args, key).ok_or_else(|| format!("Missing required argument: {}", key))
+}
+
+/// Only the REST bodies' real field names are forwarded.
+fn contact_body(args: &Value, keys: &[&str]) -> Value {
+    let mut map = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) = args.get(*key) {
+            if !value.is_null() {
+                map.insert((*key).to_string(), value.clone());
+            }
+        }
+    }
+    Value::Object(map)
+}
+
+fn event_body(args: &Value) -> Value {
+    contact_body(args, &["title", "description", "eventAt"])
+}
+
+fn dispatch(name: &str, args: &Value, base: &str) -> Result<ApiCall, String> {
+    let get = |path: String| ApiCall {
+        method: Method::Get,
+        url: path,
+        body: None,
+    };
+
+    match name {
+        "list_contacts" => {
+            let mut url = format!("{}/api/v1/contacts", base);
+            let mut params: Vec<String> = Vec::new();
+            for key in ["status_id", "tag", "search"] {
+                if let Some(value) = arg(args, key) {
+                    params.push(format!("{}={}", key, urlencode(value)));
+                }
+            }
+            if !params.is_empty() {
+                url.push('?');
+                url.push_str(&params.join("&"));
+            }
+            Ok(get(url))
+        }
+        "get_contact" => Ok(get(format!(
+            "{}/api/v1/contacts/{}",
+            base,
+            required(args, "id")?
+        ))),
+        "create_contact" => Ok(ApiCall {
+            method: Method::Post,
+            url: format!("{}/api/v1/contacts", base),
+            body: Some(contact_body(
+                args,
+                &[
+                    "firstName",
+                    "lastName",
+                    "email",
+                    "linkedinUrl",
+                    "statusId",
+                    "title",
+                    "company",
+                    "location",
+                    "companyWebsite",
+                ],
+            )),
+        }),
+        "update_contact" => {
+            let id = required(args, "id")?;
+            Ok(ApiCall {
+                method: Method::Patch,
+                url: format!("{}/api/v1/contacts/{}", base, id),
+                body: Some(contact_body(
+                    args,
+                    &[
+                        "firstName",
+                        "lastName",
+                        "email",
+                        "linkedinUrl",
+                        "statusId",
+                        "lastContactedDate",
+                        "nextContactDate",
+                        "cadenceStage",
+                        "title",
+                        "company",
+                        "location",
+                        "companyWebsite",
+                    ],
+                )),
+            })
+        }
+        "bulk_update_status" => Ok(ApiCall {
+            method: Method::Post,
+            url: format!("{}/api/v1/contacts/bulk-status", base),
+            body: Some(json!({
+                "ids": args.get("ids").cloned().unwrap_or_else(|| json!([])),
+                "status_id": args.get("status_id").cloned().unwrap_or(Value::Null),
+            })),
+        }),
+        "assign_tag" | "unassign_tag" => {
+            let contact_id = required(args, "contact_id")?;
+            let tag_id = required(args, "tag_id")?;
+            Ok(ApiCall {
+                method: if name == "assign_tag" {
+                    Method::Post
+                } else {
+                    Method::Delete
+                },
+                url: format!(
+                    "{}/api/v1/contacts/{}/tags/{}",
+                    base, contact_id, tag_id
+                ),
+                body: None,
+            })
+        }
+        "create_contact_event" => Ok(ApiCall {
+            method: Method::Post,
+            url: format!(
+                "{}/api/v1/contacts/{}/events",
+                base,
+                required(args, "contact_id")?
+            ),
+            body: Some(event_body(args)),
+        }),
+        "update_contact_event" => {
+            let contact_id = required(args, "contact_id")?;
+            let event_id = required(args, "event_id")?;
+            Ok(ApiCall {
+                method: Method::Patch,
+                url: format!(
+                    "{}/api/v1/contacts/{}/events/{}",
+                    base, contact_id, event_id
+                ),
+                body: Some(event_body(args)),
+            })
+        }
+        "list_emails_for_contact" => Ok(get(format!(
+            "{}/api/v1/contacts/{}/emails",
+            base,
+            required(args, "contact_id")?
+        ))),
+        "get_contact_activity" => Ok(get(format!(
+            "{}/api/v1/contacts/{}/activity",
+            base,
+            required(args, "contact_id")?
+        ))),
+        "search_contacts" => Ok(get(format!(
+            "{}/api/v1/search?q={}",
+            base,
+            urlencode(required(args, "q")?)
+        ))),
+        "list_statuses" => Ok(get(format!("{}/api/v1/statuses", base))),
+        "list_tags" => Ok(get(format!("{}/api/v1/tags", base))),
+        "list_templates" => Ok(get(format!("{}/api/v1/templates", base))),
+        "list_signatures" => Ok(get(format!("{}/api/v1/signatures", base))),
+        "list_email_accounts" => Ok(get(format!("{}/api/v1/email-accounts", base))),
+        "list_relationship_actions" => Ok(get(format!("{}/api/v1/relationship-actions", base))),
+        "propose_relationship_email" => Ok(ApiCall {
+            method: Method::Post,
+            url: format!("{}/api/v1/relationship-actions/propose", base),
+            body: Some(json!({
+                "contactId": required(args, "contactId")?,
+                "payload": args.get("payload").cloned().unwrap_or(Value::Null),
+            })),
+        }),
+        "get_pipeline_summary" => Ok(get(format!("{}/api/v1/pipeline-summary", base))),
+        "get_overdue_followups" => Ok(get(format!("{}/api/v1/overdue-followups", base))),
+        _ => Err(format!("Unknown tool: {}", name)),
+    }
+}
+
+fn urlencode(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    out
 }
 
 fn get_tool_definitions() -> Vec<Value> {
     vec![
         json!({
             "name": "list_contacts",
-            "description": "Get all contacts in your JobDex CRM. Optionally filter by pipeline stage, tag, or search term.",
+            "description": "List people you have allowed this API key to see. Optionally filter by status ID, tag name, or a search term.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "status_id": { "type": "string", "description": "Filter by pipeline stage ID." },
+                    "status_id": { "type": "string", "description": "Filter by status ID." },
                     "tag": { "type": "string", "description": "Filter by tag name." },
                     "search": { "type": "string", "description": "Search across name, email, company, and title." }
                 }
@@ -46,7 +246,7 @@ fn get_tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_contact",
-            "description": "Get a single contact by ID with full details including tags and status.",
+            "description": "Get one permitted contact with tags and status.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -57,414 +257,246 @@ fn get_tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_contact",
-            "description": "Add a person to your outreach pipeline. You need at least their first and last name.",
+            "description": "Add a person. Requires organize access and contact-creation permission in JobDex. The new contact joins API scope only.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "first_name": { "type": "string", "description": "Given name." },
-                    "last_name": { "type": "string", "description": "Family name." },
+                    "firstName": { "type": "string", "description": "Given name." },
+                    "lastName": { "type": "string", "description": "Family name." },
                     "email": { "type": "string", "description": "Email address." },
-                    "company": { "type": "string", "description": "Company." },
+                    "linkedinUrl": { "type": "string", "description": "LinkedIn profile URL." },
+                    "statusId": { "type": "string", "description": "Status ID." },
                     "title": { "type": "string", "description": "Job title." },
+                    "company": { "type": "string", "description": "Company." },
                     "location": { "type": "string", "description": "City or region." },
-                    "linkedin_url": { "type": "string", "description": "LinkedIn profile URL." },
-                    "company_website": { "type": "string", "description": "Company website URL." },
-                    "status_id": { "type": "string", "description": "Pipeline stage ID." }
+                    "companyWebsite": { "type": "string", "description": "Company website URL." }
                 },
-                "required": ["first_name", "last_name"]
+                "required": ["firstName", "lastName"]
             }
         }),
         json!({
             "name": "update_contact",
-            "description": "Update an existing contact. Only provided fields are changed.",
+            "description": "Update identity and profile fields of a permitted contact. The user-written summary cannot be changed here.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "id": { "type": "string" },
-                    "first_name": { "type": "string" },
-                    "last_name": { "type": "string" },
+                    "firstName": { "type": "string" },
+                    "lastName": { "type": "string" },
                     "email": { "type": "string" },
-                    "company": { "type": "string" },
+                    "linkedinUrl": { "type": "string" },
+                    "statusId": { "type": "string" },
+                    "lastContactedDate": { "type": "string", "description": "ISO 8601 datetime." },
+                    "nextContactDate": { "type": "string", "description": "ISO 8601 datetime." },
+                    "cadenceStage": { "type": "integer" },
                     "title": { "type": "string" },
+                    "company": { "type": "string" },
                     "location": { "type": "string" },
-                    "linkedin_url": { "type": "string" },
-                    "company_website": { "type": "string" },
-                    "status_id": { "type": "string" },
-                    "summary": { "type": "string" }
+                    "companyWebsite": { "type": "string" }
                 },
                 "required": ["id"]
             }
         }),
         json!({
-            "name": "delete_contact",
-            "description": "Permanently delete a contact and all their associated data.",
+            "name": "bulk_update_status",
+            "description": "Move several permitted contacts to one status. Fails without writes if any ID is out of scope.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "id": { "type": "string" }
+                    "ids": { "type": "array", "items": { "type": "string" } },
+                    "status_id": { "type": "string" }
                 },
-                "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "search_contacts",
-            "description": "Search across contacts by name, email, company, or title. Also searches tags.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "q": { "type": "string", "description": "Search query." }
-                },
-                "required": ["q"]
-            }
-        }),
-        json!({
-            "name": "list_statuses",
-            "description": "Get all pipeline stages with IDs, labels, and colors.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }),
-        json!({
-            "name": "create_status",
-            "description": "Create a new pipeline stage.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "label": { "type": "string" },
-                    "color": { "type": "string", "description": "Hex color e.g. '#3b82f6'." }
-                },
-                "required": ["label", "color"]
-            }
-        }),
-        json!({
-            "name": "update_status",
-            "description": "Rename or recolor a pipeline stage.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "id": { "type": "string" }, "label": { "type": "string" }, "color": { "type": "string" } },
-                "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "delete_status",
-            "description": "Remove a pipeline stage. Contacts in it will be unassigned.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "id": { "type": "string" } },
-                "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "list_tags",
-            "description": "Get all tags.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }),
-        json!({
-            "name": "create_tag",
-            "description": "Create a new tag.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "name": { "type": "string" }, "color": { "type": "string" } },
-                "required": ["name", "color"]
+                "required": ["ids", "status_id"]
             }
         }),
         json!({
             "name": "assign_tag",
-            "description": "Assign a tag to a contact.",
+            "description": "Assign an existing tag to a permitted contact.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "contact_id": { "type": "string" }, "tag_id": { "type": "string" } },
+                "properties": {
+                    "contact_id": { "type": "string" },
+                    "tag_id": { "type": "string" }
+                },
                 "required": ["contact_id", "tag_id"]
             }
         }),
         json!({
             "name": "unassign_tag",
-            "description": "Remove a tag from a contact.",
+            "description": "Remove a tag from a permitted contact.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "contact_id": { "type": "string" }, "tag_id": { "type": "string" } },
+                "properties": {
+                    "contact_id": { "type": "string" },
+                    "tag_id": { "type": "string" }
+                },
                 "required": ["contact_id", "tag_id"]
             }
         }),
         json!({
-            "name": "list_email_accounts",
-            "description": "Get connected email accounts.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }),
-        json!({
-            "name": "send_email",
-            "description": "Send an email immediately.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "account_id": { "type": "string" },
-                    "to": { "type": "string" },
-                    "subject": { "type": "string" },
-                    "body": { "type": "string" },
-                    "contact_id": { "type": "string" }
-                },
-                "required": ["account_id", "to", "subject", "body"]
-            }
-        }),
-        json!({
-            "name": "schedule_email",
-            "description": "Schedule an email for future delivery.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "account_id": { "type": "string" },
-                    "contact_id": { "type": "string" },
-                    "subject": { "type": "string" },
-                    "body": { "type": "string" },
-                    "scheduled_at": { "type": "integer", "description": "Unix timestamp." }
-                },
-                "required": ["account_id", "contact_id", "subject", "body", "scheduled_at"]
-            }
-        }),
-        json!({
-            "name": "list_scheduled_emails",
-            "description": "Get pending and failed scheduled emails.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "contact_id": { "type": "string" } }
-            }
-        }),
-        json!({
-            "name": "cancel_scheduled_email",
-            "description": "Cancel a pending scheduled email.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "id": { "type": "string" } },
-                "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "list_emails_for_contact",
-            "description": "Get email history for a contact.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "contact_id": { "type": "string" } },
-                "required": ["contact_id"]
-            }
-        }),
-        json!({
-            "name": "list_templates",
-            "description": "Get all email templates.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }),
-        json!({
-            "name": "create_template",
-            "description": "Create or update an email template. Use {{firstName}} and {{lastName}} for merge variables.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": { "type": "string" },
-                    "subject": { "type": "string" },
-                    "body": { "type": "string" },
-                    "id": { "type": "string" }
-                },
-                "required": ["name"]
-            }
-        }),
-        json!({
-            "name": "delete_template",
-            "description": "Delete an email template.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "id": { "type": "string" } },
-                "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "get_contact_activity",
-            "description": "Get the activity timeline for a contact.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "contact_id": { "type": "string" } },
-                "required": ["contact_id"]
-            }
-        }),
-        json!({
             "name": "create_contact_event",
-            "description": "Add an event to a contact's timeline.",
+            "description": "Add a user event to a permitted contact's timeline.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "contact_id": { "type": "string" },
                     "title": { "type": "string" },
                     "description": { "type": "string" },
-                    "event_at": { "type": "string", "description": "ISO 8601 datetime." }
+                    "eventAt": { "type": "string", "description": "ISO 8601 datetime." }
                 },
                 "required": ["contact_id", "title"]
             }
         }),
         json!({
-            "name": "export_data",
-            "description": "Export all JobDex data as JSON.",
+            "name": "update_contact_event",
+            "description": "Edit a user event that belongs to a permitted contact.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "contact_id": { "type": "string" },
+                    "event_id": { "type": "string" },
+                    "title": { "type": "string" },
+                    "description": { "type": "string" },
+                    "eventAt": { "type": "string", "description": "ISO 8601 datetime." }
+                },
+                "required": ["contact_id", "event_id"]
+            }
+        }),
+        json!({
+            "name": "list_emails_for_contact",
+            "description": "Get synced messages for a permitted contact.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "contact_id": { "type": "string" } },
+                "required": ["contact_id"]
+            }
+        }),
+        json!({
+            "name": "get_contact_activity",
+            "description": "Get the activity timeline for a permitted contact.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "contact_id": { "type": "string" } },
+                "required": ["contact_id"]
+            }
+        }),
+        json!({
+            "name": "search_contacts",
+            "description": "Search permitted contacts by name, email, company, or title. Also searches tags.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "q": { "type": "string", "description": "Search query." } },
+                "required": ["q"]
+            }
+        }),
+        json!({
+            "name": "list_statuses",
+            "description": "Get status definitions. Read-only externally.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "list_tags",
+            "description": "Get tag definitions. Read-only externally.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_templates",
+            "description": "Get email templates. Read-only externally.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_signatures",
+            "description": "Get email signatures. Read-only externally.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_email_accounts",
+            "description": "Get connected email accounts as id, provider, address and last sync time.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_relationship_actions",
+            "description": "Get relationship actions for permitted contacts. Read-only: sending happens only after native approval.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "propose_relationship_email",
+            "description": "Propose an email draft for a permitted contact. The draft waits for the user's explicit approval in JobDex; it is never sent from here.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "contactId": { "type": "string" },
+                    "payload": {
+                        "type": "object",
+                        "properties": {
+                            "accountId": { "type": "string" },
+                            "to": { "type": "string" },
+                            "subject": { "type": "string" },
+                            "body": { "type": "string" }
+                        },
+                        "required": ["accountId", "to", "subject", "body"]
+                    }
+                },
+                "required": ["contactId", "payload"]
+            }
+        }),
+        json!({
             "name": "get_pipeline_summary",
-            "description": "Get counts of contacts per pipeline stage.",
+            "description": "Get counts of permitted contacts per status.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
             "name": "get_overdue_followups",
-            "description": "Get contacts whose next follow-up date has passed.",
+            "description": "Get permitted contacts whose next follow-up date has passed.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
     ]
 }
 
-fn build_url_for_tool(name: &str, args: &Value, base_url: &str) -> String {
-    let base = base_url.trim_end_matches('/');
-    match name {
-        "get_contact" | "update_contact" | "delete_contact" => {
-            if let Some(id) = args.get("id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/contacts/{}", base, id)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "update_status" | "delete_status" => {
-            if let Some(id) = args.get("id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/statuses/{}", base, id)
-            } else {
-                format!("{}/api/v1/statuses", base)
-            }
-        }
-        "list_emails_for_contact" => {
-            if let Some(id) = args.get("contact_id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/contacts/{}/emails", base, id)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "get_contact_activity" => {
-            if let Some(id) = args.get("contact_id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/contacts/{}/activity", base, id)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "assign_tag" => {
-            if let (Some(cid), Some(tid)) = (
-                args.get("contact_id").and_then(|v| v.as_str()),
-                args.get("tag_id").and_then(|v| v.as_str()),
-            ) {
-                format!("{}/api/v1/contacts/{}/tags/{}", base, cid, tid)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "unassign_tag" => {
-            if let (Some(cid), Some(tid)) = (
-                args.get("contact_id").and_then(|v| v.as_str()),
-                args.get("tag_id").and_then(|v| v.as_str()),
-            ) {
-                format!("{}/api/v1/contacts/{}/tags/{}", base, cid, tid)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "create_contact_event" => {
-            if let Some(id) = args.get("contact_id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/contacts/{}/events", base, id)
-            } else {
-                format!("{}/api/v1/contacts", base)
-            }
-        }
-        "cancel_scheduled_email" => {
-            if let Some(id) = args.get("id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/emails/scheduled/{}", base, id)
-            } else {
-                format!("{}/api/v1/emails/scheduled", base)
-            }
-        }
-        "delete_template" => {
-            if let Some(id) = args.get("id").and_then(|v| v.as_str()) {
-                format!("{}/api/v1/templates/{}", base, id)
-            } else {
-                format!("{}/api/v1/templates", base)
-            }
-        }
-        "list_contacts" => format!("{}/api/v1/contacts", base),
-        "create_contact" => format!("{}/api/v1/contacts", base),
-        "search_contacts" => format!("{}/api/v1/search", base),
-        "list_statuses" => format!("{}/api/v1/statuses", base),
-        "create_status" => format!("{}/api/v1/statuses", base),
-        "list_tags" => format!("{}/api/v1/tags", base),
-        "create_tag" => format!("{}/api/v1/tags", base),
-        "list_email_accounts" => format!("{}/api/v1/email-accounts", base),
-        "send_email" => format!("{}/api/v1/emails/send", base),
-        "schedule_email" => format!("{}/api/v1/emails/schedule", base),
-        "list_scheduled_emails" => format!("{}/api/v1/emails/scheduled", base),
-        "list_templates" => format!("{}/api/v1/templates", base),
-        "create_template" => format!("{}/api/v1/templates", base),
-        "export_data" => format!("{}/api/v1/data/export", base),
-        "get_pipeline_summary" => format!("{}/api/v1/pipeline-summary", base),
-        "get_overdue_followups" => format!("{}/api/v1/overdue-followups", base),
-        _ => format!("{}/api/v1/", base),
+async fn call_tool(
+    client: &reqwest::Client,
+    call: ApiCall,
+    api_key: &str,
+) -> Result<Value, String> {
+    let mut request = match call.method {
+        Method::Get => client.get(&call.url),
+        Method::Post => client.post(&call.url),
+        Method::Patch => client.patch(&call.url),
+        Method::Delete => client.delete(&call.url),
     }
-}
+    .bearer_auth(api_key);
 
-fn http_method_for_tool(name: &str) -> &'static str {
-    match name {
-        "list_contacts"
-        | "list_statuses"
-        | "list_tags"
-        | "list_email_accounts"
-        | "list_scheduled_emails"
-        | "list_emails_for_contact"
-        | "list_templates"
-        | "search_contacts"
-        | "get_contact"
-        | "get_contact_activity"
-        | "export_data"
-        | "get_pipeline_summary"
-        | "get_overdue_followups" => "GET",
-        "delete_contact"
-        | "delete_status"
-        | "cancel_scheduled_email"
-        | "unassign_tag"
-        | "delete_template" => "DELETE",
-        _ => "POST",
+    if let Some(body) = &call.body {
+        request = request.json(body);
     }
-}
 
-fn build_query_params<'a>(name: &'a str, args: &Value) -> Vec<(&'a str, String)> {
-    let mut params = Vec::new();
-    match name {
-        "list_contacts" => {
-            if let Some(v) = args.get("status_id").and_then(|v| v.as_str()) {
-                params.push(("status_id", v.to_string()));
-            }
-            if let Some(v) = args.get("tag").and_then(|v| v.as_str()) {
-                params.push(("tag", v.to_string()));
-            }
-            if let Some(v) = args.get("search").and_then(|v| v.as_str()) {
-                params.push(("search", v.to_string()));
-            }
-        }
-        "list_scheduled_emails" => {
-            if let Some(v) = args.get("contact_id").and_then(|v| v.as_str()) {
-                params.push(("contact_id", v.to_string()));
-            }
-        }
-        "search_contacts" => {
-            if let Some(v) = args.get("q").and_then(|v| v.as_str()) {
-                params.push(("q", v.to_string()));
-            }
-        }
-        _ => {}
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .unwrap_or_else(|e| format!("Error reading response: {}", e));
+
+    let mut result = json!({
+        "content": [{ "type": "text", "text": text }]
+    });
+    if !status.is_success() {
+        result["isError"] = json!(true);
     }
-    params
+    Ok(result)
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+    let base = args.api_url.trim_end_matches('/').to_string();
 
     #[cfg(debug_assertions)]
-    eprintln!("[MCP] Starting jobdex-mcp, connecting to {}", args.api_url);
+    eprintln!("[MCP] Starting jobdex-mcp, connecting to {}", base);
 
     let client = reqwest::Client::new();
     let stdin = tokio::io::BufReader::new(tokio::io::stdin());
@@ -522,60 +554,29 @@ async fn main() -> Result<()> {
                 #[cfg(debug_assertions)]
                 eprintln!("[MCP] Calling tool: {}", tool_name);
 
-                let url = build_url_for_tool(tool_name, arguments, &args.api_url);
-                let method = http_method_for_tool(tool_name);
-
-                let result = match method {
-                    "GET" => {
-                        let params = build_query_params(tool_name, arguments);
-                        if params.is_empty() {
-                            client.get(&url).bearer_auth(&args.api_key).send().await
-                        } else {
-                            client
-                                .get(&url)
-                                .bearer_auth(&args.api_key)
-                                .query(&params)
-                                .send()
-                                .await
+                match dispatch(tool_name, arguments, &base) {
+                    Ok(call) => match call_tool(&client, call, &args.api_key).await {
+                        Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+                        Err(e) => {
+                            log_err(&format!("{}", e));
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": { "code": INTERNAL_ERROR, "message": e }
+                            })
                         }
-                    }
-                    "DELETE" => client.delete(&url).bearer_auth(&args.api_key).send().await,
-                    _ => {
-                        client
-                            .post(&url)
-                            .bearer_auth(&args.api_key)
-                            .json(arguments)
-                            .send()
-                            .await
-                    }
-                };
-
-                match result {
-                    Ok(resp) => {
-                        let body: String = resp
-                            .text()
-                            .await
-                            .unwrap_or_else(|e| format!("Error reading response: {}", e));
-                        json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "result": { "content": [{ "type": "text", "text": body }] }
-                        })
-                    }
-                    Err(e) => {
-                        log_err(&format!("HTTP request failed: {}", e));
-                        json!({
-                            "jsonrpc": "2.0",
-                            "id": id,
-                            "error": { "code": -32000, "message": format!("Request failed: {}", e) }
-                        })
-                    }
+                    },
+                    Err(message) => json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": INVALID_PARAMS, "message": message }
+                    }),
                 }
             }
             _ => json!({
                 "jsonrpc": "2.0",
                 "id": id,
-                "error": { "code": -32601, "message": "Method not found" }
+                "error": { "code": METHOD_NOT_FOUND, "message": "Method not found" }
             }),
         };
 

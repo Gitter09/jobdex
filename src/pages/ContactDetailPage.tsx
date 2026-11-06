@@ -1,11 +1,30 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Contact, ContactEvent, ContactFile } from "@/types/crm";
+import {
+    Contact,
+    ContactEvent,
+    ContactFile,
+    EmailAccount,
+    MemoryKind,
+    RelationshipAction,
+    RelationshipActivity,
+    RelationshipMemory,
+} from "@/types/crm";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useErrors } from "@/hooks/use-errors";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Mail, Linkedin, Calendar, MapPin, Building, Loader2, Sparkles, Briefcase, Copy, MoreHorizontal, Send, Check, Pencil, Trash2, Tag as TagIcon, Plus, X, Clock, RefreshCw, Paperclip, FileIcon, ExternalLink, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail, Linkedin, Calendar, MapPin, Building, Loader2, Sparkles, Briefcase, Copy, MoreHorizontal, Send, Check, Pencil, Trash2, Tag as TagIcon, Plus, X, Clock, RefreshCw, Paperclip, FileIcon, ExternalLink, User, Brain, ShieldAlert, History, MessageSquarePlus } from "lucide-react";
+import { useRelationshipAgent } from "@/hooks/use-relationship-agent";
+import { ActionReviewDialog } from "@/components/relationships/action-review-dialog";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +71,54 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 
+const MEMORY_KIND_ORDER: MemoryKind[] = ["boundary", "commitment", "context"];
+
+const MEMORY_KIND_LABELS: Record<MemoryKind, string> = {
+    boundary: "Boundaries",
+    commitment: "Commitments",
+    context: "Context",
+};
+
+const MEMORY_ORIGIN_LABELS: Record<string, string> = {
+    user: "You",
+    source: "From email",
+    inference: "AI suggestion",
+};
+
+const MEMORY_STATUS_LABELS: Record<string, string> = {
+    suggested: "Suggested",
+    confirmed: "Confirmed",
+    dismissed: "Dismissed",
+    superseded: "Replaced",
+};
+
+const AGENT_ACTIVITY_LABELS: Record<string, string> = {
+    action_created: "Action created",
+    draft_prepared: "Draft prepared for review",
+    preparation_blocked: "Preparation blocked",
+    action_approved: "Approved to send",
+    send_started: "Sending started",
+    send_succeeded: "Email sent",
+    send_blocked: "Send blocked",
+    delivery_unknown: "Delivery could not be confirmed",
+    action_dismissed: "Action dismissed",
+    reminder_created: "Reminder created",
+    reminder_done: "Reminder completed",
+    action_snoozed: "Action snoozed",
+    memory_created: "Relationship note added",
+    memory_corrected: "Relationship note corrected",
+    memory_status_changed: "Relationship note status changed",
+    draft_edited: "Draft edited",
+    external_draft_proposed: "Draft proposed by an external tool",
+};
+
+function toDateTimeLocal(iso?: string): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return format(date, "yyyy-MM-dd'T'HH:mm");
+}
+
 export function ContactDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -85,6 +152,37 @@ export function ContactDetailPage() {
     const { tags: availableTags, assignTag, unassignTag, fetchTags } = useTags();
     const { handleError } = useErrors();
 
+    // Relationship agent
+    const {
+        actions: agentActions,
+        modelStatus,
+        refreshMemory,
+        createMemory,
+        updateMemory,
+        saveWorkflow,
+    } = useRelationshipAgent();
+    const [memory, setMemory] = useState<RelationshipMemory[]>([]);
+    const [memoryLoading, setMemoryLoading] = useState(true);
+    const [agentActivity, setAgentActivity] = useState<RelationshipActivity[]>([]);
+    const [agentActivityLoading, setAgentActivityLoading] = useState(true);
+    const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
+    const [noteText, setNoteText] = useState("");
+    const [noteKind, setNoteKind] = useState<MemoryKind>("context");
+    const [noteDue, setNoteDue] = useState("");
+    const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+    const [editText, setEditText] = useState("");
+    const [editDue, setEditDue] = useState("");
+    const [busyMemoryId, setBusyMemoryId] = useState<string | null>(null);
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [isStayInTouchOpen, setIsStayInTouchOpen] = useState(false);
+    const [stayAccounts, setStayAccounts] = useState<EmailAccount[]>([]);
+    const [stayAccountId, setStayAccountId] = useState("");
+    const [stayCadence, setStayCadence] = useState("45");
+    const [stayTone, setStayTone] = useState("warm");
+    const [stayPurpose, setStayPurpose] = useState("Stay in touch");
+    const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
+    const [reviewActionTarget, setReviewActionTarget] = useState<RelationshipAction | null>(null);
+
     // Fetch Contact
     const fetchContact = async () => {
         if (!id) return;
@@ -99,12 +197,164 @@ export function ContactDetailPage() {
         }
     };
 
+    const fetchMemory = async () => {
+        if (!id) return;
+        try {
+            const result = await invoke<RelationshipMemory[]>("list_relationship_memory", { contactId: id });
+            setMemory(result);
+        } catch (err) {
+            handleError(err, "Failed to load relationship context");
+        } finally {
+            setMemoryLoading(false);
+        }
+    };
+
+    const fetchAgentActivity = async () => {
+        if (!id) return;
+        try {
+            const result = await invoke<RelationshipActivity[]>("get_relationship_activity", { contactId: id });
+            setAgentActivity(result);
+        } catch (err) {
+            handleError(err, "Failed to load agent activity");
+        } finally {
+            setAgentActivityLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchContact();
         fetchEvents();
         fetchActivity();
         fetchFiles();
+        fetchMemory();
+        fetchAgentActivity();
     }, [id]);
+
+    useEffect(() => {
+        if (!isStayInTouchOpen) return;
+        invoke<EmailAccount[]>("get_email_accounts")
+            .then((accounts) => {
+                setStayAccounts(accounts);
+                setStayAccountId((prev) => prev || accounts[0]?.id || "");
+            })
+            .catch((err) => handleError(err, "Failed to load email accounts"));
+    }, [isStayInTouchOpen]);
+
+    const handleCreateNote = async () => {
+        if (!id) return;
+        const text = noteText.trim();
+        if (!text) {
+            toast.error("Add some text first");
+            return;
+        }
+        try {
+            await createMemory(id, noteKind, text, noteDue ? new Date(noteDue).toISOString() : undefined);
+            toast.success(noteKind === "boundary" ? "Boundary saved" : "Added to relationship context");
+            setNoteText("");
+            setNoteDue("");
+            setNoteKind("context");
+            setIsNoteFormOpen(false);
+            await fetchMemory();
+            await fetchAgentActivity();
+        } catch (err) {
+            handleError(err, "Failed to save note");
+        }
+    };
+
+    const handleMemoryStatus = async (record: RelationshipMemory, status: "confirmed" | "dismissed") => {
+        setBusyMemoryId(record.id);
+        try {
+            await updateMemory(record.id, record.text, record.dueAt, status);
+            toast.success(
+                status === "confirmed"
+                    ? "Confirmed"
+                    : record.kind === "boundary"
+                        ? "Boundary removed"
+                        : "Dismissed",
+            );
+            await fetchMemory();
+            await fetchAgentActivity();
+        } catch (err) {
+            handleError(err, "Failed to update this note");
+        } finally {
+            setBusyMemoryId(null);
+        }
+    };
+
+    const handleCorrectMemory = async (record: RelationshipMemory) => {
+        const text = editText.trim();
+        if (!text) {
+            toast.error("The note cannot be empty");
+            return;
+        }
+        setBusyMemoryId(record.id);
+        try {
+            await updateMemory(record.id, text, editDue ? new Date(editDue).toISOString() : undefined, "confirmed");
+            toast.success("Saved your correction");
+            setEditingMemoryId(null);
+            setEditText("");
+            setEditDue("");
+            await fetchMemory();
+            await fetchAgentActivity();
+        } catch (err) {
+            handleError(err, "Failed to save the correction");
+        } finally {
+            setBusyMemoryId(null);
+        }
+    };
+
+    const handleSummarizeFromEmail = async () => {
+        if (!id) return;
+        setIsSummarizing(true);
+        try {
+            await refreshMemory(id);
+            toast.success("Suggestions refreshed. Confirm what is accurate.");
+            await fetchMemory();
+            await fetchAgentActivity();
+        } catch (err) {
+            handleError(err, "Could not summarize this relationship");
+        } finally {
+            setIsSummarizing(false);
+        }
+    };
+
+    const handleSaveStayInTouch = async () => {
+        if (!contact) return;
+        const days = Number(stayCadence);
+        if (!Number.isFinite(days) || days < 1 || days > 365) {
+            toast.error("Cadence must be between 1 and 365 days");
+            return;
+        }
+        const account = stayAccounts.find((a) => a.id === stayAccountId);
+        const purpose = stayPurpose.trim() || "Stay in touch";
+        setIsSavingWorkflow(true);
+        try {
+            await saveWorkflow({
+                title: `Stay in touch with ${contact.first_name} ${contact.last_name}`.trim(),
+                intent: purpose,
+                spec: {
+                    schemaVersion: 1,
+                    contactIds: [contact.id],
+                    accountId: account?.id,
+                    purpose,
+                    tone: stayTone.trim() || "warm",
+                    rules: [{
+                        id: "r1",
+                        trigger: "cadence",
+                        days,
+                        action: account ? "email_draft" : "reminder",
+                    }],
+                },
+                status: "draft",
+            });
+            toast.success("Draft workflow saved. Review and activate it in Workflows.");
+            setIsStayInTouchOpen(false);
+        } catch (err) {
+            handleError(err, "Failed to create the workflow");
+        } finally {
+            setIsSavingWorkflow(false);
+        }
+    };
 
     const fetchEvents = async () => {
         if (!id) return;
@@ -316,6 +566,17 @@ export function ContactDetailPage() {
     if (!contact) {
         return <div className="flex h-screen items-center justify-center">Contact not found</div>;
     }
+
+    const contactName = `${contact.first_name} ${contact.last_name}`.trim();
+    const visibleMemory = memory.filter((m) => m.status !== "superseded");
+    const hasBoundary = visibleMemory.some((m) => m.kind === "boundary" && m.status === "confirmed");
+    const summarizeBlockedReason = !modelStatus
+        ? "Checking AI access…"
+        : !modelStatus.configured
+            ? "AI is not configured. Add a provider in Settings → Agent."
+            : !modelStatus.allowedContactIds.includes(contact.id)
+                ? `${contact.first_name} is not included in AI disclosure. Add them in Settings → Agent.`
+                : undefined;
 
     return (
         <>
@@ -794,6 +1055,269 @@ export function ContactDetailPage() {
                             </section>
                         </div>
 
+                        {/* Relationship Context Section */}
+                        <section>
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <h2 className="text-lg font-semibold flex items-center gap-2">
+                                    <Brain className="h-4 w-4 text-muted-foreground" />
+                                    Relationship context
+                                </h2>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setIsStayInTouchOpen(true)}>
+                                        <Clock className="h-3.5 w-3.5" />
+                                        Stay in touch
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 gap-1.5"
+                                        aria-expanded={isNoteFormOpen}
+                                        onClick={() => setIsNoteFormOpen((open) => !open)}
+                                    >
+                                        {isNoteFormOpen ? <X className="h-3.5 w-3.5" /> : <MessageSquarePlus className="h-3.5 w-3.5" />}
+                                        {isNoteFormOpen ? "Close note form" : "Add note"}
+                                    </Button>
+                                    <span title={summarizeBlockedReason}>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 gap-1.5"
+                                            onClick={handleSummarizeFromEmail}
+                                            disabled={!!summarizeBlockedReason || isSummarizing || memoryLoading}
+                                        >
+                                            <RefreshCw className={cn("h-3.5 w-3.5", isSummarizing && "animate-spin")} />
+                                            {isSummarizing ? "Reading emails…" : "Summarize from email"}
+                                        </Button>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground mb-4 break-words">
+                                {summarizeBlockedReason
+                                    ? `Summarize from email is unavailable: ${summarizeBlockedReason}`
+                                    : `Summarizing sends this person's already-synced conversations to your configured AI provider. Every suggestion stays a suggestion until you confirm it.`}
+                            </p>
+
+                            {hasBoundary && (
+                                <div role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 p-3 flex items-start gap-2">
+                                    <ShieldAlert className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                                    <div className="min-w-0 text-sm">
+                                        <p className="font-medium text-destructive">Do not contact</p>
+                                        <p className="text-muted-foreground break-words">
+                                            Email drafting and sending are blocked for {contact.first_name}. Only you can remove this boundary.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isNoteFormOpen && (
+                                <form
+                                    className="mb-4 rounded-md border bg-muted/20 p-4 space-y-3"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleCreateNote();
+                                    }}
+                                >
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="memory-note-text">Note</Label>
+                                        <Textarea
+                                            id="memory-note-text"
+                                            placeholder="What should you remember about this person?"
+                                            value={noteText}
+                                            onChange={(e) => setNoteText(e.target.value)}
+                                            className="min-h-[80px] resize-none"
+                                            autoCorrect="off"
+                                            autoCapitalize="off"
+                                            spellCheck={false}
+                                        />
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="memory-note-kind">Kind</Label>
+                                            <Select value={noteKind} onValueChange={(value) => setNoteKind(value as MemoryKind)}>
+                                                <SelectTrigger id="memory-note-kind">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="context">Context</SelectItem>
+                                                    <SelectItem value="commitment">Commitment</SelectItem>
+                                                    <SelectItem value="boundary">Boundary (do not contact)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="memory-note-due">Due (optional)</Label>
+                                            <Input
+                                                id="memory-note-due"
+                                                type="datetime-local"
+                                                value={noteDue}
+                                                onChange={(e) => setNoteDue(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button type="submit" size="sm">Save note</Button>
+                                        <Button type="button" size="sm" variant="ghost" onClick={() => setIsNoteFormOpen(false)}>Cancel</Button>
+                                    </div>
+                                </form>
+                            )}
+
+                            <Card className="shadow-sm">
+                                {memoryLoading ? (
+                                    <div className="flex justify-center p-8 items-center">
+                                        <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                ) : visibleMemory.length === 0 ? (
+                                    <CardContent className="p-6 text-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            Nothing yet. Add a note about this person, or summarize their synced emails when AI access is on.
+                                        </p>
+                                    </CardContent>
+                                ) : (
+                                    <div>
+                                        {MEMORY_KIND_ORDER.map((kind) => {
+                                            const records = visibleMemory.filter((m) => m.kind === kind);
+                                            if (records.length === 0) return null;
+                                            return (
+                                                <div key={kind} className="border-b last:border-b-0">
+                                                    <div className="px-4 pt-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                        {MEMORY_KIND_LABELS[kind]}
+                                                    </div>
+                                                    <div className="divide-y">
+                                                        {records.map((record) => {
+                                                            const isEditing = editingMemoryId === record.id;
+                                                            return (
+                                                                <div key={record.id} className="p-4 space-y-2">
+                                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 font-normal">
+                                                                            {MEMORY_ORIGIN_LABELS[record.origin] ?? record.origin}
+                                                                        </Badge>
+                                                                        <Badge
+                                                                            variant={record.status === "confirmed" ? "secondary" : "outline"}
+                                                                            className="text-[10px] px-1.5 py-0 h-5 font-normal"
+                                                                        >
+                                                                            {MEMORY_STATUS_LABELS[record.status] ?? record.status}
+                                                                        </Badge>
+                                                                        {record.dueAt && (
+                                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                                <Calendar className="h-3 w-3" />
+                                                                                Due {format(new Date(record.dueAt), "MMM d, yyyy")}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {isEditing ? (
+                                                                        <div className="space-y-2">
+                                                                            <Textarea
+                                                                                aria-label="Correct this note"
+                                                                                value={editText}
+                                                                                onChange={(e) => setEditText(e.target.value)}
+                                                                                className="min-h-[80px] resize-none"
+                                                                                autoCorrect="off"
+                                                                                autoCapitalize="off"
+                                                                                spellCheck={false}
+                                                                            />
+                                                                            <div className="flex flex-wrap items-end gap-2">
+                                                                                <div className="space-y-1">
+                                                                                    <Label htmlFor={`memory-edit-due-${record.id}`} className="text-xs">Due (optional)</Label>
+                                                                                    <Input
+                                                                                        id={`memory-edit-due-${record.id}`}
+                                                                                        type="datetime-local"
+                                                                                        value={editDue}
+                                                                                        onChange={(e) => setEditDue(e.target.value)}
+                                                                                        className="h-8 w-auto"
+                                                                                    />
+                                                                                </div>
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    onClick={() => handleCorrectMemory(record)}
+                                                                                    disabled={busyMemoryId === record.id}
+                                                                                >
+                                                                                    Save correction
+                                                                                </Button>
+                                                                                <Button size="sm" variant="ghost" onClick={() => setEditingMemoryId(null)}>
+                                                                                    Cancel
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <p className={cn("text-sm break-words whitespace-pre-wrap", record.status === "dismissed" ? "text-muted-foreground line-through" : "text-foreground/90")}>
+                                                                                {record.text}
+                                                                            </p>
+                                                                            {record.sourceQuote && (
+                                                                                <blockquote className="border-l-2 border-muted-foreground/30 pl-3 py-0.5 text-sm italic text-muted-foreground break-words whitespace-pre-wrap">
+                                                                                    “{record.sourceQuote}”
+                                                                                    <span className="mt-1 block not-italic text-xs">
+                                                                                        From email{record.sourceMessageId ? ` ${record.sourceMessageId.slice(0, 8)}` : ""}
+                                                                                    </span>
+                                                                                </blockquote>
+                                                                            )}
+                                                                            <div className="flex flex-wrap gap-1.5">
+                                                                                {record.status === "suggested" && (
+                                                                                    <>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 gap-1 text-xs"
+                                                                                            onClick={() => handleMemoryStatus(record, "confirmed")}
+                                                                                            disabled={busyMemoryId === record.id}
+                                                                                        >
+                                                                                            <Check className="h-3 w-3" />
+                                                                                            Confirm
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="ghost"
+                                                                                            className="h-7 gap-1 text-xs"
+                                                                                            onClick={() => handleMemoryStatus(record, "dismissed")}
+                                                                                            disabled={busyMemoryId === record.id}
+                                                                                        >
+                                                                                            <X className="h-3 w-3" />
+                                                                                            Dismiss
+                                                                                        </Button>
+                                                                                    </>
+                                                                                )}
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="ghost"
+                                                                                    className="h-7 gap-1 text-xs"
+                                                                                    onClick={() => {
+                                                                                        setEditingMemoryId(record.id);
+                                                                                        setEditText(record.text);
+                                                                                        setEditDue(toDateTimeLocal(record.dueAt));
+                                                                                    }}
+                                                                                >
+                                                                                    <Pencil className="h-3 w-3" />
+                                                                                    Correct
+                                                                                </Button>
+                                                                                {record.kind === "boundary" && record.status === "confirmed" && (
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="ghost"
+                                                                                        className="h-7 gap-1 text-xs text-destructive hover:text-destructive"
+                                                                                        onClick={() => handleMemoryStatus(record, "dismissed")}
+                                                                                        disabled={busyMemoryId === record.id}
+                                                                                    >
+                                                                                        <ShieldAlert className="h-3 w-3" />
+                                                                                        Remove boundary
+                                                                                    </Button>
+                                                                                )}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </Card>
+                        </section>
+
                         {/* Pipeline Status Section */}
                         <section>
                             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -960,6 +1484,66 @@ export function ContactDetailPage() {
                                 </TabsContent>
                             </Tabs>
                         </section>
+
+                        {/* Agent Activity Section */}
+                        <section>
+                            <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                                <div className="p-1 rounded bg-muted">
+                                    <History className="h-4 w-4 text-foreground" />
+                                </div>
+                                Agent activity
+                            </h2>
+                            <Card className="border shadow-sm">
+                                <div className="divide-y">
+                                    {agentActivityLoading ? (
+                                        <div className="flex justify-center p-8 items-center">
+                                            <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
+                                        </div>
+                                    ) : agentActivity.length === 0 ? (
+                                        <div className="p-6 text-center">
+                                            <p className="text-sm text-muted-foreground">
+                                                Nothing yet. Reminders, prepared drafts, approvals and sends for this person appear here.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        agentActivity.map((entry) => {
+                                            const linkedAction = entry.actionId
+                                                ? agentActions.find((action) => action.id === entry.actionId)
+                                                : undefined;
+                                            const label = AGENT_ACTIVITY_LABELS[entry.eventType] ?? entry.eventType.replace(/_/g, " ");
+                                            const body = (
+                                                <>
+                                                    <p className="text-sm text-foreground break-words">{label}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {format(new Date(entry.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                                    </p>
+                                                </>
+                                            );
+                                            return (
+                                                <div key={entry.id} className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors">
+                                                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border shrink-0 mt-0.5">
+                                                        <History className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        {linkedAction ? (
+                                                            <button
+                                                                type="button"
+                                                                className="text-left w-full rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                                                onClick={() => setReviewActionTarget(linkedAction)}
+                                                            >
+                                                                {body}
+                                                            </button>
+                                                        ) : (
+                                                            body
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </Card>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -987,6 +1571,86 @@ export function ContactDetailPage() {
                             onOpenChange={setIsEmailOpen}
                             onEmailSent={fetchActivity}
                         />
+
+                        <ActionReviewDialog
+                            action={reviewActionTarget}
+                            contactName={contactName}
+                            onOpenChange={(open) => {
+                                if (!open) setReviewActionTarget(null);
+                            }}
+                        />
+
+                        <Dialog open={isStayInTouchOpen} onOpenChange={setIsStayInTouchOpen}>
+                            <DialogContent className="max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>Stay in touch with {contact.first_name}</DialogTitle>
+                                    <DialogDescription>
+                                        This saves a draft workflow for {contactName}. Activating it is a separate step in Workflows,
+                                        and every email the agent prepares still needs your approval before it is sent.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="stay-cadence">Remind me every (days)</Label>
+                                        <Input
+                                            id="stay-cadence"
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={stayCadence}
+                                            onChange={(e) => setStayCadence(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="stay-purpose">Purpose</Label>
+                                        <Input
+                                            id="stay-purpose"
+                                            value={stayPurpose}
+                                            onChange={(e) => setStayPurpose(e.target.value)}
+                                            placeholder="Stay in touch"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="stay-tone">Tone</Label>
+                                        <Input
+                                            id="stay-tone"
+                                            value={stayTone}
+                                            onChange={(e) => setStayTone(e.target.value)}
+                                            placeholder="warm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="stay-account">Sending account</Label>
+                                        {stayAccounts.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground break-words">
+                                                No email account is connected, so this will create local reminders instead.
+                                                Connect an account in Settings → Email to draft emails.
+                                            </p>
+                                        ) : (
+                                            <Select value={stayAccountId} onValueChange={setStayAccountId}>
+                                                <SelectTrigger id="stay-account">
+                                                    <SelectValue placeholder="Choose an account" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {stayAccounts.map((account) => (
+                                                        <SelectItem key={account.id} value={account.id}>
+                                                            {account.email}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="ghost" onClick={() => setIsStayInTouchOpen(false)}>Cancel</Button>
+                                    <Button onClick={handleSaveStayInTouch} disabled={isSavingWorkflow}>
+                                        {isSavingWorkflow && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Save draft workflow
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
 
                         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                             <AlertDialogContent>

@@ -1,11 +1,8 @@
 pub mod contacts;
-pub mod data;
 pub mod emails;
 pub mod events;
-pub mod files;
-pub mod import;
+pub mod relationship_actions;
 pub mod search;
-pub mod settings;
 pub mod signatures;
 pub mod sse;
 pub mod statuses;

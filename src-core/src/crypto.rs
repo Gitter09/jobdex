@@ -30,10 +30,11 @@ fn get_master_secret() -> Result<MasterSecret> {
 
     match entry.get_password() {
         Ok(json_str) => {
-            let secret: MasterSecret = serde_json::from_str(&json_str).unwrap_or_default();
+            let secret: MasterSecret = serde_json::from_str(&json_str)
+                .context("Stored master secret is malformed; refusing to replace it")?;
             Ok(secret)
         }
-        Err(_) => {
+        Err(keyring::Error::NoEntry) => {
             // No master secret exists yet. Attempt to migrate from legacy standalone entries.
             let mut secret = MasterSecret::default();
 
@@ -64,6 +65,7 @@ fn get_master_secret() -> Result<MasterSecret> {
             save_master_secret(&secret)?;
             Ok(secret)
         }
+        Err(error) => Err(error).context("Cannot access the master secret; refusing migration"),
     }
 }
 
@@ -191,6 +193,9 @@ pub fn encrypt(plaintext: &str) -> Result<String> {
 /// Decrypts a base64-encoded `nonce || ciphertext` string.
 /// Returns the original plaintext.
 pub fn decrypt(encrypted: &str) -> Result<String> {
+    #[cfg(test)]
+    let key_bytes = [42u8; 32];
+    #[cfg(not(test))]
     let key_bytes = get_or_create_key()?;
     decrypt_with_key(encrypted, &key_bytes)
 }
@@ -252,6 +257,16 @@ pub fn get_secret(name: &str) -> Result<String> {
         .get(name)
         .cloned()
         .ok_or_else(|| anyhow!("Secret '{}' not found in keychain", name))
+}
+
+/// Removes a named secret from the consolidated OS keychain entry.
+/// Succeeds when the secret was not present.
+pub fn remove_secret(name: &str) -> Result<()> {
+    let mut ms = get_master_secret()?;
+    if ms.secrets.remove(name).is_some() {
+        save_master_secret(&ms)?;
+    }
+    Ok(())
 }
 
 // ===== App Lock Screen PIN Logic =====

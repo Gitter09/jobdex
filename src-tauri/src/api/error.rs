@@ -12,8 +12,7 @@ pub enum ApiError {
     Database(String),
     #[allow(dead_code)]
     Unauthorized,
-    #[allow(dead_code)]
-    Forbidden,
+    Forbidden(String),
     Internal(String),
 }
 
@@ -53,11 +52,7 @@ impl IntoResponse for ApiError {
                 "UNAUTHORIZED",
                 "Invalid or missing API key.".into(),
             ),
-            ApiError::Forbidden => (
-                StatusCode::FORBIDDEN,
-                "FORBIDDEN",
-                "API access is disabled.".into(),
-            ),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg),
             ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL", msg),
         };
 

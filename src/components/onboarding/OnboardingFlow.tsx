@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Shield, Upload, UserPlus, Compass, ArrowRight, Sparkles } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { Shield, Upload, UserPlus, Compass, ArrowRight, Sparkles, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Contact, ModelStatus, RelationshipModelConfig } from "@/types/crm";
 
 // ── Types ────────────────────────────────────────────────────────────
 type Screen = 1 | 2 | 3 | 4;
@@ -10,72 +14,55 @@ interface OnboardingFlowProps {
     onComplete: (action: OnboardingAction) => void;
 }
 
+interface IntentPreset {
+    key: string;
+    title: string;
+    subtitle: string;
+    intent: string;
+}
+
+const INTENT_PRESETS: IntentPreset[] = [
+    {
+        key: "stay_in_touch",
+        title: "Stay in touch",
+        subtitle: "Keep the people you value close.",
+        intent: "Keep in regular contact with people I value.",
+    },
+    {
+        key: "reconnect",
+        title: "Reconnect",
+        subtitle: "Reach back out to people you've lost touch with.",
+        intent: "Reach back out to people I haven't talked to in a while.",
+    },
+    {
+        key: "collaborators",
+        title: "Find collaborators",
+        subtitle: "Stay close to people you could work with.",
+        intent: "Stay close to people I could build or work with.",
+    },
+    {
+        key: "career",
+        title: "Career move",
+        subtitle: "Keep the people who matter to your career warm.",
+        intent: "Keep the people who matter to my career warm.",
+    },
+];
+
 // ── Typewriter text data ─────────────────────────────────────────────
 // Each segment is a line. The typewriter types through them sequentially.
 // A "\n" between segments creates a visible line break with a brief typing pause.
 const TYPEWRITER_LINES = [
-    { text: "i'm harshit.", style: "bold" as const },
-    { text: "i built this for people like us —", style: "normal" as const },
-    { text: "the ones cold-emailing their way to a career.", style: "normal" as const },
+    { text: "hey.", style: "bold" as const },
+    { text: "this is your private relationship agent.", style: "normal" as const },
     { text: "", style: "break" as const }, // blank line pause
-    { text: "(spreadsheets weren't cutting it.)", style: "dim" as const },
+    { text: "remember what matters.", style: "normal" as const },
+    { text: "follow through naturally.", style: "normal" as const },
+    { text: "", style: "break" as const },
+    { text: "(all of it stays on this machine.)", style: "dim" as const },
 ];
 
 // Flatten into a single string with \n markers for the typewriter engine
 const FULL_TEXT = TYPEWRITER_LINES.map((l) => l.text).join("\n");
-
-// ── Kanban demo data ─────────────────────────────────────────────────
-const KANBAN_COLUMNS = [
-    { label: "New", color: "#3b82f6" },
-    { label: "Contacted", color: "#eab308" },
-    { label: "Replied", color: "#a855f7" },
-    { label: "Interested", color: "#22c55e" },
-    { label: "", color: "#f59e0b", icon: true },
-];
-
-const DEMO_CARDS: {
-    name: string;
-    initials: string;
-    role: string;
-    column: number;
-    animClass: string;
-    delay: number;
-    shimmer?: boolean;
-    isStatic?: boolean;
-}[] = [
-    // Static cards — appear with column fade-in, board feels "lived-in"
-    { name: "Alex Rivera", initials: "AR", role: "Product Designer", column: 0, animClass: "ob-column-fade", delay: 0, isStatic: true },
-    { name: "Maya Lin", initials: "ML", role: "Data Analyst", column: 0, animClass: "ob-column-fade", delay: 0, isStatic: true },
-    { name: "David Kim", initials: "DK", role: "VP Eng", column: 1, animClass: "ob-column-fade", delay: 150, isStatic: true },
-    { name: "Lena Müller", initials: "LM", role: "CTO", column: 3, animClass: "ob-column-fade", delay: 450, isStatic: true },
-    { name: "Tom Nguyen", initials: "TN", role: "Founder", column: 4, animClass: "ob-column-fade", delay: 600, isStatic: true },
-    // Animated cards — choreographed pipeline story
-    {
-        name: "Sarah Chen",
-        initials: "SC",
-        role: "Recruiter",
-        column: 1, // Contacted — slides from New
-        animClass: "ob-card-slide",
-        delay: 1000,
-    },
-    {
-        name: "James Park",
-        initials: "JP",
-        role: "Eng Manager",
-        column: 2, // Replied
-        animClass: "ob-card-appear",
-        delay: 1400,
-    },
-    {
-        name: "Priya Sharma",
-        initials: "PS",
-        role: "Hiring Lead",
-        column: 3, // Interested
-        animClass: "ob-card-appear",
-        delay: 1900,
-        shimmer: true,
-    },
-];
 
 // ── Component ────────────────────────────────────────────────────────
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
@@ -88,6 +75,37 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     const [typewriterDone, setTypewriterDone] = useState(false);
     const svgPathRef = useRef<SVGPathElement>(null);
     const [pathLength, setPathLength] = useState(0);
+
+    // Relationship scope state
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [contactsLoaded, setContactsLoaded] = useState(false);
+    const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [preset, setPreset] = useState<string | null>(null);
+    const [savingConsent, setSavingConsent] = useState(false);
+    const [consentError, setConsentError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const people = await invoke<Contact[]>("get_contacts");
+                if (!cancelled) setContacts(people);
+            } catch {
+                // Browser preview or locked database — the picker stays hidden.
+            }
+            try {
+                const status = await invoke<ModelStatus>("get_relationship_model_status");
+                if (!cancelled) setModelStatus(status);
+            } catch {
+                // No agent status available; consent is set later in settings.
+            }
+            if (!cancelled) setContactsLoaded(true);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     // Reduced motion detection
     const prefersReducedMotion = useRef(
@@ -140,13 +158,51 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     }, [screen, svgDone, typedIndex]);
 
     // ── Navigation ───────────────────────────────────────────────────
-    const goNext = useCallback(() => {
-        if (screen < 4) setScreen((s) => (s + 1) as Screen);
-    }, [screen]);
-
     const goBack = useCallback(() => {
         if (screen > 1) setScreen((s) => (s - 1) as Screen);
     }, [screen]);
+
+    /**
+     * Persists the contact selection as disclosure consent through the validated
+     * native command, preserving the rest of the provider configuration.
+     */
+    const commitConsent = useCallback(async (): Promise<boolean> => {
+        if (!modelStatus) return true;
+        const unchanged =
+            selectedIds.length === modelStatus.allowedContactIds.length &&
+            selectedIds.every((id) => modelStatus.allowedContactIds.includes(id));
+        if (unchanged) return true;
+
+        setSavingConsent(true);
+        setConsentError(null);
+        try {
+            const config: RelationshipModelConfig = {
+                baseUrl: modelStatus.baseUrl,
+                model: modelStatus.model,
+                enabled: modelStatus.enabled,
+                dailyRequestLimit: modelStatus.dailyRequestLimit,
+                allowedContactIds: selectedIds,
+            };
+            await invoke("configure_relationship_model", { config, apiKey: null });
+            setModelStatus({ ...modelStatus, allowedContactIds: selectedIds });
+            return true;
+        } catch (error) {
+            setConsentError(
+                typeof error === "string"
+                    ? error
+                    : "Couldn't save your contact selection. You can set it later in Settings → Relationship agent."
+            );
+            return false;
+        } finally {
+            setSavingConsent(false);
+        }
+    }, [modelStatus, selectedIds]);
+
+    const handleContinue = useCallback(async () => {
+        if (screen >= 4) return;
+        if (screen === 3 && !(await commitConsent())) return;
+        setScreen((s) => (s + 1) as Screen);
+    }, [screen, commitConsent]);
 
     const handleFinish = useCallback(
         (action: OnboardingAction) => {
@@ -171,7 +227,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             if (e.key === "ArrowRight" || e.key === "Enter") {
                 if (screen < 4) {
                     e.preventDefault();
-                    goNext();
+                    handleContinue();
                 }
             } else if (e.key === "ArrowLeft" || e.key === "Backspace") {
                 e.preventDefault();
@@ -183,7 +239,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [screen, goNext, goBack, skip]);
+    }, [screen, handleContinue, goBack, skip]);
 
     // ── Render helpers ───────────────────────────────────────────────
     const renderTypedText = () => {
@@ -267,175 +323,214 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     );
 
     const renderScreen2 = () => (
-        <div className="flex flex-col items-center justify-center h-full px-6">
-            <div className="max-w-lg w-full flex flex-col items-center text-center space-y-8">
-                {/* Shield icon */}
-                <div className="ob-shield-pop">
-                    <div className="w-16 h-16 rounded-2xl bg-[#1a1a1a] border border-[#333] flex items-center justify-center">
-                        <Shield className="h-8 w-8 text-[#fafafa]" />
-                    </div>
-                </div>
-
-                {/* Main heading */}
+        <div className="flex flex-col items-center justify-start [@media(min-height:760px)]:justify-center h-full px-6 overflow-y-auto py-6">
+            <div className="max-w-xl w-full text-center space-y-6">
                 <h2
                     className="ob-stagger text-2xl sm:text-3xl font-bold text-[#fafafa]"
-                    style={{ animationDelay: "300ms" }}
+                    style={{ animationDelay: "0ms" }}
                 >
-                    everything stays here.
+                    what do you want to keep up with?
                 </h2>
+                <p
+                    className="ob-stagger text-sm text-[#a3a3a3] leading-relaxed"
+                    style={{ animationDelay: "150ms" }}
+                >
+                    Pick a starting point. These are presets, not separate products — you describe the real
+                    workflow and approve it before anything runs.
+                </p>
 
-                {/* Privacy lines */}
-                <div className="space-y-3 w-full max-w-sm">
-                    {[
-                        { left: "your contacts", right: "on this machine" },
-                        { left: "your emails", right: "on this machine" },
-                        { left: "your data", right: "never leaves" },
-                    ].map((line, i) => (
-                        <div
-                            key={i}
-                            className="ob-slide-left flex items-center justify-center gap-3 text-base"
-                            style={{ animationDelay: `${500 + i * 150}ms` }}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {INTENT_PRESETS.map((option, i) => (
+                        <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => setPreset(option.key)}
+                            aria-pressed={preset === option.key}
+                            className={cn(
+                                "ob-stagger ob-action-card text-left p-4 rounded-xl border transition-colors",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#555] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]",
+                                preset === option.key
+                                    ? "border-[#fafafa]/60 bg-[#1a1a1a]"
+                                    : "border-[#2a2a2a] bg-[#141414] hover:border-[#3a3a3a]"
+                            )}
+                            style={{ animationDelay: `${250 + i * 100}ms` }}
                         >
-                            <span className="text-[#fafafa] font-medium">{line.left}</span>
-                            <ArrowRight className="h-4 w-4 text-[#555] flex-shrink-0" />
-                            <span className="text-[#a3a3a3]">{line.right}</span>
-                        </div>
+                            <span className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-[#fafafa]">{option.title}</span>
+                                {preset === option.key && <Check className="h-4 w-4 shrink-0 text-[#fafafa]" />}
+                            </span>
+                            <span className="mt-1 block text-xs text-[#888] leading-relaxed">
+                                {option.subtitle}
+                            </span>
+                        </button>
                     ))}
                 </div>
 
-                {/* Nerd badge */}
-                <p
-                    className="ob-stagger text-[10px] text-[#555] uppercase tracking-[0.15em] font-mono"
-                    style={{ animationDelay: "1100ms" }}
-                >
-                    AES-256-GCM &middot; SQLCipher &middot; OS Keychain
+                {preset && (
+                    <p className="rounded-lg border border-[#2a2a2a] bg-[#111] p-3 text-left text-xs text-[#a3a3a3] leading-relaxed">
+                        Intent preview: “{INTENT_PRESETS.find((option) => option.key === preset)?.intent}”
+                    </p>
+                )}
+
+                <p className="text-xs text-[#666] leading-relaxed">
+                    Nothing runs yet. No reminders, no drafts — your first workflow is created and activated
+                    later, after you review it.
                 </p>
             </div>
         </div>
     );
 
-    const renderScreen3 = () => (
-        <div className="flex flex-col items-center justify-center h-full px-6">
-            <div className="w-full max-w-2xl">
-                {/* Mini Kanban board */}
-                <div className="flex gap-3 justify-center mb-8">
-                    {KANBAN_COLUMNS.map((col, colIdx) => (
-                        <div
-                            key={colIdx}
-                            className="ob-column-fade w-[120px] sm:w-[130px] flex-shrink-0"
-                            style={{ animationDelay: `${colIdx * 150}ms` }}
-                        >
-                            {/* Column header */}
-                            <div className="flex items-center gap-1.5 mb-3 px-1">
-                                {col.icon ? (
-                                    <Sparkles className="h-3 w-3 text-[#f59e0b]" />
-                                ) : (
-                                    <div
-                                        className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: col.color }}
-                                    />
-                                )}
-                                <span className="text-[11px] font-medium text-[#a3a3a3] truncate">
-                                    {col.icon ? "Won" : col.label}
-                                </span>
-                            </div>
+    const renderScreen3 = () => {
+        const pickerReady = contactsLoaded && contacts.length > 0 && modelStatus !== null;
 
-                            {/* Column body */}
-                            <div className="min-h-[100px] rounded-lg bg-[#111] border border-[#222] p-1.5 space-y-1.5">
-                                {DEMO_CARDS.filter((c) => c.column === colIdx).map((card) => (
-                                    <div
-                                        key={card.name}
-                                        className={cn(
-                                            card.animClass,
-                                            "rounded-md bg-[#1a1a1a] border border-[#2a2a2a] p-2 border-l-[3px]",
-                                            card.shimmer && "ob-shimmer"
-                                        )}
-                                        style={{
-                                            borderLeftColor: KANBAN_COLUMNS[card.column].color,
-                                            animationDelay: `${card.delay}ms`,
-                                            ...(card.animClass === "ob-card-slide"
-                                                ? { ["--slide-from" as string]: "-140px" }
-                                                : {}),
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-5 h-5 rounded-full bg-[#262626] flex items-center justify-center flex-shrink-0">
-                                                <span className="text-[8px] font-bold text-[#a3a3a3]">
-                                                    {card.initials}
-                                                </span>
-                                            </div>
-                                            <div className="overflow-hidden">
-                                                <p className="text-[10px] font-medium text-[#e5e5e5] truncate leading-tight">
-                                                    {card.name}
-                                                </p>
-                                                <p className="text-[8px] text-[#777] truncate leading-tight">
-                                                    {card.role}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+        return (
+            <div className="flex flex-col items-center justify-start [@media(min-height:760px)]:justify-center h-full px-6 overflow-y-auto py-6">
+                <div className="w-full max-w-xl space-y-5">
+                    <div className="text-center space-y-2">
+                        <h2 className="ob-stagger text-2xl sm:text-3xl font-bold text-[#fafafa]">
+                            who do you want to keep up with?
+                        </h2>
+                        <p className="ob-stagger text-sm text-[#a3a3a3]" style={{ animationDelay: "150ms" }}>
+                            Optional. Anyone you leave unchecked stays fully usable by hand.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                        <div className="rounded-lg border border-[#2a2a2a] bg-[#111] p-3">
+                            <p className="flex items-center gap-1.5 font-medium text-[#fafafa]">
+                                <Shield className="h-3.5 w-3.5 shrink-0" />
+                                Syncing email
+                            </p>
+                            <p className="mt-1 text-xs text-[#888] leading-relaxed">
+                                Messages from a mail account you connect are stored on this machine first.
+                            </p>
                         </div>
-                    ))}
-                </div>
+                        <div className="rounded-lg border border-[#2a2a2a] bg-[#111] p-3">
+                            <p className="flex items-center gap-1.5 font-medium text-[#fafafa]">
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                                AI disclosure
+                            </p>
+                            <p className="mt-1 text-xs text-[#888] leading-relaxed">
+                                Only people you select can be sent to a provider you configure yourself.
+                            </p>
+                        </div>
+                    </div>
 
-                {/* Description text */}
-                <div className="text-center space-y-1">
-                    <p
-                        className="ob-stagger text-base font-medium text-[#fafafa]"
-                        style={{ animationDelay: "2400ms" }}
-                    >
-                        this is what it looks like when it&apos;s working.
+                    <p className="text-center text-xs text-[#777]">
+                        These are two separate decisions, and neither is required to use JobDex.
                     </p>
-                    <p
-                        className="ob-stagger text-sm text-[#a3a3a3]"
-                        style={{ animationDelay: "2550ms" }}
-                    >
-                        add contacts. track conversations. send emails.
-                    </p>
-                    <p
-                        className="ob-stagger text-sm text-[#a3a3a3]"
-                        style={{ animationDelay: "2700ms" }}
-                    >
-                        drag a card when something changes.
-                    </p>
+
+                    {pickerReady ? (
+                        <>
+                            <div className="max-h-44 overflow-y-auto rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] divide-y divide-[#1f1f1f]">
+                                {contacts.map((contact) => {
+                                    const id = `onboarding-consent-${contact.id}`;
+                                    return (
+                                        <label
+                                            key={contact.id}
+                                            htmlFor={id}
+                                            className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-[#161616]"
+                                        >
+                                            <Checkbox
+                                                id={id}
+                                                checked={selectedIds.includes(contact.id)}
+                                                onCheckedChange={() =>
+                                                    setSelectedIds((current) =>
+                                                        current.includes(contact.id)
+                                                            ? current.filter((value) => value !== contact.id)
+                                                            : [...current, contact.id]
+                                                    )
+                                                }
+                                                className="mt-0.5 border-[#555] data-[state=checked]:bg-[#fafafa] data-[state=checked]:text-[#0a0a0a]"
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block text-sm text-[#e5e5e5] break-words">
+                                                    {`${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim() ||
+                                                        contact.email ||
+                                                        "Unnamed contact"}
+                                                </span>
+                                                {contact.email && (
+                                                    <span className="block text-xs text-[#777] break-all">
+                                                        {contact.email}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[11px] text-[#666] leading-relaxed">
+                                Checking someone lets the agent use their synced plain-text conversations if you
+                                connect a provider later. Attachments, contact files, access tokens and messages
+                                from other people are never included. You can change this anytime in Settings →
+                                Relationship agent, and revoking it invalidates drafts derived from that person.
+                            </p>
+                            <p className="text-xs text-[#a3a3a3]">
+                                {selectedIds.length === 0
+                                    ? "No one selected — nothing is shared with any provider."
+                                    : `${selectedIds.length} selected for the agent.`}
+                            </p>
+                        </>
+                    ) : (
+                        <p className="rounded-lg border border-[#2a2a2a] bg-[#111] p-4 text-sm text-[#a3a3a3] leading-relaxed">
+                            {contactsLoaded && contacts.length === 0
+                                ? "No contacts yet. You can add people after setup — nothing is shared either way."
+                                : "Contact selection opens once your database is unlocked. Until then, nothing is shared with any provider."}
+                        </p>
+                    )}
+
+                    {consentError && (
+                        <p role="alert" className="text-xs text-red-400 break-words">
+                            {consentError}
+                        </p>
+                    )}
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderScreen4 = () => (
-        <div className="flex flex-col items-center justify-center h-full px-6">
-            <div className="max-w-2xl w-full text-center">
-                <h2
-                    className="ob-stagger text-2xl sm:text-3xl font-bold text-[#fafafa] mb-10"
-                    style={{ animationDelay: "0ms" }}
-                >
-                    ready? pick your first move.
-                </h2>
+        <div className="flex flex-col items-center justify-start [@media(min-height:760px)]:justify-center h-full px-6 overflow-y-auto py-6">
+            <div className="max-w-2xl w-full text-center space-y-6">
+                <div className="space-y-3">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#1a1a1a] border border-[#333]">
+                        <Sparkles className="h-5 w-5 text-[#fafafa]" />
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-[#fafafa]">ai is optional.</h2>
+                    <p className="mx-auto max-w-lg text-sm text-[#a3a3a3] leading-relaxed">
+                        JobDex is free. Memory suggestions and draft writing need your own OpenAI-compatible
+                        provider, connected later in Settings → Relationship agent. Inference is billed by that
+                        provider, directly to you, and the connection must pass a test before anything uses it.
+                    </p>
+                    <p className="text-xs text-[#777] leading-relaxed">
+                        Nothing is active yet. Every agent-written email still needs your approval, and the first
+                        workflow starts only after you create and review it.
+                    </p>
+                </div>
+
+                <h3 className="text-sm font-semibold text-[#fafafa]">where do you want to start?</h3>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     {[
                         {
-                            action: "import" as OnboardingAction,
-                            icon: Upload,
-                            title: "Import a LinkedIn CSV",
-                            subtitle: "A career fair's worth of contacts in two clicks.",
-                            delay: 150,
-                        },
-                        {
                             action: "add_contact" as OnboardingAction,
                             icon: UserPlus,
                             title: "Add your first contact",
-                            subtitle: "Start with the person you've been meaning to email.",
+                            subtitle: "Start with the person you've been meaning to reach out to.",
+                            delay: 150,
+                        },
+                        {
+                            action: "import" as OnboardingAction,
+                            icon: Upload,
+                            title: "Import a LinkedIn CSV",
+                            subtitle: "Bring in people you already know.",
                             delay: 300,
                         },
                         {
                             action: "explore" as OnboardingAction,
                             icon: Compass,
-                            title: "Just explore",
-                            subtitle: "No pressure. Look around first.",
+                            title: "Skip AI setup for now",
+                            subtitle: "Look around. Set up the agent anytime in Settings.",
                             delay: 450,
                         },
                     ].map((card) => (
@@ -501,8 +596,18 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 {screen === 4 && renderScreen4()}
             </div>
 
-            {/* Bottom bar — dots + keyboard hint */}
-            <div className="pb-8 flex flex-col items-center gap-4">
+            {/* Bottom bar — dots + continue + keyboard hint */}
+            <div className="pb-8 flex flex-col items-center gap-3">
+                {screen < 4 && (
+                    <Button
+                        onClick={handleContinue}
+                        disabled={savingConsent}
+                        className="bg-[#fafafa] text-[#0a0a0a] hover:bg-[#d4d4d4]"
+                    >
+                        {savingConsent ? "Saving…" : "continue"}
+                    </Button>
+                )}
+
                 {/* Progress dots */}
                 <div className="flex items-center gap-2">
                     {([1, 2, 3, 4] as Screen[]).map((s) => (

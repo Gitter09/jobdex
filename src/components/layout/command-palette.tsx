@@ -18,12 +18,24 @@ import {
     Shield,
     Keyboard,
     Info,
+    GitBranch,
+    Sparkles,
+    LayoutDashboard,
+    CheckSquare,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { Contact } from "@/types/crm";
 import { useErrors } from "@/hooks/use-errors";
 
+const NAV_DESTINATIONS = [
+    { id: "today",      label: "Today",              hint: "What needs you",         icon: LayoutDashboard, path: "/" },
+    { id: "people",     label: "People",             hint: "Everyone you know",      icon: Users,     path: "/people" },
+    { id: "workflows",  label: "Workflows",          hint: "Intent & cadence",       icon: GitBranch, path: "/workflows" },
+    { id: "tasks",      label: "Tasks",              hint: "Reminders",              icon: CheckSquare, path: "/tasks" },
+] as const;
+
 const SETTINGS_DESTINATIONS = [
+    { id: "agent",      label: "Relationship agent",  hint: "Provider · consent",     icon: Sparkles,  path: "/settings/agent" },
     { id: "appearance", label: "Appearance",         hint: "Theme & display",        icon: Palette,   path: "/settings/appearance" },
     { id: "email",      label: "Email Integration",  hint: "Gmail · Outlook",        icon: PlugZap,   path: "/settings/email" },
     { id: "pipeline",   label: "Pipeline",           hint: "Stages & statuses",      icon: Kanban,    path: "/settings/pipeline" },
@@ -113,6 +125,20 @@ export function CommandPalette({ open, onOpenChange, onOpenImport, onOpenAddCont
                         ))}
                     </CommandGroup>
                 )}
+
+                <CommandGroup heading="Go to">
+                    {NAV_DESTINATIONS.map(({ id, label, hint, icon: Icon, path }) => (
+                        <CommandItem
+                            key={id}
+                            onSelect={() => handleAction(`navigate_settings_${path}`)}
+                            onPointerDown={(e) => e.preventDefault()}
+                        >
+                            <Icon className="mr-2 h-4 w-4" />
+                            <span>{label}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{hint}</span>
+                        </CommandItem>
+                    ))}
+                </CommandGroup>
 
                 <CommandGroup heading="Settings">
                     {SETTINGS_DESTINATIONS.map(({ id, label, hint, icon: Icon, path }) => (

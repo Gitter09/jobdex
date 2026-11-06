@@ -72,6 +72,10 @@ pub struct SyncResult {
     pub synced_count: usize,
     pub skipped_count: usize,
     pub token_expired: bool,
+    /// True when some messages could not be fetched, parsed or stored. The sync
+    /// cursor is deliberately not advanced in that case.
+    #[serde(default)]
+    pub partial: bool,
     pub error: Option<String>,
 }
 
@@ -398,6 +402,7 @@ impl EmailService {
                     synced_count: 0,
                     skipped_count: 0,
                     token_expired,
+                    partial: false,
                     error: Some(e.to_string()),
                 });
             }
@@ -428,6 +433,9 @@ impl EmailService {
         // 4. Fetch messages from provider (filtered by CRM contacts at API level)
         let mut synced_count = 0usize;
         let mut skipped_count = 0usize;
+        // Any failed fetch, parse or store leaves the cursor where it was so the
+        // next sync retries the same window instead of silently skipping messages.
+        let mut partial = false;
 
         let contact_emails: Vec<String> = contact_email_to_id.keys().cloned().collect();
 
@@ -447,6 +455,7 @@ impl EmailService {
                             synced_count: 0,
                             skipped_count: 0,
                             token_expired: true,
+                            partial: false,
                             error: Some("Token expired".to_string()),
                         });
                     }
@@ -470,7 +479,10 @@ impl EmailService {
                             msg.sent_at,
                             msg.attachments,
                         )),
-                        Err(e) => eprintln!("Failed to fetch Gmail message {}: {}", stub.id, e),
+                        Err(e) => {
+                            eprintln!("Failed to fetch Gmail message {}: {}", stub.id, e);
+                            partial = true;
+                        }
                     }
                 }
                 messages
@@ -490,6 +502,7 @@ impl EmailService {
                             synced_count: 0,
                             skipped_count: 0,
                             token_expired: true,
+                            partial: false,
                             error: Some("Token expired".to_string()),
                         });
                     }
@@ -640,11 +653,14 @@ impl EmailService {
             }
         }
 
-        // 8. Update last_synced_at
-        sqlx::query("UPDATE email_accounts SET last_synced_at = CURRENT_TIMESTAMP WHERE id = ?")
-            .bind(&account.id)
-            .execute(self.db.pool())
-            .await?;
+        // 8. Advance the cursor only after a complete pass. Provider message IDs are
+        //    deduplicated on insert, so re-reading the overlap is safe.
+        if !partial {
+            sqlx::query("UPDATE email_accounts SET last_synced_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(&account.id)
+                .execute(self.db.pool())
+                .await?;
+        }
 
         Ok(SyncResult {
             account_id: account.id,
@@ -653,6 +669,7 @@ impl EmailService {
             synced_count,
             skipped_count,
             token_expired: false,
+            partial,
             error: None,
         })
     }

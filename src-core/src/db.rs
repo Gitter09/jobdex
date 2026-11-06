@@ -221,6 +221,8 @@ pub mod models {
         pub scheduled_at: DateTime<Utc>,
         pub status: String,
         pub error_message: Option<String>,
+        pub send_started_at: Option<String>,
+        pub provider_receipt: Option<String>,
         pub created_at: DateTime<Utc>,
     }
 

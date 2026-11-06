@@ -1,12 +1,13 @@
 use crate::api::{
     error::{ApiError, ApiResponse},
+    handlers::contacts::ensure_in_scope,
+    scope,
     AppState,
 };
 use axum::{
     extract::{Path, State},
     Json,
 };
-use serde::Deserialize;
 
 pub async fn list_tags(
     State(state): State<AppState>,
@@ -19,66 +20,27 @@ pub async fn list_tags(
     Ok(Json(ApiResponse::ok(tags)))
 }
 
-#[derive(Deserialize)]
-pub struct CreateTagBody {
-    pub name: String,
-    pub color: String,
-}
-
-pub async fn create_tag(
-    State(state): State<AppState>,
-    Json(body): Json<CreateTagBody>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO tags (id, name, color) VALUES (?, ?, ?)")
-        .bind(&id)
-        .bind(&body.name)
-        .bind(&body.color)
-        .execute(&state.pool)
-        .await?;
-    Ok(Json(ApiResponse::ok(serde_json::json!({ "id": id }))))
-}
-
-#[derive(Deserialize)]
-pub struct UpdateTagBody {
-    pub name: Option<String>,
-    pub color: Option<String>,
-}
-
-pub async fn update_tag(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-    Json(body): Json<UpdateTagBody>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    sqlx::query(
-        "UPDATE tags SET name = COALESCE(?, name), color = COALESCE(?, color) WHERE id = ?",
-    )
-    .bind(&body.name)
-    .bind(&body.color)
-    .bind(&id)
-    .execute(&state.pool)
-    .await?;
-    Ok(Json(ApiResponse::ok(serde_json::json!({ "id": id }))))
-}
-
-pub async fn delete_tag(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    sqlx::query("DELETE FROM tags WHERE id = ?")
-        .bind(&id)
-        .execute(&state.pool)
-        .await?;
-    Ok(Json(ApiResponse::ok(
-        serde_json::json!({ "deleted": true }),
-    )))
-}
-
 pub async fn assign_tag(
     State(state): State<AppState>,
     Path(ids): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     let (contact_id, tag_id) = ids;
+    let scope = scope::load(&state.pool).await?;
+    scope.require_organize()?;
+    ensure_in_scope(&scope, &contact_id)?;
+
+    let tag_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tags WHERE id = ?)")
+            .bind(&tag_id)
+            .fetch_one(&state.pool)
+            .await?;
+    if !tag_exists {
+        return Err(ApiError::Validation(format!(
+            "Tag '{}' does not exist.",
+            tag_id
+        )));
+    }
+
     sqlx::query("INSERT OR IGNORE INTO contact_tags (contact_id, tag_id) VALUES (?, ?)")
         .bind(&contact_id)
         .bind(&tag_id)
@@ -94,6 +56,10 @@ pub async fn unassign_tag(
     Path(ids): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     let (contact_id, tag_id) = ids;
+    let scope = scope::load(&state.pool).await?;
+    scope.require_organize()?;
+    ensure_in_scope(&scope, &contact_id)?;
+
     sqlx::query("DELETE FROM contact_tags WHERE contact_id = ? AND tag_id = ?")
         .bind(&contact_id)
         .bind(&tag_id)

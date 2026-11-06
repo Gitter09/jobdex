@@ -8,6 +8,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Local relationship goals, reviewed workflows, sourced memory suggestions, Today review queue, and manual reminders.
+- Optional OpenAI-compatible BYOK settings with selected-contact disclosure and persisted daily request accounting.
+- Explicit external API contact scope and read/organize permissions; external drafts require native review.
+
+### Changed
+- Removed external send, schedule, destructive, export, file, account-mutation and settings routes from REST and both MCP surfaces.
+- Scheduled delivery now claims before sending and records ambiguous outcomes without automatic resends.
+
+### Verification limits
+- Native isolated-user smoke, dedicated Gmail/Outlook pilots, full authority regression coverage and release signing remain unverified. These changes are unreleased.
+
 ---
 
 ## [0.2.0] — 2026-04-14

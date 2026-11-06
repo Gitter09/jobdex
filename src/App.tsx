@@ -10,11 +10,13 @@ import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { TemplatesPage } from "@/pages/TemplatesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { WorkflowsPage } from "@/pages/WorkflowsPage";
 import { ErrorBoundary } from "@/components/error-boundary/ErrorBoundary";
 import { useErrors } from "@/hooks/use-errors";
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { toast } from "sonner";
 import "./index.css";
 
 window.onerror = (msg, url, line) => {
@@ -28,14 +30,12 @@ function App() {
 
   useEffect(() => {
     // Listen for background scheduled email failures
-    const unlistenScheduleFailure = listen<{ email_id: string; to_email: string; subject: string; error: string }>(
+    const unlistenScheduleFailure = listen<{ email_id: string; to_email: string; subject: string; error: string; state: string }>(
       "email_schedule_failed",
       (event) => {
-        import("sonner").then(({ toast }) => {
-          toast.error(`Scheduled Email Failed`, {
-            description: `Failed to send to ${event.payload.to_email}: ${event.payload.error}. Retrying later...`,
-            duration: 10000,
-          });
+        toast.error("Scheduled Email Failed", {
+          description: `Delivery to ${event.payload.to_email} could not be confirmed. Check your Sent mail before sending again.`,
+          duration: 10000,
         });
       }
     );
@@ -83,6 +83,7 @@ function App() {
             <Route path="/emails" element={<EmailsPage />} />
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/workflows" element={<WorkflowsPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/:tab" element={<SettingsPage />} />

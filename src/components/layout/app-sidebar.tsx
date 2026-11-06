@@ -10,6 +10,7 @@ import {
     PanelLeftClose,
     PanelLeft,
     CheckSquare,
+    GitBranch,
 } from "lucide-react";
 import {
     Tooltip,
@@ -31,7 +32,8 @@ const mainNavItems: NavItem[] = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "People", icon: Users, path: "/people" },
     { label: "Emails", icon: Mail, path: "/emails" },
-    { label: "Tasks", icon: CheckSquare, path: "/tasks", soon: true },
+    { label: "Tasks", icon: CheckSquare, path: "/tasks" },
+    { label: "Workflows", icon: GitBranch, path: "/workflows" },
     { label: "Templates", icon: FileText, path: "/templates" },
 ];
 

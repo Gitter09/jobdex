@@ -6,6 +6,7 @@ pub mod gmail;
 pub mod import;
 pub mod oauth_html;
 pub mod outlook;
+pub mod relationship_agent;
 pub mod settings;
 
 pub use contacts::{ContactWithTags, CONTACT_SELECT_BASE};

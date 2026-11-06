@@ -16,7 +16,7 @@ export function AboutTab() {
         <div className="space-y-8">
             <div>
                 <h3 className="text-lg font-medium">About</h3>
-                <p className="text-sm text-muted-foreground">Who built this and why.</p>
+                <p className="text-sm text-muted-foreground">A private relationship CRM and who built it.</p>
             </div>
 
             <Separator />
@@ -30,10 +30,21 @@ export function AboutTab() {
                             <span className="text-sm text-muted-foreground font-mono">v{version}</span>
                         </div>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            I built this while tracking job applications in a spreadsheet that kept breaking. Everything else was either complex enterprise software or a very "salesy" SaaS. I didn't want to pay for that.
+                            JobDex is a personal relationship CRM with a private relationship agent. It helps you
+                            remember what matters about the people you work with, and follow through naturally — reconnecting
+                            with a former colleague, keeping up with a mentor, staying close to collaborators or clients.
+                            A job search is just one of the ways people use it.
                         </p>
                         <p className="text-sm text-foreground/80 leading-relaxed">
-                            It's free, offline-first, and your data never leaves your machine. I'm sharing it in case it's useful to anyone else doing the same thing.
+                            It started as a spreadsheet for tracking a job search that kept breaking. Everything else was
+                            either complex enterprise software or a very "salesy" SaaS, so this became a local-first app
+                            instead: free, no account, and private by default.
+                        </p>
+                        <p className="text-sm text-foreground/80 leading-relaxed">
+                            Your contacts and notes live on this machine in an encrypted database. Nothing leaves it
+                            unless you explicitly choose which people may be sent to a model provider you configure
+                            yourself — and every agent-written email waits for your approval before it is sent. The
+                            manual tools work with no AI provider at all.
                         </p>
                         <p className="text-sm text-muted-foreground">
                             - Harshit Singh
@@ -74,9 +85,6 @@ export function AboutTab() {
                             </li>
                         ))}
                     </ul>
-                    <p className="text-xs text-muted-foreground pt-1">
-                        Tasks are still in progress and will be coming in a future update before long.
-                    </p>
                 </div>
             </div>
 

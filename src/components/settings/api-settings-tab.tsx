@@ -2,13 +2,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Copy, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldAlert, Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { useErrors } from "@/hooks/use-errors";
 import { useSettings } from "@/hooks/use-settings";
-import type { ToolStatus } from "@/types/crm";
+import type { AccessMode, ApiRelationshipScope, Contact, ToolStatus } from "@/types/crm";
 import { SettingRow, SettingSection } from "@/components/settings/setting-row";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface ApiStatus {
     enabled: boolean;
@@ -31,6 +40,48 @@ export function ApiSettingsTab() {
     const [copiedKey, setCopiedKey] = useState(false);
     const [tools, setTools] = useState<ToolStatus[]>([]);
     const [loadingTools, setLoadingTools] = useState(false);
+
+    // External-agent scope
+    const [contacts, setContacts] = useState<Contact[]>([]);
+    const [access, setAccess] = useState<AccessMode>("read");
+    const [allowedContactIds, setAllowedContactIds] = useState<string[]>([]);
+    const [allowContactCreation, setAllowContactCreation] = useState(false);
+    const [contactFilter, setContactFilter] = useState("");
+    const [savingScope, setSavingScope] = useState(false);
+
+    const fetchScope = useCallback(async () => {
+        try {
+            const [scope, people] = await Promise.all([
+                invoke<ApiRelationshipScope>("get_api_relationship_scope"),
+                invoke<Contact[]>("get_contacts"),
+            ]);
+            setAccess(scope.access);
+            setAllowedContactIds(scope.allowedContactIds);
+            setAllowContactCreation(scope.allowContactCreation);
+            setContacts(people);
+        } catch (error) {
+            handleErrorRef.current(error, "Couldn't load API access scope");
+        }
+    }, []);
+
+    const handleSaveScope = async () => {
+        setSavingScope(true);
+        try {
+            const scope = await invoke<ApiRelationshipScope>("set_api_relationship_scope", {
+                access,
+                allowedContactIds,
+                allowContactCreation,
+            });
+            setAccess(scope.access);
+            setAllowedContactIds(scope.allowedContactIds);
+            setAllowContactCreation(scope.allowContactCreation);
+            toast.success("API access scope saved.");
+        } catch (error) {
+            handleError(error, "Couldn't save API access scope");
+        } finally {
+            setSavingScope(false);
+        }
+    };
 
     const fetchStatus = useCallback(async () => {
         try {
@@ -57,7 +108,8 @@ export function ApiSettingsTab() {
     useEffect(() => {
         fetchStatus();
         fetchTools();
-    }, []);
+        fetchScope();
+    }, [fetchStatus, fetchTools, fetchScope]);
 
     const handleToggle = async () => {
         if (!status) return;
@@ -128,6 +180,14 @@ export function ApiSettingsTab() {
 
     const currentKey = apiKey || (settings.api_key ?? "");
 
+    const scopedQuery = contactFilter.trim().toLowerCase();
+    const filteredContacts = scopedQuery
+        ? contacts.filter((contact) => {
+              const label = `${contact.first_name ?? ""} ${contact.last_name ?? ""} ${contact.email ?? ""}`.toLowerCase();
+              return label.includes(scopedQuery);
+          })
+        : contacts;
+
     const copyToClipboard = async (text: string) => {
         try {
             await navigator.clipboard.writeText(text);
@@ -141,6 +201,140 @@ export function ApiSettingsTab() {
 
     return (
         <div className="space-y-6">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-50/60 dark:bg-amber-900/10 p-4">
+                <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                    External agents are limited to organizing people
+                </p>
+                <div className="mt-2 space-y-1.5 text-xs leading-relaxed text-amber-800/90 dark:text-amber-300/90">
+                    <p>
+                        Sending or scheduling email, deleting contacts, importing data, reading contact files, changing
+                        email accounts, editing settings, and exporting or clearing data are no longer available over the
+                        API. Agent-written email must be proposed and then approved in the native app before it is sent.
+                    </p>
+                    <p>
+                        There is no legacy unrestricted override. An existing API key sees no people or messages until
+                        you select a scope below.
+                    </p>
+                </div>
+            </div>
+
+            <SettingSection title="External agent access">
+                <div className="space-y-4 p-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="api-access-mode">Access mode</Label>
+                        <Select value={access} onValueChange={(value) => setAccess(value as AccessMode)}>
+                            <SelectTrigger id="api-access-mode" className="w-full sm:w-64">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="read">Read only</SelectItem>
+                                <SelectItem value="organize">Read and organize</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Read only exposes the people and messages in scope. Read and organize additionally allows
+                            creating or updating scoped people, assigning tags, and adding user events. Even in organize
+                            mode an external agent can never approve or send email — that requires you, in the native app.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="api-contact-filter">People in scope</Label>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Empty scope exposes no people or messages at all. This is separate from the AI disclosure
+                            consent in the relationship agent settings; changing one never changes the other.
+                        </p>
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                id="api-contact-filter"
+                                value={contactFilter}
+                                onChange={(e) => setContactFilter(e.target.value)}
+                                placeholder="Filter contacts"
+                                className="pl-8 h-8 text-sm"
+                            />
+                        </div>
+                        <div className="max-h-56 overflow-y-auto rounded-md border">
+                            {filteredContacts.length === 0 ? (
+                                <p className="px-3 py-4 text-sm text-muted-foreground">
+                                    {contacts.length === 0
+                                        ? "No contacts yet. Nothing is exposed until you add people and scope them."
+                                        : "No contacts match that filter."}
+                                </p>
+                            ) : (
+                                <ul className="divide-y">
+                                    {filteredContacts.map((contact) => {
+                                        const id = `api-scope-${contact.id}`;
+                                        const name =
+                                            `${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim() ||
+                                            contact.email ||
+                                            "Unnamed contact";
+                                        return (
+                                            <li key={contact.id}>
+                                                <label
+                                                    htmlFor={id}
+                                                    className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-muted/40"
+                                                >
+                                                    <Checkbox
+                                                        id={id}
+                                                        checked={allowedContactIds.includes(contact.id)}
+                                                        onCheckedChange={() =>
+                                                            setAllowedContactIds((current) =>
+                                                                current.includes(contact.id)
+                                                                    ? current.filter((value) => value !== contact.id)
+                                                                    : [...current, contact.id]
+                                                            )
+                                                        }
+                                                        className="mt-0.5"
+                                                    />
+                                                    <span className="min-w-0">
+                                                        <span className="block text-sm font-medium break-words">
+                                                            {name}
+                                                        </span>
+                                                        {contact.email && (
+                                                            <span className="block text-xs text-muted-foreground break-all">
+                                                                {contact.email}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </label>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {allowedContactIds.length === 0
+                                ? "No one in scope."
+                                : `${allowedContactIds.length} ${allowedContactIds.length === 1 ? "person" : "people"} in scope.`}
+                        </p>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                        <Checkbox
+                            id="api-allow-creation"
+                            checked={allowContactCreation}
+                            onCheckedChange={(value) => setAllowContactCreation(value === true)}
+                            className="mt-0.5"
+                        />
+                        <Label htmlFor="api-allow-creation" className="text-sm font-normal leading-relaxed">
+                            Allow external contact creation
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                                Off by default. Newly created contacts are added only to this API scope — never to AI
+                                disclosure consent.
+                            </span>
+                        </Label>
+                    </div>
+
+                    <Button onClick={handleSaveScope} disabled={savingScope}>
+                        {savingScope && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save scope
+                    </Button>
+                </div>
+            </SettingSection>
+
             <SettingSection title="Server">
                 <SettingRow
                     label="Enable API server"

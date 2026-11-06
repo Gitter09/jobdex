@@ -15,6 +15,7 @@ use error::AppError;
 #[cfg(target_os = "macos")]
 mod launchagent;
 mod mcp_config;
+mod relationship_agent;
 mod scheduler;
 mod tray;
 mod utils;
@@ -396,6 +397,7 @@ pub fn run() {
             #[cfg(debug_assertions)]
             println!("[Boot] Starting Email Scheduler...");
             scheduler::start_email_scheduler(app_handle.clone(), db.clone());
+            relationship_agent::start_runner(app_handle.clone(), db.clone());
 
             // Start the API server (if enabled)
             let api_pool = db.pool().clone();
@@ -525,7 +527,30 @@ pub fn run() {
             detect_ai_tools,
             configure_ai_tool,
             remove_ai_tool_config,
-            get_mcp_binary_path
+            get_mcp_binary_path,
+            relationship_agent::configure_relationship_model,
+            relationship_agent::get_relationship_model_status,
+            relationship_agent::test_relationship_model,
+            relationship_agent::disconnect_relationship_model,
+            relationship_agent::set_relationship_agent_paused,
+            relationship_agent::get_api_relationship_scope,
+            relationship_agent::set_api_relationship_scope,
+            relationship_agent::list_relationship_memory,
+            relationship_agent::refresh_relationship_memory,
+            relationship_agent::create_relationship_memory,
+            relationship_agent::update_relationship_memory,
+            relationship_agent::list_relationship_goals,
+            relationship_agent::save_relationship_goal,
+            relationship_agent::list_relationship_workflows,
+            relationship_agent::propose_relationship_workflow,
+            relationship_agent::save_relationship_workflow,
+            relationship_agent::list_relationship_actions,
+            relationship_agent::get_relationship_activity,
+            relationship_agent::create_relationship_reminder,
+            relationship_agent::edit_relationship_draft,
+            relationship_agent::review_relationship_action,
+            relationship_agent::retry_relationship_action,
+            relationship_agent::send_relationship_action
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -534,6 +559,7 @@ pub fn run() {
                     let _ = window.hide();
                 } else {
                     scheduler::stop_email_scheduler();
+                    relationship_agent::stop_runner();
                     if let Some(shutdown_tx) =
                         window.try_state::<Mutex<tokio::sync::broadcast::Sender<()>>>()
                     {
@@ -669,6 +695,10 @@ async fn delete_contact(db: tauri::State<'_, Db>, id: String) -> Result<(), AppE
         .bind(&id)
         .execute(&mut *tx)
         .await?;
+
+    // Relationship-agent records have no foreign keys to cascade; clean them up
+    // in the same transaction so no orphaned draft can reach a deleted person.
+    jobdex_core::relationship_agent::store::purge_contacts_tx(&mut tx, &[id.clone()]).await?;
 
     sqlx::query("DELETE FROM contacts WHERE id = ?")
         .bind(&id)
@@ -1033,6 +1063,8 @@ struct ScheduledEmailRow {
     scheduled_at: chrono::DateTime<chrono::Utc>,
     status: String,
     error_message: Option<String>,
+    send_started_at: Option<String>,
+    provider_receipt: Option<String>,
     created_at: chrono::DateTime<chrono::Utc>,
     attachment_paths: String,
 }
@@ -1049,7 +1081,7 @@ async fn get_scheduled_emails(
                     COALESCE(c.first_name, '') AS contact_first_name,
                     COALESCE(c.last_name, '') AS contact_last_name,
                     se.account_id, se.subject, se.body, se.scheduled_at, se.status,
-                    se.error_message, se.created_at,
+                    se.error_message, se.send_started_at, se.provider_receipt, se.created_at,
                     COALESCE(se.attachment_paths, '[]') AS attachment_paths
              FROM scheduled_emails se
              LEFT JOIN contacts c ON se.contact_id = c.id
@@ -1065,7 +1097,7 @@ async fn get_scheduled_emails(
                     COALESCE(c.first_name, '') AS contact_first_name,
                     COALESCE(c.last_name, '') AS contact_last_name,
                     se.account_id, se.subject, se.body, se.scheduled_at, se.status,
-                    se.error_message, se.created_at,
+                    se.error_message, se.send_started_at, se.provider_receipt, se.created_at,
                     COALESCE(se.attachment_paths, '[]') AS attachment_paths
              FROM scheduled_emails se
              LEFT JOIN contacts c ON se.contact_id = c.id
@@ -1080,7 +1112,9 @@ async fn get_scheduled_emails(
 #[tauri::command]
 async fn cancel_scheduled_email(db: tauri::State<'_, Db>, id: String) -> Result<(), AppError> {
     let pool = db.pool();
-    sqlx::query("DELETE FROM scheduled_emails WHERE id = ?")
+    // Never delete a row the scheduler has already claimed: that would erase the
+    // only record of a delivery whose outcome is still unknown.
+    sqlx::query("DELETE FROM scheduled_emails WHERE id = ? AND status != 'sending'")
         .bind(&id)
         .execute(pool)
         .await?;
@@ -1285,6 +1319,7 @@ async fn clear_all_data(db: tauri::State<'_, Db>) -> Result<(), AppError> {
     sqlx::query("DELETE FROM email_signatures")
         .execute(&mut *tx)
         .await?;
+    jobdex_core::relationship_agent::store::purge_all_tx(&mut tx).await?;
 
     tx.commit().await?;
     Ok(())
@@ -1953,6 +1988,15 @@ async fn save_setting(
     key: String,
     value: String,
 ) -> Result<(), AppError> {
+    // Settings that carry agent authority are only writable through validated
+    // native commands, never through this unrestricted path.
+    if key.starts_with("agent.") || key.starts_with("api.") {
+        return Err(AppError::Validation(format!(
+            "{} is managed by its own settings screen",
+            key
+        )));
+    }
+
     // Intercept sensitive keys and store them in OS keychain
     if key == "outlook_client_id" {
         jobdex_core::crypto::store_secret("outlook_client_id", &value)
@@ -2215,6 +2259,8 @@ async fn delete_contacts_bulk(db: tauri::State<'_, Db>, ids: Vec<String>) -> Res
     let mut tx = pool.begin().await?;
 
     let mut deleted_count = 0;
+
+    jobdex_core::relationship_agent::store::purge_contacts_tx(&mut tx, &ids).await?;
 
     for id in ids {
         let result = sqlx::query("DELETE FROM contacts WHERE id = ?")
@@ -2515,7 +2561,13 @@ async fn verify_lock_pin(db: tauri::State<'_, Db>, pin: String) -> Result<bool, 
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     match stored {
-        Some(hash) => Ok(jobdex_core::crypto::verify_pin_against_hash(&pin, &hash)),
+        Some(hash) => {
+            let ok = jobdex_core::crypto::verify_pin_against_hash(&pin, &hash);
+            if ok {
+                relationship_agent::set_unlocked(true);
+            }
+            Ok(ok)
+        }
         None => Err(AppError::Internal("No PIN configured".to_string())),
     }
 }

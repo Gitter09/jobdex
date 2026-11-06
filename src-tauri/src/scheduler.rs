@@ -13,6 +13,9 @@ struct ScheduleFailedPayload {
     to_email: String,
     subject: String,
     error: String,
+    /// `delivery_unknown` means the message may have been sent — never retried
+    /// automatically.
+    state: String,
 }
 
 struct PendingEmail {
@@ -28,6 +31,9 @@ static SHUTDOWN_FLAG: AtomicBool = AtomicBool::new(false);
 
 pub fn start_email_scheduler(app_handle: AppHandle, db: Db) {
     tauri::async_runtime::spawn(async move {
+        // Any row left mid-send by a previous process is ambiguous, not retryable.
+        recover_interrupted_sends(&db).await;
+
         let mut interval = time::interval(Duration::from_secs(60));
         let email_service = EmailService::new(db.clone());
 
@@ -53,13 +59,26 @@ pub fn stop_email_scheduler() {
     SHUTDOWN_FLAG.store(true, Ordering::Relaxed);
 }
 
+async fn recover_interrupted_sends(db: &Db) {
+    let result = sqlx::query(
+        "UPDATE scheduled_emails SET status = 'delivery_unknown', error_message = 'Interrupted during send — check Sent mail before sending again'
+         WHERE status = 'sending'",
+    )
+    .execute(db.pool())
+    .await;
+
+    if let Err(e) = result {
+        #[cfg(debug_assertions)]
+        eprintln!("Failed to recover interrupted scheduled sends: {}", e);
+    }
+}
+
+
 async fn check_and_send_scheduled_emails(
     app_handle: &AppHandle,
     db: &Db,
     email_service: &EmailService,
 ) -> Result<()> {
-    // 1. Fetch pending emails whose scheduled time has passed
-    // We join with contacts to get the recipient email address
     let rows = sqlx::query(
         r#"
         SELECT
@@ -92,38 +111,42 @@ async fn check_and_send_scheduled_emails(
         })
         .collect();
 
-    #[cfg(debug_assertions)]
-    if pending_emails.is_empty() {
-        return Ok(());
-    }
-
-    #[cfg(debug_assertions)]
-    println!(
-        "Found {} scheduled emails ready to send",
-        pending_emails.len()
-    );
-
     for email in pending_emails {
         let to_email = match email.to_email {
             Some(e) if !e.trim().is_empty() => e,
             _ => {
-                #[cfg(debug_assertions)]
-                eprintln!(
-                    "Skipping scheduled email {} because contact has no email",
-                    email.schedule_id
-                );
-                // Mark as failed permanently
-                let _ = sqlx::query("UPDATE scheduled_emails SET status = 'failed', error_message = 'Contact has no email address' WHERE id = ?")
-                    .bind(&email.schedule_id)
-                    .execute(db.pool())
-                    .await;
+                // Preflight failure: nothing was handed to the provider.
+                persist_status(
+                    db,
+                    &email.schedule_id,
+                    "UPDATE scheduled_emails SET status = 'failed', error_message = 'Contact has no email address' WHERE id = ?",
+                )
+                .await;
                 continue;
             }
         };
 
-        // 2. Attempt to send
+        // Claim exactly once: pending -> sending.
+        let claimed = sqlx::query(
+            "UPDATE scheduled_emails SET status = 'sending', send_started_at = ? WHERE id = ? AND status = 'pending'",
+        )
+        .bind(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+        .bind(&email.schedule_id)
+        .execute(db.pool())
+        .await;
+
+        match claimed {
+            Ok(result) if result.rows_affected() == 1 => {}
+            Ok(_) => continue, // lost the race to another tick or process
+            Err(e) => {
+                #[cfg(debug_assertions)]
+                eprintln!("Failed to claim scheduled email {}: {}", email.schedule_id, e);
+                continue;
+            }
+        }
+
         let paths: Vec<String> = serde_json::from_str(&email.attachment_paths).unwrap_or_default();
-        match email_service
+        let result = email_service
             .send_email(
                 &email.account_id,
                 &to_email,
@@ -131,28 +154,38 @@ async fn check_and_send_scheduled_emails(
                 &email.body,
                 paths,
             )
-            .await
-        {
-            Ok(_message_id) => {
-                // 3. Mark as sent
-                #[cfg(debug_assertions)]
-                println!("Successfully sent scheduled email {}", email.schedule_id);
-                let _ = sqlx::query("UPDATE scheduled_emails SET status = 'sent' WHERE id = ?")
-                    .bind(&email.schedule_id)
-                    .execute(db.pool())
-                    .await;
+            .await;
+
+        match result {
+            Ok(receipt) => {
+                let updated = sqlx::query(
+                    "UPDATE scheduled_emails SET status = 'sent', provider_receipt = ?, error_message = NULL WHERE id = ?",
+                )
+                .bind(&receipt)
+                .bind(&email.schedule_id)
+                .execute(db.pool())
+                .await;
+                if let Err(e) = updated {
+                    // The message went out; losing the status write would leave the
+                    // row in `sending` and be recovered as delivery_unknown.
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "Sent scheduled email {} but failed to persist status: {}",
+                        email.schedule_id, e
+                    );
+                }
             }
             Err(e) => {
-                // 4. Handle failure
-                // We leave it as 'pending' so it can retry later, but emit an event to notify the user.
+                // The request reached the provider and its outcome is unknown.
+                // Retrying here could deliver the same email twice.
                 let error_msg = e.to_string();
-                #[cfg(debug_assertions)]
-                eprintln!(
-                    "Failed to send scheduled email {}: {}",
-                    email.schedule_id, error_msg
-                );
+                persist_status(
+                    db,
+                    &email.schedule_id,
+                    "UPDATE scheduled_emails SET status = 'delivery_unknown', error_message = 'Delivery could not be confirmed — check Sent mail before sending again' WHERE id = ?",
+                )
+                .await;
 
-                // Emit event to frontend
                 let _ = app_handle.emit(
                     "email_schedule_failed",
                     ScheduleFailedPayload {
@@ -160,6 +193,7 @@ async fn check_and_send_scheduled_emails(
                         to_email: to_email.clone(),
                         subject: email.subject.clone(),
                         error: error_msg,
+                        state: "delivery_unknown".to_string(),
                     },
                 );
             }
@@ -167,4 +201,18 @@ async fn check_and_send_scheduled_emails(
     }
 
     Ok(())
+}
+
+async fn persist_status(db: &Db, schedule_id: &str, statement: &str) {
+    if let Err(e) = sqlx::query(statement)
+        .bind(schedule_id)
+        .execute(db.pool())
+        .await
+    {
+        #[cfg(debug_assertions)]
+        eprintln!(
+            "Failed to persist status for scheduled email {}: {}",
+            schedule_id, e
+        );
+    }
 }

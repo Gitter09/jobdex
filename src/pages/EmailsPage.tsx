@@ -80,8 +80,9 @@ export function EmailsPage() {
         }
     };
 
-    const pending = scheduled.filter((e) => e.status === "pending");
+    const pending = scheduled.filter((e) => e.status === "pending" || e.status === "sending");
     const failed = scheduled.filter((e) => e.status === "failed");
+    const uncertain = scheduled.filter((e) => e.status === "delivery_unknown");
 
     return (
         <div className="flex flex-col h-full relative">
@@ -124,6 +125,24 @@ export function EmailsPage() {
                                     <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Pending</h3>
                                     <div className="rounded-lg border divide-y">
                                         {pending.map((email) => (
+                                            <ScheduledEmailRow
+                                                key={email.id}
+                                                email={email}
+                                                onCancel={() => setCancelTarget(email)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {uncertain.length > 0 && (
+                                <div>
+                                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Delivery unclear</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        These were handed to your email provider but the result could not be confirmed.
+                                        Check your Sent mail before sending again — JobDex will never resend automatically.
+                                    </p>
+                                    <div className="rounded-lg border divide-y">
+                                        {uncertain.map((email) => (
                                             <ScheduledEmailRow
                                                 key={email.id}
                                                 email={email}
@@ -277,6 +296,12 @@ function ScheduledEmailRow({ email, onCancel }: { email: ScheduledEmail; onCance
                     <span className="font-medium text-sm truncate">{email.subject}</span>
                     {email.status === "failed" && (
                         <Badge variant="destructive" className="text-[10px] shrink-0">Failed</Badge>
+                    )}
+                    {email.status === "delivery_unknown" && (
+                        <Badge variant="destructive" className="text-[10px] shrink-0">Unconfirmed</Badge>
+                    )}
+                    {email.status === "sending" && (
+                        <Badge variant="outline" className="text-[10px] shrink-0">Sending</Badge>
                     )}
                     {overdue && (
                         <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50 shrink-0">

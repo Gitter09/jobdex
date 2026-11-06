@@ -8,6 +8,7 @@ import { AboutTab } from "@/components/settings/about-tab";
 import { PipelineSettingsTab } from "@/components/settings/pipeline-settings-tab";
 import { KeyboardSettingsTab } from "@/components/settings/keyboard-settings-tab";
 import { ApiSettingsTab } from "@/components/settings/api-settings-tab";
+import { RelationshipAgentSettingsTab } from "@/components/settings/relationship-agent-settings-tab";
 import { Button } from "@/components/ui/button";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
@@ -28,11 +29,12 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { SettingRow, SettingSection } from "@/components/settings/setting-row";
 
-type SettingsTab = "email" | "appearance" | "pipeline" | "data" | "security" | "keyboard" | "about" | "api";
+type SettingsTab = "email" | "appearance" | "pipeline" | "data" | "security" | "keyboard" | "about" | "api" | "agent";
 
 const NAV_ITEMS: { id: SettingsTab; label: string }[] = [
     { id: "appearance", label: "General" },
     { id: "email", label: "Email" },
+    { id: "agent", label: "Agent" },
     { id: "pipeline", label: "Pipeline" },
     { id: "security", label: "Security" },
     { id: "data", label: "Data" },
@@ -278,6 +280,7 @@ export function SettingsPage() {
             case "keyboard": return <KeyboardSettingsTab />;
             case "about": return <AboutTab />;
             case "api": return <ApiSettingsTab />;
+            case "agent": return <RelationshipAgentSettingsTab />;
             default: return renderAppearanceContent();
         }
     };

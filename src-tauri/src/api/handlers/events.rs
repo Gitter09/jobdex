@@ -1,5 +1,7 @@
 use crate::api::{
     error::{ApiError, ApiResponse},
+    handlers::contacts::ensure_in_scope,
+    scope,
     AppState,
 };
 use axum::{
@@ -12,6 +14,9 @@ pub async fn list_events(
     State(state): State<AppState>,
     Path(contact_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<jobdex_core::models::ContactEvent>>>, ApiError> {
+    let scope = scope::load(&state.pool).await?;
+    ensure_in_scope(&scope, &contact_id)?;
+
     let events = sqlx::query_as::<_, jobdex_core::models::ContactEvent>(
         "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'user_event' ORDER BY event_at ASC",
     )
@@ -25,6 +30,9 @@ pub async fn get_activity(
     State(state): State<AppState>,
     Path(contact_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<jobdex_core::models::ContactEvent>>>, ApiError> {
+    let scope = scope::load(&state.pool).await?;
+    ensure_in_scope(&scope, &contact_id)?;
+
     let events = sqlx::query_as::<_, jobdex_core::models::ContactEvent>(
         "SELECT id, contact_id, title, description, event_at, created_at, updated_at FROM contact_events WHERE contact_id = ? AND event_type = 'activity' ORDER BY event_at DESC",
     )
@@ -40,25 +48,28 @@ pub struct CreateEventBody {
     pub title: String,
     pub description: Option<String>,
     pub event_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub event_type: Option<String>,
 }
 
+/// External events are always `user_event`: an API key cannot fabricate activity
+/// or approvals.
 pub async fn create_event(
     State(state): State<AppState>,
     Path(contact_id): Path<String>,
     Json(body): Json<CreateEventBody>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let event_type = body.event_type.unwrap_or_else(|| "user_event".to_string());
+    let scope = scope::load(&state.pool).await?;
+    scope.require_organize()?;
+    ensure_in_scope(&scope, &contact_id)?;
+
     let event_id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO contact_events (id, contact_id, title, description, event_at, event_type) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO contact_events (id, contact_id, title, description, event_at, event_type) VALUES (?, ?, ?, ?, ?, 'user_event')",
     )
     .bind(&event_id)
     .bind(&contact_id)
     .bind(&body.title)
     .bind(&body.description)
     .bind(body.event_at)
-    .bind(&event_type)
     .execute(&state.pool)
     .await?;
     Ok(Json(ApiResponse::ok(serde_json::json!({ "id": event_id }))))
@@ -77,29 +88,24 @@ pub async fn update_event(
     Path(ids): Path<(String, String)>,
     Json(body): Json<UpdateEventBody>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let (_contact_id, event_id) = ids;
-    sqlx::query(
-        "UPDATE contact_events SET title = COALESCE(?, title), description = COALESCE(?, description), event_at = COALESCE(?, event_at), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    let (contact_id, event_id) = ids;
+    let scope = scope::load(&state.pool).await?;
+    scope.require_organize()?;
+    ensure_in_scope(&scope, &contact_id)?;
+
+    let result = sqlx::query(
+        "UPDATE contact_events SET title = COALESCE(?, title), description = COALESCE(?, description), event_at = COALESCE(?, event_at), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND contact_id = ? AND event_type = 'user_event'",
     )
     .bind(&body.title)
     .bind(&body.description)
     .bind(body.event_at)
     .bind(&event_id)
+    .bind(&contact_id)
     .execute(&state.pool)
     .await?;
-    Ok(Json(ApiResponse::ok(serde_json::json!({ "id": event_id }))))
-}
 
-pub async fn delete_event(
-    State(state): State<AppState>,
-    Path(ids): Path<(String, String)>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let (_contact_id, event_id) = ids;
-    sqlx::query("DELETE FROM contact_events WHERE id = ?")
-        .bind(&event_id)
-        .execute(&state.pool)
-        .await?;
-    Ok(Json(ApiResponse::ok(
-        serde_json::json!({ "deleted": true }),
-    )))
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound("Event not found.".into()));
+    }
+    Ok(Json(ApiResponse::ok(serde_json::json!({ "id": event_id }))))
 }

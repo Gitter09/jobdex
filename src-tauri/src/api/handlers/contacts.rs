@@ -7,6 +7,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 
 use crate::api::error::{ApiError, ApiResponse};
+use crate::api::scope::{self, Scope};
 use crate::api::AppState;
 
 /// Re-export the shared SQL query base from src-core.
@@ -67,17 +68,54 @@ pub async fn list_contacts(
     Query(params): Query<ListContactsQuery>,
 ) -> Result<Json<ApiResponse<Vec<ContactWithTags>>>, ApiError> {
     let pool = &state.pool;
+    let scope = scope::load(pool).await?;
 
-    let contacts: Vec<ContactWithTags> =
-        if params.search.is_some() || params.status_id.is_some() || params.tag.is_some() {
-            search_contacts_query(pool, &params.search, &params.status_id, &params.tag).await?
-        } else {
-            let sql = format!("{} ORDER BY c.updated_at DESC", CONTACT_SELECT_BASE);
-            sqlx::query_as::<_, ContactWithTags>(&sql)
-                .fetch_all(pool)
-                .await?
-        };
+    let mut sql = format!("{} ", CONTACT_SELECT_BASE);
+    let mut conditions: Vec<&str> = Vec::new();
 
+    let tag = params.tag.as_deref().filter(|t| !t.is_empty());
+    let search = params.search.as_deref().filter(|s| !s.is_empty());
+    let status_id = params.status_id.as_deref().filter(|s| !s.is_empty());
+
+    if tag.is_some() {
+        sql.push_str(
+            "LEFT JOIN contact_tags ct ON c.id = ct.contact_id LEFT JOIN tags tg ON ct.tag_id = tg.id ",
+        );
+        conditions.push("tg.name = ?");
+    }
+    if search.is_some() {
+        conditions.push("(c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ? OR c.company LIKE ? OR c.title LIKE ?)");
+    }
+    if status_id.is_some() {
+        conditions.push("c.status_id = ?");
+    }
+
+    // Scope lives in the WHERE clause so out-of-scope rows are never selected.
+    sql.push_str(&format!("WHERE 1=1 {} ", scope.contact_filter("c")));
+    if !conditions.is_empty() {
+        sql.push_str(&format!("AND {} ", conditions.join(" AND ")));
+    }
+    sql.push_str("ORDER BY c.updated_at DESC");
+
+    // Bindings must follow placeholder order, not builder order.
+    let mut query = scope.bind_as(sqlx::query_as::<_, ContactWithTags>(&sql));
+    if let Some(tag) = tag {
+        query = query.bind(tag.to_string());
+    }
+    if let Some(search) = search {
+        let pattern = format!("%{}%", search);
+        query = query
+            .bind(pattern.clone())
+            .bind(pattern.clone())
+            .bind(pattern.clone())
+            .bind(pattern.clone())
+            .bind(pattern);
+    }
+    if let Some(status_id) = status_id {
+        query = query.bind(status_id.to_string());
+    }
+
+    let contacts = query.fetch_all(pool).await?;
     let enriched = enrich_with_tags(pool, contacts).await?;
     Ok(Json(ApiResponse::ok(enriched)))
 }
@@ -87,6 +125,9 @@ pub async fn get_contact(
     Path(id): Path<String>,
 ) -> Result<Json<ApiResponse<ContactWithTags>>, ApiError> {
     let pool = &state.pool;
+    let scope = scope::load(pool).await?;
+    ensure_in_scope(&scope, &id)?;
+
     let sql = format!(
         "{} WHERE c.id = ? ORDER BY c.updated_at DESC",
         CONTACT_SELECT_BASE
@@ -120,10 +161,30 @@ pub async fn create_contact(
     Json(body): Json<CreateContactBody>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     let pool = &state.pool;
+    let scope = scope::load(pool).await?;
+    scope.require_create()?;
+
+    let email = body.email.as_deref().map(str::trim).filter(|e| !e.is_empty());
+
+    // Duplicate detection by normalized email, without revealing the other row.
+    if let Some(email) = email {
+        let duplicate: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM contacts WHERE lower(trim(email)) = lower(trim(?)))",
+        )
+        .bind(email)
+        .fetch_one(pool)
+        .await?;
+        if duplicate {
+            return Err(ApiError::Validation(
+                "A contact with this email already exists.".into(),
+            ));
+        }
+    }
+
     let id = uuid::Uuid::new_v4().to_string();
 
     let provided_status_id = body.status_id.filter(|s| !s.trim().is_empty());
-    let final_status_id = if let Some(ref sid) = provided_status_id {
+    let final_status_id = if let Some(sid) = &provided_status_id {
         let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)")
             .bind(sid)
             .fetch_one(pool)
@@ -144,19 +205,36 @@ pub async fn create_contact(
             })?
     };
 
+    let mut tx = pool.begin().await?;
     sqlx::query("INSERT INTO contacts (id, first_name, last_name, email, linkedin_url, status_id, title, company, location, company_website) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(&id)
         .bind(&body.first_name)
         .bind(&body.last_name)
-        .bind(&body.email)
+        .bind(email)
         .bind(&body.linkedin_url)
         .bind(&final_status_id)
         .bind(&body.title)
         .bind(&body.company)
         .bind(&body.location)
         .bind(&body.company_website)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
+
+    // Externally created contacts join API scope only, never model consent.
+    jobdex_core::relationship_agent::store::add_to_api_scope(pool, &id)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    jobdex_core::relationship_agent::store::log_activity(
+        pool,
+        None,
+        None,
+        &id,
+        "contact_created_externally",
+        serde_json::json!({ "origin": "api" }),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     #[cfg(debug_assertions)]
     println!(
@@ -182,7 +260,9 @@ pub struct UpdateContactBody {
     pub company: Option<String>,
     pub location: Option<String>,
     pub company_website: Option<String>,
-    #[serde(rename = "summary")]
+    /// The user-written summary is native-only. Accepted for an explicit rejection,
+    /// never applied.
+    #[serde(rename = "summary", alias = "intelligenceSummary")]
     pub intelligence_summary: Option<String>,
 }
 
@@ -192,13 +272,35 @@ pub async fn update_contact(
     Json(body): Json<UpdateContactBody>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     let pool = &state.pool;
+    let scope = scope::load(pool).await?;
+    scope.require_organize()?;
+    ensure_in_scope(&scope, &id)?;
 
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM contacts WHERE id = ?)")
-        .bind(&id)
-        .fetch_one(pool)
-        .await?;
-    if !exists {
-        return Err(ApiError::NotFound(format!("Contact '{}' not found", id)));
+    if body.intelligence_summary.is_some() {
+        return Err(ApiError::Forbidden(
+            "The user-written summary can only be changed in the JobDex app.".into(),
+        ));
+    }
+
+    let before = sqlx::query_as::<_, ContactSnapshot>(
+        "SELECT first_name, last_name, email, linkedin_url, status_id, last_contacted_date, next_contact_date, cadence_stage, title, company, location, company_website FROM contacts WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| ApiError::NotFound(format!("Contact '{}' not found", id)))?;
+
+    if let Some(sid) = &body.status_id {
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)")
+            .bind(sid)
+            .fetch_one(pool)
+            .await?;
+        if !exists {
+            return Err(ApiError::Validation(format!(
+                "Status '{}' does not exist.",
+                sid
+            )));
+        }
     }
 
     sqlx::query(
@@ -216,39 +318,37 @@ pub async fn update_contact(
             company = COALESCE(?, company),
             location = COALESCE(?, location),
             company_website = COALESCE(?, company_website),
-            intelligence_summary = COALESCE(?, intelligence_summary),
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         "#,
     )
-    .bind(body.first_name)
-    .bind(body.last_name)
-    .bind(body.email)
-    .bind(body.linkedin_url)
+    .bind(&body.first_name)
+    .bind(&body.last_name)
+    .bind(&body.email)
+    .bind(&body.linkedin_url)
     .bind(&body.status_id)
     .bind(body.last_contacted_date)
     .bind(body.next_contact_date)
     .bind(body.cadence_stage)
-    .bind(body.title)
-    .bind(body.company)
-    .bind(body.location)
-    .bind(body.company_website)
-    .bind(body.intelligence_summary)
+    .bind(&body.title)
+    .bind(&body.company)
+    .bind(&body.location)
+    .bind(&body.company_website)
     .bind(&id)
     .execute(pool)
     .await?;
 
-    if let Some(ref sid) = body.status_id {
+    if let Some(sid) = &body.status_id {
         let label: Option<String> = sqlx::query_scalar("SELECT label FROM statuses WHERE id = ?")
             .bind(sid)
             .fetch_optional(pool)
             .await
             .ok()
             .flatten();
-        if let Some(ref lbl) = label {
+        if let Some(lbl) = &label {
             let event_id = uuid::Uuid::new_v4().to_string();
             let _ = sqlx::query(
-                "INSERT INTO contact_events (id, contact_id, title, description, event_at, event_type) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'activity')",
+                "INSERT INTO contact_events (id, contact_id, title, description, event_at, event_type) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'user_event')",
             )
             .bind(&event_id)
             .bind(&id)
@@ -259,82 +359,86 @@ pub async fn update_contact(
         }
     }
 
-    #[cfg(debug_assertions)]
+    let changed = before.changed_fields(&body);
+    jobdex_core::relationship_agent::store::log_activity(
+        pool,
+        None,
+        None,
+        &id,
+        "contact_updated_externally",
+        serde_json::json!({ "origin": "api", "changedFields": changed }),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
     #[cfg(debug_assertions)]
     println!("[API] Updated contact {}", id);
 
     Ok(Json(ApiResponse::ok(serde_json::json!({ "id": id }))))
 }
 
-pub async fn delete_contact(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let pool = &state.pool;
-    let mut tx = pool.begin().await?;
-
-    sqlx::query("DELETE FROM contact_events WHERE contact_id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM contact_tags WHERE contact_id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM contact_files WHERE contact_id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM scheduled_emails WHERE contact_id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("DELETE FROM contacts WHERE id = ?")
-        .bind(&id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
-
-    #[cfg(debug_assertions)]
-    #[cfg(debug_assertions)]
-    println!("[API] Deleted contact {}", id);
-
-    Ok(Json(ApiResponse::ok(
-        serde_json::json!({ "deleted": true }),
-    )))
+#[derive(sqlx::FromRow)]
+struct ContactSnapshot {
+    first_name: String,
+    last_name: String,
+    email: Option<String>,
+    linkedin_url: Option<String>,
+    status_id: Option<String>,
+    last_contacted_date: Option<chrono::DateTime<chrono::Utc>>,
+    next_contact_date: Option<chrono::DateTime<chrono::Utc>>,
+    cadence_stage: Option<i32>,
+    title: Option<String>,
+    company: Option<String>,
+    location: Option<String>,
+    company_website: Option<String>,
 }
 
-#[derive(Deserialize)]
-pub struct BulkDeleteBody {
-    pub ids: Vec<String>,
-}
-
-pub async fn bulk_delete_contacts(
-    State(state): State<AppState>,
-    Json(body): Json<BulkDeleteBody>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
-    let pool = &state.pool;
-    let mut tx = pool.begin().await?;
-    let mut count: u64 = 0;
-
-    for id in &body.ids {
-        let result = sqlx::query("DELETE FROM contacts WHERE id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        count += result.rows_affected();
+impl ContactSnapshot {
+    fn changed_fields(&self, body: &UpdateContactBody) -> Vec<&'static str> {
+        let flags: [(&'static str, bool); 12] = [
+            (
+                "firstName",
+                body.first_name.is_some() && body.first_name.as_ref() != Some(&self.first_name),
+            ),
+            (
+                "lastName",
+                body.last_name.is_some() && body.last_name.as_ref() != Some(&self.last_name),
+            ),
+            ("email", body.email.is_some() && body.email != self.email),
+            (
+                "linkedinUrl",
+                body.linkedin_url.is_some() && body.linkedin_url != self.linkedin_url,
+            ),
+            (
+                "statusId",
+                body.status_id.is_some() && body.status_id != self.status_id,
+            ),
+            (
+                "lastContactedDate",
+                body.last_contacted_date.is_some()
+                    && body.last_contacted_date != self.last_contacted_date,
+            ),
+            (
+                "nextContactDate",
+                body.next_contact_date.is_some() && body.next_contact_date != self.next_contact_date,
+            ),
+            (
+                "cadenceStage",
+                body.cadence_stage.is_some() && body.cadence_stage != self.cadence_stage,
+            ),
+            ("title", body.title.is_some() && body.title != self.title),
+            ("company", body.company.is_some() && body.company != self.company),
+            ("location", body.location.is_some() && body.location != self.location),
+            (
+                "companyWebsite",
+                body.company_website.is_some() && body.company_website != self.company_website,
+            ),
+        ];
+        flags
+            .into_iter()
+            .filter_map(|(name, changed)| changed.then_some(name))
+            .collect()
     }
-
-    tx.commit().await?;
-
-    #[cfg(debug_assertions)]
-    #[cfg(debug_assertions)]
-    println!("[API] Bulk deleted {} contacts", count);
-
-    Ok(Json(ApiResponse::ok(
-        serde_json::json!({ "deleted": count }),
-    )))
 }
 
 #[derive(Deserialize)]
@@ -348,21 +452,44 @@ pub async fn bulk_update_status(
     Json(body): Json<BulkStatusBody>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiError> {
     let pool = &state.pool;
+    let scope = scope::load(pool).await?;
+    scope.require_organize()?;
+
+    if body.ids.is_empty() {
+        return Err(ApiError::Validation("No contact IDs supplied.".into()));
+    }
+    for id in &body.ids {
+        if !scope.allows(id) {
+            return Err(ApiError::Forbidden(
+                "One or more contacts are not in this API key's scope.".into(),
+            ));
+        }
+    }
+
+    let status_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)")
+            .bind(&body.status_id)
+            .fetch_one(pool)
+            .await?;
+    if !status_exists {
+        return Err(ApiError::Validation(format!(
+            "Status '{}' does not exist.",
+            body.status_id
+        )));
+    }
+
     let mut tx = pool.begin().await?;
     let mut count: u64 = 0;
-
     for id in &body.ids {
-        let result = sqlx::query("UPDATE contacts SET status_id = ? WHERE id = ?")
+        let result = sqlx::query("UPDATE contacts SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             .bind(&body.status_id)
             .bind(id)
             .execute(&mut *tx)
             .await?;
         count += result.rows_affected();
     }
-
     tx.commit().await?;
 
-    #[cfg(debug_assertions)]
     #[cfg(debug_assertions)]
     println!("[API] Bulk updated status for {} contacts", count);
 
@@ -371,42 +498,13 @@ pub async fn bulk_update_status(
     )))
 }
 
-async fn search_contacts_query(
-    pool: &SqlitePool,
-    search: &Option<String>,
-    status_id: &Option<String>,
-    tag: &Option<String>,
-) -> Result<Vec<ContactWithTags>, sqlx::Error> {
-    let mut conditions = vec!["1=1".to_string()];
-    let mut sql = format!("{} ", CONTACT_SELECT_BASE);
-
-    if let Some(s) = search {
-        if !s.is_empty() {
-            conditions.push(format!(
-                "(c.first_name LIKE '%{s}%' OR c.last_name LIKE '%{s}%' OR c.email LIKE '%{s}%' OR c.company LIKE '%{s}%' OR c.title LIKE '%{s}%')"
-            ));
-        }
+/// Out-of-scope IDs are indistinguishable from missing ones.
+pub fn ensure_in_scope(scope: &Scope, contact_id: &str) -> Result<(), ApiError> {
+    if scope.allows(contact_id) {
+        Ok(())
+    } else {
+        Err(ApiError::NotFound("Contact not found.".into()))
     }
-
-    if let Some(sid) = status_id {
-        if !sid.is_empty() {
-            conditions.push(format!("c.status_id = '{sid}'"));
-        }
-    }
-
-    if let Some(t) = tag {
-        if !t.is_empty() {
-            sql = format!("{} LEFT JOIN contact_tags ct ON c.id = ct.contact_id LEFT JOIN tags tg ON ct.tag_id = tg.id ", CONTACT_SELECT_BASE);
-            conditions.push(format!("tg.name = '{t}'"));
-        }
-    }
-
-    let where_clause = conditions.join(" AND ");
-    let full_sql = format!("{} WHERE {} ORDER BY c.updated_at DESC", sql, where_clause);
-
-    sqlx::query_as::<_, ContactWithTags>(&full_sql)
-        .fetch_all(pool)
-        .await
 }
 
 pub async fn enrich_with_tags(
