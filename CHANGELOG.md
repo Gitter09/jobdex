@@ -23,10 +23,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Relationship activity refreshes after agent changes, open reviews use current revisions, and Escape restores focus to the opening card.
 - Onboarding distinguishes local storage from optional, consented AI disclosure.
 - Contact email history follows persisted thread ownership; editing a permitted address cannot expose another person's conversations through the API.
+- Draft review shows the sender's email address and disables approval while the sending account is unavailable.
 
 ### Verification limits
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
 - Regression suites exercise concurrent delivery claims, terminal-state protection, paused workflow/goal authority, consent preflight, scoped HTTP organization and interrupted scheduled-send recovery.
+- Sender-account review was verified in browser mode; the final isolated native restart stalled during database initialization. Orca could not inspect a visible macOS SecurityAgent window, and the app process was stopped without approving unseen access.
 - Dedicated Gmail/Outlook pilots, native provider/consent flows, full authority regression coverage and release signing remain unverified. These changes are unreleased.
 
 ---

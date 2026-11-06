@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +21,9 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, CheckCircle2, Clock, Mail, RotateCcw, ShieldAlert } from "lucide-react";
 import { useRelationshipAgent } from "@/hooks/use-relationship-agent";
+import { useErrors } from "@/hooks/use-errors";
 import { isEmailDraft, isReminder } from "@/types/crm";
-import type { ActionStatus, RelationshipAction } from "@/types/crm";
+import type { ActionStatus, EmailAccount, RelationshipAction } from "@/types/crm";
 
 const ERROR_LABELS: Record<string, string> = {
     MODEL_NOT_CONFIGURED: "The AI provider is not configured. Configure it in Settings → Agent.",
@@ -91,6 +93,8 @@ interface ActionReviewDialogProps {
 
 export function ActionReviewDialog({ action, contactName, onOpenChange }: ActionReviewDialogProps) {
     const { reviewAction, editDraft, retryAction, sendAction } = useRelationshipAgent({ autoLoad: false });
+    const { handleError } = useErrors();
+    const [sender, setSender] = useState<{ id: string; email?: string } | null>(null);
     const [busy, setBusy] = useState(false);
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
@@ -99,6 +103,23 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
     const returnFocus = useRef<HTMLElement | null>(null);
     const incomingSubject = action && isEmailDraft(action) ? action.payload.subject : "";
     const incomingBody = action && isEmailDraft(action) ? action.payload.body : "";
+    const accountId = action && isEmailDraft(action) ? action.payload.accountId : undefined;
+    const senderEmail = sender?.id === accountId ? sender?.email : undefined;
+
+    useEffect(() => {
+        setSender(null);
+        if (!accountId) return;
+        let cancelled = false;
+        invoke<EmailAccount[]>("get_email_accounts").then((accounts) => {
+            if (!cancelled) setSender({ id: accountId, email: accounts.find((account) => account.id === accountId)?.email });
+        }).catch((error) => {
+            if (!cancelled) {
+                setSender({ id: accountId });
+                handleError(error, "Failed to load the sending account");
+            }
+        });
+        return () => { cancelled = true; };
+    }, [accountId, handleError]);
 
     // Rehydrate whenever the record or its revision changes — never keep a stale draft.
     useEffect(() => {
@@ -195,7 +216,7 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
                     <div className="space-y-3">
                         <div className="grid gap-1">
                             <Label className="text-xs text-muted-foreground">From account</Label>
-                            <p className="text-xs font-mono break-all">{draft.accountId}</p>
+                            <p className="text-sm break-all">{senderEmail || (sender?.id === accountId ? "Account unavailable" : "Loading account…")}</p>
                         </div>
                         <div className="grid gap-1">
                             <Label className="text-xs text-muted-foreground">To</Label>
@@ -297,7 +318,7 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
                             </Button>
                             <Button
                                 size="sm"
-                                disabled={busy || draftChanged}
+                                disabled={busy || draftChanged || !senderEmail}
                                 title={draftChanged ? "Save your changes before approving" : undefined}
                                 onClick={() =>
                                     run(async () => {
