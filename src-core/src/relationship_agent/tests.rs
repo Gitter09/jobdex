@@ -167,6 +167,25 @@ async fn save_active_workflow(
     .expect("save active workflow")
 }
 
+/// Binds a prepared draft to a workflow and records the resulting fingerprint, so
+/// approval is judged against the workflow that produced it.
+async fn attach_draft_to_workflow(pool: &SqlitePool, draft_id: &str, workflow_id: &str) {
+    sqlx::query("UPDATE relationship_actions SET workflow_id = ? WHERE id = ?")
+        .bind(workflow_id)
+        .bind(draft_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    let action = actions::get(pool, draft_id).await.unwrap();
+    let hash = actions::recompute_hash(pool, &action).await.unwrap();
+    sqlx::query("UPDATE relationship_actions SET context_hash = ? WHERE id = ?")
+        .bind(&hash)
+        .bind(draft_id)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
 // ===== Scripted HTTP provider =====
 
 #[derive(Clone)]
@@ -1078,4 +1097,446 @@ async fn empty_scope_cannot_be_activated() {
     .await
     .unwrap_err();
     assert!(err.to_string().contains("no contacts"));
+}
+
+#[tokio::test]
+async fn concurrent_claims_send_exactly_once() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_account(&env.pool, "acc1", "me@example.com").await;
+    enable_agent(&env.pool).await;
+
+    let action = actions::create_external_draft(
+        &env.pool,
+        "c1",
+        EmailDraftPayload {
+            account_id: "acc1".to_string(),
+            to: "alex@example.com".to_string(),
+            subject: "Hello".to_string(),
+            body: "Body".to_string(),
+        },
+        "test",
+    )
+    .await
+    .unwrap();
+    actions::review(&env.pool, &action.id, 1, ReviewDecision::Approve, None)
+        .await
+        .unwrap();
+
+    // Both callers observe the same approved revision and race for the claim.
+    let sends = Arc::new(AtomicUsize::new(0));
+    let first_counter = sends.clone();
+    let second_counter = sends.clone();
+    let first = actions::claim_and_send(
+        &env.pool,
+        &action.id,
+        move |_payload| {
+            let counter = first_counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok("provider-first".to_string())
+            }
+        },
+        SendGate { allowed: true },
+    );
+    let second = actions::claim_and_send(
+        &env.pool,
+        &action.id,
+        move |_payload| {
+            let counter = second_counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok("provider-second".to_string())
+            }
+        },
+        SendGate { allowed: true },
+    );
+    let (first, second) = tokio::join!(first, second);
+
+    assert_eq!(sends.load(Ordering::SeqCst), 1, "only one provider call");
+    assert_eq!(
+        [first.is_ok(), second.is_ok()].iter().filter(|ok| **ok).count(),
+        1,
+        "exactly one caller wins the claim"
+    );
+
+    let stored = actions::get(&env.pool, &action.id).await.unwrap();
+    assert_eq!(stored.status, "sent");
+    assert!(stored.send_started_at.is_some());
+    assert!(
+        matches!(stored.provider_receipt.as_deref(), Some("provider-first") | Some("provider-second"))
+    );
+
+    let activity = store::list_activity(&env.pool, Some("c1")).await.unwrap();
+    assert_eq!(
+        activity.iter().filter(|a| a.event_type == "send_started").count(),
+        1,
+        "the losing caller never claimed"
+    );
+}
+
+#[tokio::test]
+async fn claimed_and_terminal_deliveries_cannot_return_to_send() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_account(&env.pool, "acc1", "me@example.com").await;
+    enable_agent(&env.pool).await;
+
+    let action = actions::create_external_draft(
+        &env.pool,
+        "c1",
+        EmailDraftPayload {
+            account_id: "acc1".to_string(),
+            to: "alex@example.com".to_string(),
+            subject: "Hello".to_string(),
+            body: "Body".to_string(),
+        },
+        "test",
+    )
+    .await
+    .unwrap();
+    actions::review(&env.pool, &action.id, 1, ReviewDecision::Approve, None)
+        .await
+        .unwrap();
+
+    // Hold the provider call open so the claimed `sending` state is observable.
+    let (release, wait) = tokio::sync::oneshot::channel::<()>();
+    let (entered, entered_rx) = tokio::sync::oneshot::channel::<()>();
+    let sends = Arc::new(AtomicUsize::new(0));
+    let counter = sends.clone();
+    let pool = env.pool.clone();
+    let id = action.id.clone();
+    let claim = tokio::spawn(async move {
+        actions::claim_and_send(
+            &pool,
+            &id,
+            move |_payload| {
+                counter.fetch_add(1, Ordering::SeqCst);
+                entered.send(()).unwrap();
+                async move {
+                    let _ = wait.await;
+                    Ok("provider-claimed".to_string())
+                }
+            },
+            SendGate { allowed: true },
+        )
+        .await
+    });
+
+    entered_rx.await.unwrap();
+    assert_eq!(actions::get(&env.pool, &action.id).await.unwrap().status, "sending");
+    assert_eq!(sends.load(Ordering::SeqCst), 1);
+
+    // No review decision may move a claimed send back into the review queue.
+    for decision in [
+        ReviewDecision::Approve,
+        ReviewDecision::Dismiss,
+        ReviewDecision::Snooze,
+        ReviewDecision::Done,
+    ] {
+        assert!(actions::review(
+            &env.pool,
+            &action.id,
+            1,
+            decision,
+            Some("2099-01-01T00:00:00.000Z".to_string()),
+        ).await.is_err());
+    }
+    assert!(actions::retry(&env.pool, &action.id).await.is_err());
+
+    let stored = actions::get(&env.pool, &action.id).await.unwrap();
+    assert_eq!(stored.status, "sending");
+    assert!(stored.send_started_at.is_some());
+    assert!(stored.approved_at.is_some());
+    assert_eq!(sends.load(Ordering::SeqCst), 1, "rejections made no provider call");
+
+    release.send(()).unwrap();
+    let outcome = claim.await.unwrap().unwrap();
+    assert_eq!(outcome.action.status, "sent");
+    assert_eq!(outcome.action.provider_receipt.as_deref(), Some("provider-claimed"));
+
+    // A delivered email is terminal: nothing re-approves or resends it.
+    for decision in [ReviewDecision::Approve, ReviewDecision::Dismiss] {
+        assert!(
+            actions::review(&env.pool, &action.id, 1, decision, None)
+                .await
+                .is_err(),
+            "sent email rejects {:?}",
+            decision
+        );
+    }
+    assert!(actions::retry(&env.pool, &action.id).await.is_err());
+    let stored = actions::get(&env.pool, &action.id).await.unwrap();
+    assert_eq!(stored.status, "sent");
+    assert_eq!(stored.provider_receipt.as_deref(), Some("provider-claimed"));
+    assert_eq!(sends.load(Ordering::SeqCst), 1);
+
+    // Ambiguous delivery keeps its claim and can only be checked manually.
+    let ambiguous = actions::create_external_draft(
+        &env.pool,
+        "c1",
+        EmailDraftPayload {
+            account_id: "acc1".to_string(),
+            to: "alex@example.com".to_string(),
+            subject: "Second".to_string(),
+            body: "Second body".to_string(),
+        },
+        "test",
+    )
+    .await
+    .unwrap();
+    actions::review(&env.pool, &ambiguous.id, 1, ReviewDecision::Approve, None)
+        .await
+        .unwrap();
+    let ambiguous_sends = Arc::new(AtomicUsize::new(0));
+    let counter = ambiguous_sends.clone();
+    let outcome = actions::claim_and_send(
+        &env.pool,
+        &ambiguous.id,
+        move |_payload| {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Err(anyhow::anyhow!("connection reset after upload"))
+            }
+        },
+        SendGate { allowed: true },
+    )
+    .await
+    .unwrap();
+    assert_eq!(outcome.action.status, "delivery_unknown");
+
+    for decision in [ReviewDecision::Approve, ReviewDecision::Snooze] {
+        assert!(
+            actions::review(
+                &env.pool,
+                &ambiguous.id,
+                1,
+                decision,
+                Some("2099-01-01T00:00:00.000Z".to_string()),
+            )
+            .await
+            .is_err(),
+            "ambiguous delivery rejects {:?}",
+            decision
+        );
+    }
+    assert!(actions::retry(&env.pool, &ambiguous.id).await.is_err());
+    let counter = ambiguous_sends.clone();
+    let resend = actions::claim_and_send(
+        &env.pool,
+        &ambiguous.id,
+        move |_payload| {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok("provider-third".to_string())
+            }
+        },
+        SendGate { allowed: true },
+    )
+    .await;
+    assert!(resend.is_err());
+
+    let stored = actions::get(&env.pool, &ambiguous.id).await.unwrap();
+    assert_eq!(stored.status, "delivery_unknown");
+    assert_eq!(stored.error_code.as_deref(), Some("DELIVERY_UNKNOWN"));
+    assert!(stored.send_started_at.is_some());
+    assert!(stored.provider_receipt.is_none());
+    assert_eq!(ambiguous_sends.load(Ordering::SeqCst), 1, "never resent");
+}
+
+#[tokio::test]
+async fn paused_workflow_or_goal_blocks_approval_of_prepared_draft() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_account(&env.pool, "acc1", "me@example.com").await;
+    enable_agent(&env.pool).await;
+
+    let workflow = save_active_workflow(
+        &env.pool,
+        vec!["c1".to_string()],
+        vec![cadence_rule(30, RuleAction::EmailDraft)],
+        Some("acc1".to_string()),
+    )
+    .await;
+    let draft = actions::create_external_draft(
+        &env.pool,
+        "c1",
+        EmailDraftPayload {
+            account_id: "acc1".to_string(),
+            to: "alex@example.com".to_string(),
+            subject: "Hello".to_string(),
+            body: "Body".to_string(),
+        },
+        "test",
+    )
+    .await
+    .unwrap();
+    attach_draft_to_workflow(&env.pool, &draft.id, &workflow.id).await;
+
+    let paused = workflows::save_workflow(
+        &env.pool,
+        Some(workflow.id.clone()),
+        Some(workflow.revision),
+        "Keep in touch".to_string(),
+        "stay closer".to_string(),
+        None,
+        workflow.spec.clone(),
+        WorkflowStatus::Paused,
+    )
+    .await
+    .unwrap();
+    assert_eq!(paused.status, "paused");
+
+    let sends = Arc::new(AtomicUsize::new(0));
+    let counter = sends.clone();
+    let stored = actions::get(&env.pool, &draft.id).await.unwrap();
+    assert_eq!(stored.status, "dismissed", "pausing invalidates the prepared draft");
+    assert!(stored.approved_at.is_none());
+    assert!(actions::review(&env.pool, &draft.id, 1, ReviewDecision::Approve, None)
+        .await.is_err());
+    let claim = actions::claim_and_send(
+        &env.pool,
+        &draft.id,
+        move |_payload| {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok("provider-paused".to_string())
+            }
+        },
+        SendGate { allowed: true },
+    )
+    .await;
+    assert!(claim.is_err());
+    assert_eq!(sends.load(Ordering::SeqCst), 0, "paused workflow cannot send");
+    let stored = actions::get(&env.pool, &draft.id).await.unwrap();
+    assert!(stored.approved_at.is_none());
+    assert!(stored.approved_revision.is_none());
+    assert_ne!(stored.status, "approved");
+
+    // Pausing the parent goal pauses its active workflow before review too.
+    let goal = workflows::save_goal(
+        &env.pool,
+        None,
+        "Reconnect".to_string(),
+        "see old colleagues".to_string(),
+        GoalStatus::Active,
+    )
+    .await
+    .unwrap();
+    let goal_workflow = workflows::save_workflow(
+        &env.pool,
+        None,
+        None,
+        "Goal workflow".to_string(),
+        "reach out".to_string(),
+        Some(goal.id.clone()),
+        WorkflowSpec {
+            schema_version: SPEC_SCHEMA_VERSION,
+            contact_ids: vec!["c1".to_string()],
+            account_id: Some("acc1".to_string()),
+            purpose: "Reconnect warmly".to_string(),
+            tone: "warm".to_string(),
+            rules: vec![cadence_rule(30, RuleAction::EmailDraft)],
+        },
+        WorkflowStatus::Active,
+    )
+    .await
+    .unwrap();
+    let goal_draft = actions::create_external_draft(
+        &env.pool,
+        "c1",
+        EmailDraftPayload {
+            account_id: "acc1".to_string(),
+            to: "alex@example.com".to_string(),
+            subject: "Hello".to_string(),
+            body: "Body".to_string(),
+        },
+        "test",
+    )
+    .await
+    .unwrap();
+    attach_draft_to_workflow(&env.pool, &goal_draft.id, &goal_workflow.id).await;
+
+    let paused_goal = workflows::save_goal(
+        &env.pool,
+        Some(goal.id.clone()),
+        "Reconnect".to_string(),
+        "see old colleagues".to_string(),
+        GoalStatus::Paused,
+    )
+    .await
+    .unwrap();
+    assert_eq!(paused_goal.status, "paused");
+    assert_eq!(
+        store::get_workflow(&env.pool, &goal_workflow.id).await.unwrap().unwrap().status,
+        "paused"
+    );
+
+    assert!(actions::review(&env.pool, &goal_draft.id, 1, ReviewDecision::Approve, None)
+        .await
+        .is_err());
+    let counter = sends.clone();
+    let claim = actions::claim_and_send(
+        &env.pool,
+        &goal_draft.id,
+        move |_payload| {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Ok("provider-goal".to_string())
+            }
+        },
+        SendGate { allowed: true },
+    )
+    .await;
+    assert!(claim.is_err());
+    assert_eq!(sends.load(Ordering::SeqCst), 0);
+    let stored = actions::get(&env.pool, &goal_draft.id).await.unwrap();
+    assert_eq!(stored.status, "needs_review");
+    assert!(stored.approved_at.is_none());
+    assert!(stored.approved_revision.is_none());
+}
+
+#[tokio::test]
+async fn proposal_requires_disclosure_consent_before_any_model_call() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_contact(&env.pool, "c2", "Blair", Some("blair@example.com")).await;
+
+    // A fully verified model is configured, but no contact has disclosure consent.
+    let server = spawn_mock(vec![MockReply::Json(chat_response("{}"))]).await;
+    enable_model(&env.pool, &server.base_url, "test-model").await;
+
+    let err = workflows::propose(
+        &env.pool,
+        "Reconnect every 45 days".to_string(),
+        vec!["c1".to_string()],
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert!(err.to_string().contains("consent"), "{}", err);
+    assert_eq!(server.hits.load(Ordering::SeqCst), 0, "no outbound request");
+    let settings = model::load(&env.pool).await.unwrap();
+    assert_eq!(model::requests_today(&settings), 0, "no paid usage reserved");
+    assert!(workflows::list_workflows(&env.pool).await.unwrap().is_empty());
+
+    // Consent for someone else never widens the request.
+    set_setting(&env.pool, "agent.allowed_contact_ids", r#"["c2"]"#).await;
+    let err = workflows::propose(
+        &env.pool,
+        "Reconnect every 45 days".to_string(),
+        vec!["c1".to_string()],
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert!(err.to_string().contains("consent"), "{}", err);
+    assert_eq!(server.hits.load(Ordering::SeqCst), 0);
+    let settings = model::load(&env.pool).await.unwrap();
+    assert_eq!(model::requests_today(&settings), 0);
+    assert!(workflows::list_workflows(&env.pool).await.unwrap().is_empty());
 }

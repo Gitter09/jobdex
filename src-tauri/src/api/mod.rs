@@ -4,6 +4,9 @@ pub mod handlers;
 pub mod routes;
 pub mod scope;
 
+#[cfg(test)]
+mod tests;
+
 use handlers::sse::SessionMap;
 use sqlx::SqlitePool;
 use std::collections::HashMap;

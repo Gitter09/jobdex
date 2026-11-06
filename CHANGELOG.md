@@ -22,9 +22,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Snoozed reminders can be completed directly; terminal delivery records no longer offer invalid review mutations.
 - Relationship activity refreshes after agent changes, open reviews use current revisions, and Escape restores focus to the opening card.
 - Onboarding distinguishes local storage from optional, consented AI disclosure.
+- Contact email history follows persisted thread ownership; editing a permitted address cannot expose another person's conversations through the API.
 
 ### Verification limits
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
+- Regression suites exercise concurrent delivery claims, terminal-state protection, paused workflow/goal authority, consent preflight, scoped HTTP organization and interrupted scheduled-send recovery.
 - Dedicated Gmail/Outlook pilots, native provider/consent flows, full authority regression coverage and release signing remain unverified. These changes are unreleased.
 
 ---

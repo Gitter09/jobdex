@@ -233,29 +233,19 @@ impl EmailService {
         Ok(())
     }
 
-    /// Get emails for a contact (properly resolved by contact email)
+    /// Read only conversations explicitly assigned to this contact.
     pub async fn get_emails_for_contact(
         &self,
         contact_id: &str,
     ) -> Result<Vec<crate::db::models::EmailMessage>> {
-        // First resolve the contact's email address
-        let contact_email: Option<(String,)> = sqlx::query_as(
-            "SELECT email FROM contacts WHERE id = ? AND email IS NOT NULL AND email != ''",
+        let emails = sqlx::query_as::<_, crate::db::models::EmailMessage>(
+            "SELECT m.id, m.thread_id, m.from_email, m.to_email, m.subject, m.body, m.html_body, m.sent_at, m.status, m.provider_message_id, m.manually_assigned, m.created_at
+             FROM email_messages m
+             JOIN email_threads t ON t.id = m.thread_id
+             WHERE t.contact_id = ?
+             ORDER BY m.sent_at DESC"
         )
         .bind(contact_id)
-        .fetch_optional(self.db.pool())
-        .await?;
-
-        let email = match contact_email {
-            Some((e,)) => e,
-            None => return Ok(vec![]),
-        };
-
-        let emails = sqlx::query_as::<_, crate::db::models::EmailMessage>(
-            "SELECT id, thread_id, from_email, to_email, subject, body, html_body, sent_at, status, provider_message_id, manually_assigned, created_at FROM email_messages WHERE from_email = ? OR to_email = ? ORDER BY sent_at DESC"
-        )
-        .bind(&email)
-        .bind(&email)
         .fetch_all(self.db.pool())
         .await?;
 

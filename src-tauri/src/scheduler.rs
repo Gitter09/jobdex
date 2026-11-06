@@ -216,3 +216,52 @@ async fn persist_status(db: &Db, schedule_id: &str, statement: &str) {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn restart_quarantines_only_interrupted_sends_and_preserves_receipts() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("../src-core/migrations").run(&pool).await.unwrap();
+        let db = Db::from_pool(pool);
+        let mut tx = db.pool().begin().await.unwrap();
+        sqlx::query("INSERT INTO contacts (id, first_name, last_name) VALUES ('recovery-contact', 'Test', 'Person')")
+            .execute(&mut *tx).await.unwrap();
+        sqlx::query("INSERT INTO email_accounts (id, provider, email, access_token) VALUES ('recovery-account', 'gmail', 'me@example.invalid', 'fake-token')")
+            .execute(&mut *tx).await.unwrap();
+        for status in ["pending", "sending", "sent", "failed", "delivery_unknown"] {
+            let started = matches!(status, "sending" | "sent" | "delivery_unknown");
+            sqlx::query("INSERT INTO scheduled_emails (id, contact_id, account_id, subject, body, scheduled_at, status, send_started_at, provider_receipt) VALUES (?, 'recovery-contact', 'recovery-account', 'Test', 'Test', '2026-01-01T00:00:00Z', ?, ?, ?)")
+                .bind(status)
+                .bind(status)
+                .bind(started.then_some("2026-01-01T00:01:00Z"))
+                .bind(started.then_some("provider-acknowledgement"))
+                .execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        type DeliveryRow = (String, String, String, Option<String>, Option<String>);
+        let before: Vec<DeliveryRow> = sqlx::query_as(
+            "SELECT id, status, scheduled_at, send_started_at, provider_receipt FROM scheduled_emails ORDER BY id",
+        ).fetch_all(db.pool()).await.unwrap();
+
+        recover_interrupted_sends(&db).await;
+        recover_interrupted_sends(&db).await;
+
+        let after: Vec<DeliveryRow> = sqlx::query_as(
+            "SELECT id, status, scheduled_at, send_started_at, provider_receipt FROM scheduled_emails ORDER BY id",
+        ).fetch_all(db.pool()).await.unwrap();
+        let expected: Vec<DeliveryRow> = before.into_iter().map(|mut row| {
+            if row.1 == "sending" {
+                row.1 = "delivery_unknown".to_string();
+            }
+            row
+        }).collect();
+        assert_eq!(after, expected);
+    }
+}
