@@ -72,19 +72,23 @@ export function DashboardPage() {
     const [openAction, setOpenAction] = useState<RelationshipAction | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
         (async () => {
             try {
                 const [nextContacts, nextActivity] = await Promise.all([
                     invoke<Contact[]>("get_contacts"),
                     invoke<RelationshipActivity[]>("get_relationship_activity", { contactId: null }),
                 ]);
-                setContacts(nextContacts);
-                setActivities(nextActivity);
+                if (!cancelled) {
+                    setContacts(nextContacts);
+                    setActivities(nextActivity);
+                }
             } catch (err) {
-                handleError(err, "Failed to load today's relationship data");
+                if (!cancelled) handleError(err, "Failed to load today's relationship data");
             }
         })();
-    }, []);
+        return () => { cancelled = true; };
+    }, [actions, handleError]);
 
     const contactNames = useMemo(() => {
         const map = new Map<string, string>();
@@ -248,7 +252,7 @@ export function DashboardPage() {
             </div>
 
             <ActionReviewDialog
-                action={openAction}
+                action={openAction ? actions.find((item) => item.id === openAction.id) ?? openAction : null}
                 contactName={openContactName}
                 onOpenChange={(open) => {
                     if (!open) setOpenAction(null);
@@ -278,7 +282,10 @@ function ActionCard({ action, contactName, onOpen, muted }: ActionCardProps) {
     return (
         <button
             type="button"
-            onClick={onOpen}
+            onClick={(event) => {
+                event.currentTarget.focus();
+                onOpen();
+            }}
             className="w-full text-left rounded-lg border bg-card px-4 py-3 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
         >
             <div className="flex items-start gap-3">

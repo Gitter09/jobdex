@@ -226,9 +226,29 @@ export function ContactDetailPage() {
         fetchEvents();
         fetchActivity();
         fetchFiles();
-        fetchMemory();
-        fetchAgentActivity();
     }, [id]);
+
+    useEffect(() => {
+        if (!id) return;
+        let cancelled = false;
+        Promise.all([
+            invoke<RelationshipMemory[]>("list_relationship_memory", { contactId: id }),
+            invoke<RelationshipActivity[]>("get_relationship_activity", { contactId: id }),
+        ]).then(([nextMemory, nextActivity]) => {
+            if (!cancelled) {
+                setMemory(nextMemory);
+                setAgentActivity(nextActivity);
+            }
+        }).catch((error) => {
+            if (!cancelled) handleError(error, "Failed to refresh relationship context");
+        }).finally(() => {
+            if (!cancelled) {
+                setMemoryLoading(false);
+                setAgentActivityLoading(false);
+            }
+        });
+        return () => { cancelled = true; };
+    }, [id, agentActions, handleError]);
 
     useEffect(() => {
         if (!isStayInTouchOpen) return;
@@ -1529,7 +1549,10 @@ export function ContactDetailPage() {
                                                             <button
                                                                 type="button"
                                                                 className="text-left w-full rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                                                onClick={() => setReviewActionTarget(linkedAction)}
+                                                                onClick={(event) => {
+                                                                    event.currentTarget.focus();
+                                                                    setReviewActionTarget(linkedAction);
+                                                                }}
                                                             >
                                                                 {body}
                                                             </button>
@@ -1573,7 +1596,7 @@ export function ContactDetailPage() {
                         />
 
                         <ActionReviewDialog
-                            action={reviewActionTarget}
+                            action={reviewActionTarget ? agentActions.find((item) => item.id === reviewActionTarget.id) ?? reviewActionTarget : null}
                             contactName={contactName}
                             onOpenChange={(open) => {
                                 if (!open) setReviewActionTarget(null);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,18 +96,17 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
     const [body, setBody] = useState("");
     const [snoozeHours, setSnoozeHours] = useState("24");
     const [saveError, setSaveError] = useState<string | null>(null);
+    const returnFocus = useRef<HTMLElement | null>(null);
+    const incomingSubject = action && isEmailDraft(action) ? action.payload.subject : "";
+    const incomingBody = action && isEmailDraft(action) ? action.payload.body : "";
 
     // Rehydrate whenever the record or its revision changes — never keep a stale draft.
     useEffect(() => {
         setSaveError(null);
-        if (action && isEmailDraft(action)) {
-            setSubject(action.payload.subject);
-            setBody(action.payload.body);
-        } else {
-            setSubject("");
-            setBody("");
-        }
-    }, [action?.id, action?.revision, action?.status]);
+        setSubject(incomingSubject);
+        setBody(incomingBody);
+        setSnoozeHours("24");
+    }, [action?.id, action?.revision, action?.status, incomingSubject, incomingBody]);
 
     if (!action) return null;
 
@@ -116,6 +115,8 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
     const draftChanged = draft ? draft.subject !== subject || draft.body !== body : false;
     const blocked = action.status === "blocked";
     const canReview = action.status === "needs_review" || action.status === "approved";
+    const canChange = ["needs_review", "approved", "snoozed", "blocked"].includes(action.status)
+        && !action.sendStartedAt;
 
     const snoozeUntil = () =>
         new Date(Date.now() + Number(snoozeHours) * 3600_000).toISOString();
@@ -136,7 +137,18 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
 
     return (
         <Dialog open onOpenChange={(open) => !open && onOpenChange(false)}>
-            <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
+            <DialogContent
+                className="max-w-xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto"
+                onOpenAutoFocus={() => {
+                    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                }}
+                onCloseAutoFocus={(event) => {
+                    if (returnFocus.current?.isConnected) {
+                        event.preventDefault();
+                        returnFocus.current.focus();
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-base">
                         {draft ? <Mail className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
@@ -220,8 +232,8 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
                 )}
 
                 <DialogFooter className="gap-2 sm:gap-2 flex-wrap">
-                    <Select value={snoozeHours} onValueChange={setSnoozeHours}>
-                        <SelectTrigger className="h-8 w-28 text-xs">
+                    <Select value={snoozeHours} onValueChange={setSnoozeHours} disabled={busy || !canChange}>
+                        <SelectTrigger className="h-8 w-28 text-xs" aria-label="Snooze duration">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -235,7 +247,7 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
                     <Button
                         variant="outline"
                         size="sm"
-                        disabled={busy}
+                        disabled={busy || !canChange}
                         onClick={() =>
                             run(() => reviewAction(action.id, action.revision, "snooze", snoozeUntil()))
                         }
@@ -245,20 +257,20 @@ export function ActionReviewDialog({ action, contactName, onOpenChange }: Action
                     <Button
                         variant="ghost"
                         size="sm"
-                        disabled={busy}
+                        disabled={busy || !canChange}
                         onClick={() => run(() => reviewAction(action.id, action.revision, "dismiss"))}
                     >
                         Dismiss
                     </Button>
 
-                    {blocked && action.kind === "email_draft" && (
+                    {blocked && canChange && action.kind === "email_draft" && (
                         <Button variant="outline" size="sm" disabled={busy} onClick={() => run(() => retryAction(action.id))}>
                             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                             Retry
                         </Button>
                     )}
 
-                    {reminder && canReview && (
+                    {reminder && canChange && (
                         <Button size="sm" disabled={busy} onClick={() => run(() => reviewAction(action.id, action.revision, "done"))}>
                             Mark done
                         </Button>

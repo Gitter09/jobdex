@@ -53,7 +53,7 @@ export function useRelationshipAgent(options: { autoLoad?: boolean } = {}) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [handleError]);
 
     useEffect(() => {
         if (!autoLoad) return;

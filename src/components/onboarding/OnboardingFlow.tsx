@@ -58,7 +58,7 @@ const TYPEWRITER_LINES = [
     { text: "remember what matters.", style: "normal" as const },
     { text: "follow through naturally.", style: "normal" as const },
     { text: "", style: "break" as const },
-    { text: "(all of it stays on this machine.)", style: "dim" as const },
+    { text: "(stored locally. AI sharing is optional and needs your consent.)", style: "dim" as const },
 ];
 
 // Flatten into a single string with \n markers for the typewriter engine

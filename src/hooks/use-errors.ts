@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { useCallback } from "react";
 
 export interface AppError {
     code: "DATABASE" | "NETWORK" | "IO" | "SERIALIZATION" | "VALIDATION" | "INTERNAL";
@@ -18,7 +19,7 @@ const copyToClipboard = (text: string) => {
 };
 
 export const useErrors = () => {
-    const handleError = (error: unknown, fallbackMessage?: string) => {
+    const handleError = useCallback((error: unknown, fallbackMessage?: string) => {
         console.error("App Error:", error);
 
         // Structured AppError from Rust
@@ -71,7 +72,7 @@ export const useErrors = () => {
                 onClick: () => copyToClipboard(message),
             },
         });
-    };
+    }, []);
 
     return { handleError };
 };

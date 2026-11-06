@@ -55,7 +55,7 @@ export function TasksPage() {
                 handleError(err, "Failed to load contacts for reminders");
             }
         })();
-    }, []);
+    }, [actions, handleError]);
 
     const contactNames = useMemo(() => {
         const map = new Map<string, string>();
@@ -160,7 +160,10 @@ export function TasksPage() {
                                     <button
                                         key={action.id}
                                         type="button"
-                                        onClick={() => setOpenAction(action)}
+                                        onClick={(event) => {
+                                            event.currentTarget.focus();
+                                            setOpenAction(action);
+                                        }}
                                         className="w-full text-left rounded-lg border bg-card px-4 py-3 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                                     >
                                         <div className="flex items-start gap-3">
@@ -278,7 +281,7 @@ export function TasksPage() {
             </Dialog>
 
             <ActionReviewDialog
-                action={openAction}
+                action={openAction ? actions.find((item) => item.id === openAction.id) ?? openAction : null}
                 contactName={openAction ? contactNames.get(openAction.contactId) : undefined}
                 onOpenChange={(next) => {
                     if (!next) setOpenAction(null);

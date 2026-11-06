@@ -18,8 +18,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Removed external send, schedule, destructive, export, file, account-mutation and settings routes from REST and both MCP surfaces.
 - Scheduled delivery now claims before sending and records ambiguous outcomes without automatic resends.
 
+### Fixed
+- Snoozed reminders can be completed directly; terminal delivery records no longer offer invalid review mutations.
+- Relationship activity refreshes after agent changes, open reviews use current revisions, and Escape restores focus to the opening card.
+- Onboarding distinguishes local storage from optional, consented AI disclosure.
+
 ### Verification limits
-- Native isolated-user smoke, dedicated Gmail/Outlook pilots, full authority regression coverage and release signing remain unverified. These changes are unreleased.
+- Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
+- Dedicated Gmail/Outlook pilots, native provider/consent flows, full authority regression coverage and release signing remain unverified. These changes are unreleased.
 
 ---
 
