@@ -12,6 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Local relationship goals, reviewed workflows, sourced memory suggestions, Today review queue, and manual reminders.
 - Optional OpenAI-compatible BYOK settings with selected-contact disclosure and persisted daily request accounting.
 - Explicit external API contact scope and read/organize permissions; external drafts require native review.
+- Serve-only browser development mode (`dev:browser`) reuses the React UI with resettable synthetic local fixtures; native, AI, secret-storage and send operations remain unavailable.
 
 ### Changed
 - Removed external send, schedule, destructive, export, file, account-mutation and settings routes from REST and both MCP surfaces.

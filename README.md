@@ -84,6 +84,19 @@ bun run tauri dev
 # Production build
 bun run tauri build
 ```
+
+### Browser UI development mode
+
+```bash
+bun run dev:browser   # http://127.0.0.1:1422
+```
+
+Runs the same React UI in a plain browser on port `1422` while Vite aliases the Tauri modules (`@tauri-apps/api/core`, `api/event`, `api/app`, `plugin-dialog`) to `src/dev/browser/`. It exists for fast UI iteration; it is **not** a preview of the native app and cannot prove Rust, IPC, SQLCipher, or scheduler behavior.
+
+- All data is synthetic fixture state held in `localStorage` under `jobdex.browser-dev.v1` for `127.0.0.1:1422`, so it survives reloads but never touches the real database.
+- The development banner at the top resets fixtures, or resets them and reopens onboarding. Clearing site data does the same.
+- Native-only operations are unavailable and fail with explicit errors: file open/save dialogs, keychain/PIN, imports/exports, email sync, model calls, and sending. Nothing is sent to a network.
+- Production builds are unchanged: `bun run build` always resolves the real native modules, and `--mode browser` refuses to run as a build.
  
 ---
  

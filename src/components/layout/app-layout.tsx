@@ -74,11 +74,14 @@ export function AppLayout() {
                 const onboardingDone = settings["onboarding_complete"] === "true";
                 const lastSeen = settings["last_seen_version"];
 
-                if (!onboardingDone || import.meta.env.DEV) {
+                // Browser development mode (vite --mode browser) honors the stored
+                // onboarding flag; native DEV always reopens it for iteration.
+                const browserDev = import.meta.env.DEV && import.meta.env.MODE === "browser";
+                if (!onboardingDone || (import.meta.env.DEV && !browserDev)) {
                     // True first launch → show onboarding
                     // DEV: always show for iteration
                     setOnboardingOpen(true);
-                } else if (!lastSeen || lastSeen !== currentVersion) {
+                } else if (!browserDev && (!lastSeen || lastSeen !== currentVersion)) {
                     // Returning user, new version → show What's New
                     setWhatsNewOpen(true);
                 }
@@ -110,8 +113,9 @@ export function AppLayout() {
     const handleOnboardingComplete = async (action: "import" | "add_contact" | "explore") => {
         setOnboardingOpen(false);
 
-        // DEV: show What's New after onboarding so it can be iterated on
-        if (import.meta.env.DEV) {
+        // DEV: show What's New after onboarding so it can be iterated on.
+        // Browser development mode never forces it (getVersion is synthetic there).
+        if (import.meta.env.DEV && import.meta.env.MODE !== "browser") {
             setWhatsNewOpen(true);
         }
 
