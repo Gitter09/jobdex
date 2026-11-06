@@ -24,6 +24,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Onboarding distinguishes local storage from optional, consented AI disclosure.
 - Contact email history follows persisted thread ownership; editing a permitted address cannot expose another person's conversations through the API.
 - Draft review shows the sender's email address and disables approval while the sending account is unavailable.
+- Dashboard and onboarding no longer check the OS keychain for an AI key when no model is configured, avoiding two unnecessary startup accesses.
 
 ### Verification limits
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.

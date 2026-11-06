@@ -158,9 +158,8 @@ pub fn requests_today(settings: &AgentSettings) -> i64 {
 
 pub async fn status(pool: &SqlitePool) -> Result<ModelStatus> {
     let settings = load(pool).await?;
-    let key_present = key_present().await?;
     let hash = config_hash(&settings.base_url, &settings.model);
-    let configured = key_present && !settings.model.trim().is_empty();
+    let configured = !settings.model.trim().is_empty() && key_present().await?;
     let connection_verified = !settings.verified_hash.is_empty() && settings.verified_hash == hash;
 
     Ok(ModelStatus {
@@ -210,7 +209,10 @@ pub(crate) fn set_test_key(key: &str) {
 
 pub async fn key_present() -> Result<bool> {
     #[cfg(test)]
-    { Ok(TEST_KEY.read().unwrap().is_some()) }
+    {
+        tests::KEY_LOOKUPS.with(|reads| reads.set(reads.get() + 1));
+        Ok(TEST_KEY.read().unwrap().is_some())
+    }
     #[cfg(not(test))]
     { tokio::task::spawn_blocking(|| crate::crypto::get_secret(SECRET_NAME).is_ok())
         .await
@@ -741,6 +743,25 @@ pub async fn client_for_use(pool: &SqlitePool) -> Result<Option<ModelClient>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    std::thread_local! {
+        pub(super) static KEY_LOOKUPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    }
+
+    #[tokio::test]
+    async fn unconfigured_status_does_not_request_keychain_access() {
+        let env = crate::relationship_agent::tests::TestEnv::new().await;
+        let before = KEY_LOOKUPS.with(|reads| reads.get());
+        // Dashboard and onboarding may request status independently.
+        for _ in 0..2 {
+            assert!(!status(&env.pool).await.unwrap().configured);
+        }
+        assert_eq!(KEY_LOOKUPS.with(|reads| reads.get()), before);
+
+        write(&env.pool, K_MODEL, "configured-model").await.unwrap();
+        status(&env.pool).await.unwrap();
+        assert_eq!(KEY_LOOKUPS.with(|reads| reads.get()), before + 1);
+    }
 
     #[test]
     fn base_url_must_be_https_without_extras() {
