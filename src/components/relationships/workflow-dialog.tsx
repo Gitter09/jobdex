@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { AlertTriangle, HelpCircle, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -105,49 +105,36 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
     const [suggesting, setSuggesting] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [expectedRevision, setExpectedRevision] = useState<number | null>(null);
+    const [conflict, setConflict] = useState<RelationshipWorkflow | null>(null);
+    const proposalGeneration = useRef(0);
 
-    // Reset on close and rehydrate whenever the record or its revision changes.
-    useEffect(() => {
-        if (!open) {
-            setTitle("");
-            setIntent("");
-            setSelectedGoalId(goalId);
-            setContactIds([]);
-            setPurpose("");
-            setTone("");
-            setAccountId(NO_ACCOUNT);
-            setRules([newRule()]);
-            setQuestions([]);
-            setUnsupported([]);
-            setError(null);
-            return;
-        }
-        setError(null);
+    const loadWorkflow = useCallback((record: RelationshipWorkflow | null) => {
+        setTitle(record?.title ?? "");
+        setIntent(record?.intent ?? "");
+        setSelectedGoalId(record ? record.goalId ?? null : goalId);
+        setContactIds(record?.spec.contactIds ?? []);
+        setPurpose(record?.spec.purpose ?? "");
+        setTone(record?.spec.tone ?? "");
+        setAccountId(record?.spec.accountId ?? NO_ACCOUNT);
+        setRules(record ? record.spec.rules : [newRule()]);
+        setExpectedRevision(record?.revision ?? null);
         setQuestions([]);
         setUnsupported([]);
-        if (workflow) {
-            setTitle(workflow.title);
-            setIntent(workflow.intent);
-            setSelectedGoalId(workflow.goalId ?? null);
-            setContactIds(workflow.spec.contactIds);
-            setPurpose(workflow.spec.purpose);
-            setTone(workflow.spec.tone);
-            setAccountId(workflow.spec.accountId ?? NO_ACCOUNT);
-            setRules(workflow.spec.rules);
-        } else {
-            setTitle("");
-            setIntent("");
-            setSelectedGoalId(goalId);
-            setContactIds([]);
-            setPurpose("");
-            setTone("");
-            setAccountId(NO_ACCOUNT);
-            setRules([newRule()]);
-        }
-    }, [open, workflow?.id, workflow?.revision, goalId]);
+        setConflict(null);
+        setError(null);
+    }, [goalId]);
+
+    useEffect(() => {
+        // A response from a closed/replaced dialog must never overwrite a new form.
+        proposalGeneration.current += 1;
+        setSuggesting(false);
+        loadWorkflow(open ? workflow : null);
+    }, [open, workflow, loadWorkflow]);
 
     useEffect(() => {
         if (!open) return;
+        let cancelled = false;
         (async () => {
             try {
                 const [nextContacts, nextAccounts, nextGoals] = await Promise.all([
@@ -155,19 +142,26 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                     invoke<EmailAccount[]>("get_email_accounts"),
                     invoke<RelationshipGoal[]>("list_relationship_goals"),
                 ]);
-                setContacts(nextContacts);
-                setAccounts(nextAccounts);
-                setGoals(nextGoals);
+                if (!cancelled) {
+                    setContacts(nextContacts);
+                    setAccounts(nextAccounts);
+                    setGoals(nextGoals);
+                }
             } catch (err) {
-                handleError(err, "Failed to load workflow options");
+                if (!cancelled) handleError(err, "Failed to load workflow options");
             }
         })();
-        // Loaded once per open; errors surface through the toast helper.
-    }, [open]);
+        return () => { cancelled = true; };
+    }, [open, handleError]);
 
     const emailRules = rules.filter((rule) => rule.action === "email_draft");
+    const proposalBlocker = questions.length || unsupported.length
+        ? "Resolve the AI proposal questions or explicitly continue with manual rules before saving."
+        : null;
+    const reviewBlocker = proposalBlocker ?? (conflict ? "Choose how to resolve the newer saved version first." : null);
 
     const activationBlocker = useMemo(() => {
+        if (reviewBlocker) return reviewBlocker;
         if (contactIds.length === 0) return "Select at least one person before activating.";
         if (contactIds.length > 25) return "A workflow can cover at most 25 people.";
         if (rules.length === 0) return "Add at least one timing rule before activating.";
@@ -175,7 +169,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
             return "Choose a sending account before activating email drafts.";
         }
         return null;
-    }, [contactIds.length, emailRules.length, accountId, rules.length]);
+    }, [contactIds.length, emailRules.length, accountId, rules.length, reviewBlocker]);
 
     const toggleContact = (id: string) => {
         setContactIds((current) =>
@@ -194,6 +188,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
             setError("Describe what you want in a sentence or two first.");
             return;
         }
+        const generation = ++proposalGeneration.current;
         setSuggesting(true);
         setError(null);
         try {
@@ -202,16 +197,17 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                 contactIds,
                 goalId: selectedGoalId ?? null,
             });
+            if (generation !== proposalGeneration.current) return;
             setQuestions(proposal.questions ?? []);
             setUnsupported(proposal.unsupportedRequests ?? []);
             if (proposal.title) setTitle(proposal.title);
             if (proposal.spec) {
                 const spec = proposal.spec;
-                if (spec.contactIds.length > 0) setContactIds(spec.contactIds);
+                setContactIds(spec.contactIds);
                 setPurpose(spec.purpose ?? "");
                 setTone(spec.tone ?? "");
                 if (spec.accountId) setAccountId(spec.accountId);
-                if (spec.rules.length > 0) setRules(spec.rules.slice(0, MAX_RULES));
+                setRules(spec.rules.slice(0, MAX_RULES));
             }
             if (!proposal.spec) {
                 toast.message("No proposal was generated", {
@@ -219,13 +215,22 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                 });
             }
         } catch (err) {
-            setError(errorText(err));
+            if (generation === proposalGeneration.current) {
+                handleError(err, "Failed to propose a workflow");
+                setError(errorText(err));
+            }
         } finally {
-            setSuggesting(false);
+            if (generation === proposalGeneration.current) setSuggesting(false);
         }
     };
 
     const persist = async (status: "draft" | "active") => {
+        if (saving || suggesting) return;
+        const blocker = status === "active" ? activationBlocker : reviewBlocker;
+        if (blocker) {
+            setError(blocker);
+            return;
+        }
         if (!title.trim()) {
             setError("Give this workflow a title.");
             return;
@@ -247,7 +252,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
         try {
             await saveWorkflow({
                 id: workflow?.id ?? null,
-                expectedRevision: workflow?.revision ?? null,
+                expectedRevision,
                 title: title.trim(),
                 intent: intent.trim(),
                 goalId: selectedGoalId ?? null,
@@ -257,8 +262,21 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
             toast.success(status === "active" ? "Workflow activated" : "Workflow saved");
             onOpenChange(false);
         } catch (err) {
-            // Keep the dialog open and the user's text intact.
-            setError(errorText(err));
+            const message = errorText(err);
+            setError(message);
+            handleError(err, "Failed to save workflow");
+            if (message.includes("RELATIONSHIP_REVISION_CONFLICT") && workflow?.id) {
+                try {
+                    const latest = (await invoke<RelationshipWorkflow[]>("list_relationship_workflows"))
+                        .find((record) => record.id === workflow.id);
+                    if (latest) {
+                        setConflict(latest);
+                        setError("This workflow changed. Your edits are still here; review the saved version before choosing what to keep.");
+                    }
+                } catch (refreshError) {
+                    handleError(refreshError, "Failed to load the latest workflow");
+                }
+            }
         } finally {
             setSaving(false);
         }
@@ -273,6 +291,42 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                         Describe what you want and review the exact scope and timing before anything runs.
                     </DialogDescription>
                 </DialogHeader>
+
+                {conflict && (
+                    <div role="alert" aria-label="Newer saved workflow" className="space-y-2 rounded-md border bg-muted/40 p-3 text-xs break-words">
+                        <p className="font-medium">Latest saved version: {conflict.title}</p>
+                        <p>Status: {conflict.status} · Updated {new Date(conflict.updatedAt).toLocaleString()}</p>
+                        <p>Intent: {conflict.intent}</p>
+                        <p>People: {conflict.spec.contactIds.map((id) => {
+                            const person = contacts.find((item) => item.id === id);
+                            return person ? [person.first_name, person.last_name].filter(Boolean).join(" ") : "Unavailable person";
+                        }).join(", ") || "None"}</p>
+                        <p>Goal: {goals.find((item) => item.id === conflict.goalId)?.title ?? "No goal"}</p>
+                        <p>Sending account: {conflict.spec.accountId
+                            ? accounts.find((item) => item.id === conflict.spec.accountId)?.email ?? "Unavailable account"
+                            : "None"}</p>
+                        <p>Purpose: {conflict.spec.purpose}</p>
+                        <p>Tone: {conflict.spec.tone}</p>
+                        <ul className="list-disc pl-4">
+                            {conflict.spec.rules.map((rule) => <li key={rule.id}>{describeRule(rule)}</li>)}
+                        </ul>
+                        <p>Your unsaved fields below have not been changed. Nothing is overwritten until you choose and save.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" size="sm" disabled={saving}
+                                onClick={() => loadWorkflow(conflict)}>
+                                Load latest and discard my edits
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" disabled={saving}
+                                onClick={() => {
+                                    setExpectedRevision(conflict.revision);
+                                    setConflict(null);
+                                    setError(null);
+                                }}>
+                                Use my edits instead
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 {(questions.length > 0 || unsupported.length > 0) && (
                     <div className="space-y-2">
@@ -301,6 +355,18 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                 </div>
                             </div>
                         )}
+                        <p className="text-xs text-muted-foreground">
+                            Request another proposal after clarifying your intent, or discard its unresolved parts.
+                            Only the scope and manual rules you review below can run.
+                        </p>
+                        <Button type="button" variant="outline" size="sm" disabled={saving || suggesting || !!conflict}
+                            onClick={() => {
+                                setQuestions([]);
+                                setUnsupported([]);
+                                setError(null);
+                            }}>
+                            Continue with manual rules only
+                        </Button>
                     </div>
                 )}
 
@@ -312,7 +378,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                             value={title}
                             placeholder="Stay in touch with former colleagues"
                             onChange={(event) => setTitle(event.target.value)}
-                            disabled={saving}
+                            disabled={saving || suggesting}
                             maxLength={200}
                         />
                     </div>
@@ -334,7 +400,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                 variant="outline"
                                 size="sm"
                                 onClick={suggest}
-                                disabled={saving || suggesting || !intent.trim()}
+                                disabled={saving || suggesting || !!conflict || !intent.trim()}
                             >
                                 {suggesting ? (
                                     <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -354,7 +420,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                         <Select
                             value={selectedGoalId ?? NO_ACCOUNT}
                             onValueChange={(value) => setSelectedGoalId(value === NO_ACCOUNT ? null : value)}
-                            disabled={saving}
+                            disabled={saving || suggesting}
                         >
                             <SelectTrigger id="workflow-goal">
                                 <SelectValue placeholder="No goal" />
@@ -390,7 +456,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                             id={`workflow-contact-${contact.id}`}
                                             checked={contactIds.includes(contact.id)}
                                             onCheckedChange={() => toggleContact(contact.id)}
-                                            disabled={saving}
+                                            disabled={saving || suggesting}
                                         />
                                         <span className="min-w-0 truncate">{label || "Unnamed"}</span>
                                         {contact.email && (
@@ -416,7 +482,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                 rows={2}
                                 placeholder="Reconnect and share useful updates"
                                 onChange={(event) => setPurpose(event.target.value)}
-                                disabled={saving}
+                                disabled={saving || suggesting}
                                 maxLength={4000}
                             />
                         </div>
@@ -428,7 +494,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                 rows={2}
                                 placeholder="Warm, short, no sales language"
                                 onChange={(event) => setTone(event.target.value)}
-                                disabled={saving}
+                                disabled={saving || suggesting}
                                 maxLength={4000}
                             />
                         </div>
@@ -436,7 +502,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
 
                     <div className="grid gap-1.5">
                         <Label htmlFor="workflow-account">Sending account</Label>
-                        <Select value={accountId} onValueChange={setAccountId} disabled={saving}>
+                        <Select value={accountId} onValueChange={setAccountId} disabled={saving || suggesting}>
                             <SelectTrigger id="workflow-account">
                                 <SelectValue placeholder="No sending account" />
                             </SelectTrigger>
@@ -464,7 +530,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setRules((current) => [...current, newRule()])}
-                                disabled={saving || rules.length >= MAX_RULES}
+                                disabled={saving || suggesting || rules.length >= MAX_RULES}
                             >
                                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                                 Add rule
@@ -489,7 +555,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                         onClick={() =>
                                             setRules((current) => current.filter((item) => item.id !== rule.id))
                                         }
-                                        disabled={saving}
+                                        disabled={saving || suggesting}
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
@@ -504,7 +570,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                                 days: trigger === "commitment_due" ? undefined : (rule.days ?? 45),
                                             });
                                         }}
-                                        disabled={saving}
+                                        disabled={saving || suggesting}
                                     >
                                         <SelectTrigger aria-label={`Rule ${index + 1} timing`}>
                                             <SelectValue />
@@ -533,7 +599,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                                         ),
                                                     })
                                                 }
-                                                disabled={saving}
+                                                disabled={saving || suggesting}
                                                 className="w-24"
                                             />
                                             <span className="text-xs text-muted-foreground">days</span>
@@ -545,7 +611,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                                     onValueChange={(value) =>
                                         updateRule(rule.id, { action: value as RuleAction })
                                     }
-                                    disabled={saving}
+                                    disabled={saving || suggesting}
                                 >
                                     <SelectTrigger aria-label={`Rule ${index + 1} action`}>
                                         <SelectValue />
@@ -603,7 +669,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                         type="button"
                         variant="outline"
                         onClick={() => persist("draft")}
-                        disabled={saving}
+                        disabled={saving || suggesting || reviewBlocker !== null}
                     >
                         {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                         Save as draft
@@ -611,7 +677,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
                     <Button
                         type="button"
                         onClick={() => persist("active")}
-                        disabled={saving || activationBlocker !== null}
+                        disabled={saving || suggesting || activationBlocker !== null}
                         title={activationBlocker ?? undefined}
                     >
                         {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}

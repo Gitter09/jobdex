@@ -27,6 +27,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Dashboard and onboarding no longer check the OS keychain for an AI key when no model is configured, avoiding two unnecessary startup accesses.
 - Pin the JavaScript dialog plugin to the existing Rust plugin's 2.7.0 version so native packaging no longer fails its compatibility check.
 - Workflows without timing rules remain saveable as drafts but cannot activate; reopening a draft no longer silently inserts a rule.
+- Unresolved workflow proposals cannot be saved or activated without a new resolved proposal or an explicit manual-rules choice. Conflicting edits now show the saved version and preserve local fields until the user chooses which version to keep.
 
 ### Verification limits
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
