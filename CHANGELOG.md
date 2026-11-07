@@ -31,6 +31,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
 - Regression suites exercise concurrent delivery claims, terminal-state protection, paused workflow/goal authority, consent preflight, scoped HTTP organization and interrupted scheduled-send recovery.
 - Sender-account review was verified in browser mode; the final isolated native restart stalled during database initialization. Orca could not inspect a visible macOS SecurityAgent window, and the app process was stopped without approving unseen access.
+- A corrected local macOS app bundle passed strict code-signature verification and was installed without launching against the personal CRM. It remains ad-hoc signed; actual prompt count and authorization persistence across rebuilds are not verified.
 - Dedicated Gmail/Outlook pilots, native provider/consent flows, full authority regression coverage and release signing remain unverified. These changes are unreleased.
 
 ---

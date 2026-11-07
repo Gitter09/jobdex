@@ -85,6 +85,18 @@ bun run tauri dev
 bun run tauri build
 ```
 
+### macOS local app signing
+
+For a local bundle without a distribution certificate:
+
+```bash
+bun run tauri build --debug --bundles app --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
+```
+
+Install the complete `.app` printed by Tauri, not a raw Cargo executable copied into an existing app. Verify that bundle with `codesign --verify --deep --strict` before installation; replacing its executable later invalidates the signature.
+
+This ad-hoc signature seals the bundle but is not notarized and does not preserve trusted identity across rebuilds. macOS may request keychain access again after an update. Stable code-signing identity is a separate release requirement; browser mode avoids native rebuilds during UI iteration.
+
 ### Browser UI development mode
 
 ```bash
