@@ -133,7 +133,7 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
             setPurpose(workflow.spec.purpose);
             setTone(workflow.spec.tone);
             setAccountId(workflow.spec.accountId ?? NO_ACCOUNT);
-            setRules(workflow.spec.rules.length > 0 ? workflow.spec.rules : [newRule()]);
+            setRules(workflow.spec.rules);
         } else {
             setTitle("");
             setIntent("");
@@ -170,11 +170,12 @@ export function WorkflowDialog({ open, onOpenChange, workflow = null, goalId = n
     const activationBlocker = useMemo(() => {
         if (contactIds.length === 0) return "Select at least one person before activating.";
         if (contactIds.length > 25) return "A workflow can cover at most 25 people.";
+        if (rules.length === 0) return "Add at least one timing rule before activating.";
         if (emailRules.length > 0 && accountId === NO_ACCOUNT) {
             return "Choose a sending account before activating email drafts.";
         }
         return null;
-    }, [contactIds.length, emailRules.length, accountId]);
+    }, [contactIds.length, emailRules.length, accountId, rules.length]);
 
     const toggleContact = (id: string) => {
         setContactIds((current) =>

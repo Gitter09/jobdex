@@ -504,11 +504,13 @@ export function WorkflowsPage() {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => setWorkflowStatus(workflow, "active")}
-                                                        disabled={busy || workflow.spec.contactIds.length === 0}
+                                                        disabled={busy || workflow.spec.contactIds.length === 0 || workflow.spec.rules.length === 0}
                                                         title={
                                                             workflow.spec.contactIds.length === 0
                                                                 ? "Add at least one person before activating."
-                                                                : undefined
+                                                                : workflow.spec.rules.length === 0
+                                                                    ? "Add at least one timing rule before activating."
+                                                                    : undefined
                                                         }
                                                     >
                                                         {busy ? (

@@ -140,6 +140,9 @@ pub async fn save_workflow(
     }
 
     if status == WorkflowStatus::Active {
+        if spec.rules.is_empty() {
+            return Err(anyhow!("Add at least one timing rule before activating a workflow"));
+        }
         if spec.contact_ids.is_empty() {
             return Err(anyhow!("A workflow with no contacts cannot be activated"));
         }

@@ -197,6 +197,7 @@ enum MockReply {
 struct MockServer {
     base_url: String,
     hits: Arc<AtomicUsize>,
+    requests: Arc<tokio::sync::Mutex<Vec<serde_json::Value>>>,
 }
 
 async fn spawn_mock(replies: Vec<MockReply>) -> MockServer {
@@ -204,6 +205,8 @@ async fn spawn_mock(replies: Vec<MockReply>) -> MockServer {
     let addr = listener.local_addr().unwrap();
     let hits = Arc::new(AtomicUsize::new(0));
     let counter = hits.clone();
+    let requests = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let captured = requests.clone();
 
     tokio::spawn(async move {
         for reply in replies {
@@ -211,22 +214,25 @@ async fn spawn_mock(replies: Vec<MockReply>) -> MockServer {
                 return;
             };
             counter.fetch_add(1, Ordering::SeqCst);
-            // Drain the request so the client sees a complete exchange.
-            let mut buf = Vec::new();
-            let mut chunk = [0u8; 4096];
+            // Read the complete JSON body, not just whichever bytes arrived with headers.
+            let mut request = tokio::io::BufReader::new(&mut socket);
+            let mut line = String::new();
+            let mut content_length = None;
             loop {
-                match tokio::io::AsyncReadExt::read(&mut socket, &mut chunk).await {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        buf.extend_from_slice(&chunk[..n]);
-                        let complete = buf.windows(4).any(|w| w == b"\r\n\r\n");
-                        if complete {
-                            break;
-                        }
+                line.clear();
+                let read = tokio::io::AsyncBufReadExt::read_line(&mut request, &mut line).await.unwrap();
+                assert_ne!(read, 0, "incomplete model request headers");
+                if line == "\r\n" { break; }
+                if let Some((name, value)) = line.split_once(':') {
+                    if name.eq_ignore_ascii_case("content-length") {
+                        content_length = Some(value.trim().parse::<usize>().unwrap());
                     }
-                    Err(_) => break,
                 }
             }
+            let mut body = vec![0; content_length.expect("model requests have a content length")];
+            tokio::io::AsyncReadExt::read_exact(&mut request, &mut body).await.unwrap();
+            drop(request);
+            captured.lock().await.push(serde_json::from_slice(&body).unwrap());
 
             let payload = match reply {
                 MockReply::Json(body) => format!(
@@ -247,6 +253,7 @@ async fn spawn_mock(replies: Vec<MockReply>) -> MockServer {
     MockServer {
         base_url: format!("http://{}", addr),
         hits,
+        requests,
     }
 }
 
@@ -1539,4 +1546,137 @@ async fn proposal_requires_disclosure_consent_before_any_model_call() {
     let settings = model::load(&env.pool).await.unwrap();
     assert_eq!(model::requests_today(&settings), 0);
     assert!(workflows::list_workflows(&env.pool).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn reviewed_reconnection_workflow_prepares_one_sourced_draft_with_scoped_disclosure() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_contact(&env.pool, "c2", "Blair", Some("blair@private.invalid")).await;
+    add_account(&env.pool, "acc1", "me@example.com").await;
+    let quote = "I can introduce you after the launch.";
+    add_message(&env.pool, "c1", "acc1", "m-alex", "alex@example.com",
+        "me@example.com", quote, "received", "2000-01-01T00:00:00.000Z").await;
+    add_message(&env.pool, "c2", "acc1", "m-blair", "blair@private.invalid",
+        "me@example.com", "BLAIR_PRIVATE_SOURCE", "received", "2000-01-01T00:00:00.000Z").await;
+    let intent = "Reconnect with Alex every 45 days; draft a personal note, never send automatically";
+    let proposal_json = serde_json::json!({
+        "title": "Reconnect with Alex",
+        "spec": {
+            "schemaVersion": 1, "contactIds": ["c1"], "accountId": null,
+            "purpose": "Reconnect warmly", "tone": "personal",
+            "rules": [{"id": "cadence", "trigger": "cadence", "days": 45, "action": "email_draft"}]
+        },
+        "questions": [], "unsupportedRequests": []
+    }).to_string();
+    let extraction_json = serde_json::json!({
+        "suggestions": [{
+            "kind": "commitment", "text": "Alex can introduce me after the launch",
+            "sourceMessageId": "m-alex", "sourceQuote": quote, "dueAt": null
+        }]
+    }).to_string();
+    let server = spawn_mock(vec![
+        MockReply::Json(chat_response(&proposal_json)),
+        MockReply::Json(chat_response(&extraction_json)),
+        // Confirmation changes the extraction context, but must not duplicate the suggestion.
+        MockReply::Json(chat_response(r#"{"suggestions":[]}"#)),
+        MockReply::Json(chat_response(r#"{"subject":"Catching up","body":"Hi Alex, I remembered our conversation about the launch and would enjoy catching up. How have things been?"}"#)),
+    ]).await;
+    enable_model(&env.pool, &server.base_url, "test-model").await;
+    set_setting(&env.pool, "agent.allowed_contact_ids", r#"["c1"]"#).await;
+
+    let proposal = workflows::propose(&env.pool, intent.to_string(), vec!["c1".to_string()], None)
+        .await.unwrap();
+    assert!(workflows::list_workflows(&env.pool).await.unwrap().is_empty(),
+        "a proposal cannot activate or persist a workflow");
+    let spec = proposal.spec.unwrap();
+    assert_eq!(spec.contact_ids, vec!["c1"]);
+    assert_eq!(spec.rules[0].days, Some(45));
+    assert!(spec.account_id.is_none(), "the model cannot choose an undisclosed account");
+    let draft = workflows::save_workflow(
+        &env.pool, None, None, proposal.title.unwrap(), intent.to_string(), None,
+        spec.clone(), WorkflowStatus::Draft,
+    ).await.unwrap();
+    runner::tick(&env.pool).await.unwrap();
+    assert!(actions::list(&env.pool).await.unwrap().is_empty(),
+        "saving a draft must not prepare or send anything");
+    assert_eq!(server.hits.load(Ordering::SeqCst), 1,
+        "inactive workflows do not spend additional requests");
+
+    assert!(workflows::save_workflow(
+        &env.pool, Some(draft.id.clone()), Some(draft.revision),
+        draft.title.clone(), intent.to_string(), None, spec.clone(), WorkflowStatus::Active,
+    ).await.is_err(), "email preparation requires an explicitly selected account");
+    let mut reviewed_spec = spec;
+    reviewed_spec.account_id = Some("acc1".to_string());
+    let active = workflows::save_workflow(
+        &env.pool, Some(draft.id.clone()), Some(draft.revision),
+        draft.title.clone(), intent.to_string(), None, reviewed_spec, WorkflowStatus::Active,
+    ).await.unwrap();
+
+    let memory = memory::refresh(&env.pool, "c1").await.unwrap();
+    let suggestion = memory.iter().find(|entry| entry.source_message_id.as_deref() == Some("m-alex"))
+        .expect("source-backed suggestion");
+    assert_eq!(suggestion.status, "suggested");
+    assert_eq!(suggestion.origin, "inference");
+    assert_eq!(suggestion.source_quote.as_deref(), Some(quote));
+    assert!(suggestion.due_at.is_none(), "an ambiguous launch date is not scheduled");
+    let confirmed = memory::update_memory(
+        &env.pool, &suggestion.id, &suggestion.text, None, MemoryStatus::Confirmed,
+    ).await.unwrap();
+
+    runner::tick(&env.pool).await.unwrap();
+    let prepared = actions::list(&env.pool).await.unwrap();
+    assert_eq!(prepared.len(), 1, "one review card for the due cadence anchor");
+    let action = &prepared[0];
+    assert_eq!(action.workflow_id.as_deref(), Some(active.id.as_str()));
+    assert_eq!(action.contact_id, "c1");
+    assert_eq!(action.kind, "email_draft");
+    assert_eq!(action.status, "needs_review");
+    let payload = action.email_payload().unwrap();
+    assert_eq!(payload.account_id, "acc1");
+    assert_eq!(payload.to, "alex@example.com");
+    assert_eq!(action.evidence.source_message_ids, vec!["m-alex"]);
+    assert_eq!(action.evidence.memory_ids, vec![confirmed.id]);
+    assert!(action.approved_at.is_none());
+    assert!(action.approved_revision.is_none());
+    assert!(action.send_started_at.is_none());
+    assert!(action.provider_receipt.is_none());
+
+    runner::tick(&env.pool).await.unwrap();
+    let repeated = actions::list(&env.pool).await.unwrap();
+    assert_eq!(repeated.iter().map(|item| (&item.id, &item.status)).collect::<Vec<_>>(),
+        vec![(&action.id, &action.status)], "re-evaluation does not duplicate or deliver the draft");
+    assert_eq!(server.hits.load(Ordering::SeqCst), 4);
+    assert_eq!(model::requests_today(&model::load(&env.pool).await.unwrap()), 4,
+        "unchanged re-evaluation does not reserve another paid request");
+    let requests = server.requests.lock().await;
+    let transmitted = serde_json::to_string(&*requests).unwrap();
+    assert!(!transmitted.contains("BLAIR_PRIVATE_SOURCE"));
+    assert!(!transmitted.contains("blair@private.invalid"));
+    assert!(requests[3]["messages"][1]["content"].as_str().unwrap().contains(&confirmed.text),
+        "the prepared email receives confirmed context");
+}
+
+#[tokio::test]
+async fn a_workflow_without_timing_rules_can_be_saved_but_not_activated() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", None).await;
+    let spec = WorkflowSpec {
+        schema_version: SPEC_SCHEMA_VERSION,
+        contact_ids: vec!["c1".to_string()],
+        account_id: None,
+        purpose: "Reconnect".to_string(),
+        tone: "warm".to_string(),
+        rules: Vec::new(),
+    };
+    let draft = workflows::save_workflow(&env.pool, None, None, "Reconnect".to_string(),
+        "Choose timing later".to_string(), None, spec.clone(), WorkflowStatus::Draft).await.unwrap();
+    assert!(workflows::save_workflow(&env.pool, Some(draft.id.clone()), Some(draft.revision),
+        draft.title.clone(), draft.intent.clone(), None, spec, WorkflowStatus::Active).await.is_err(),
+        "an active workflow must have an executable timing rule");
+    let stored = store::get_workflow(&env.pool, &draft.id).await.unwrap().unwrap();
+    assert_eq!(stored.status, "draft");
+    assert_eq!(stored.revision, draft.revision);
+    assert!(stored.activated_at.is_none());
 }

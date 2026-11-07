@@ -51,6 +51,7 @@ function validateSpec(state: BrowserState, spec: WorkflowSpec, status: string): 
         if (rule.trigger === "commitment_due" ? rule.days !== undefined : !Number.isInteger(rule.days) || rule.days! < 1 || rule.days! > 365) throw new Error("Invalid rule timing");
     }
     if (status === "active") {
+        if (!spec.rules.length) throw new Error("Add at least one timing rule before activating a workflow");
         if (!spec.contactIds.length) throw new Error("A workflow with no people cannot activate");
         if (spec.rules.some((r) => r.action === "email_draft") && !state.emailAccounts.some((a) => a.id === spec.accountId)) throw new Error("Choose a sending account before activation");
     }

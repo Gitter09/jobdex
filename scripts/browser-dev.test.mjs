@@ -49,3 +49,17 @@ test("stale workflow writes fail without replacing newer edits", () => {
     }, now), /RELATIONSHIP_REVISION_CONFLICT/);
     assert.notEqual(workflow.title, "Must not overwrite");
 });
+
+test("a draft without timing rules cannot be activated", () => {
+    const state = createBrowserState(now);
+    const workflow = state.workflows[0];
+    const draft = dispatchBrowserCommand(state, "save_relationship_workflow", {
+        ...workflow, spec: { ...workflow.spec, rules: [] }, status: "draft",
+        expectedRevision: workflow.revision,
+    }, now);
+    const before = structuredClone(draft);
+    assert.throws(() => dispatchBrowserCommand(state, "save_relationship_workflow", {
+        ...draft, status: "active", expectedRevision: draft.revision,
+    }, now));
+    assert.deepEqual(state.workflows.find((item) => item.id === draft.id), before);
+});
