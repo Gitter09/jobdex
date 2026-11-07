@@ -48,6 +48,7 @@ export function RelationshipAgentSettingsTab() {
     const [allowedIds, setAllowedIds] = useState<string[]>([]);
     const [contactFilter, setContactFilter] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
+    const [consentError, setConsentError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [togglingPause, setTogglingPause] = useState(false);
@@ -79,6 +80,11 @@ export function RelationshipAgentSettingsTab() {
         setDailyLimit(String(modelStatus.dailyRequestLimit ?? 20));
         setAllowedIds(modelStatus.allowedContactIds ?? []);
     }, [modelStatus]);
+
+    const providerVerified = Boolean(modelStatus?.configured && modelStatus.connectionVerified);
+    const addsConsent = allowedIds.some((id) => !modelStatus?.allowedContactIds?.includes(id));
+    const removesConsent = modelStatus?.allowedContactIds?.some((id) => !allowedIds.includes(id)) ?? false;
+    const canSaveConsent = !!modelStatus && (providerVerified || (removesConsent && !addsConsent));
 
     const filteredContacts = useMemo(() => {
         const query = contactFilter.trim().toLowerCase();
@@ -116,7 +122,7 @@ export function RelationshipAgentSettingsTab() {
 
         setSaving(true);
         try {
-            await configureModel(
+            const saved = await configureModel(
                 {
                     baseUrl: trimmedUrl,
                     model: trimmedModel,
@@ -126,10 +132,44 @@ export function RelationshipAgentSettingsTab() {
                 },
                 apiKey.trim() || undefined
             );
+            setBaseUrl(saved.baseUrl);
+            setModel(saved.model);
+            setAllowedIds(saved.allowedContactIds ?? []);
+            setConsentError(null);
             setApiKey("");
-            toast.success("Relationship agent settings saved.");
+            const destinationChanged = modelStatus
+                && (modelStatus.baseUrl !== saved.baseUrl || modelStatus.model !== saved.model);
+            toast.success(destinationChanged
+                ? "Provider changed. Test its connection and select people again."
+                : "Relationship agent settings saved.");
         } catch (error) {
             handleError(error, "Couldn't save relationship agent settings");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSaveConsent = async () => {
+        setConsentError(null);
+        if (!modelStatus || !canSaveConsent) {
+            setConsentError("Save and test a provider before adding people. Existing consent can be removed without a verified connection.");
+            return;
+        }
+        setSaving(true);
+        try {
+            // Consent applies to the saved destination, never unsaved provider edits.
+            const saved = await configureModel({
+                baseUrl: modelStatus.baseUrl,
+                model: modelStatus.model,
+                enabled: modelStatus.enabled,
+                dailyRequestLimit: modelStatus.dailyRequestLimit,
+                allowedContactIds: allowedIds,
+            });
+            setAllowedIds(saved.allowedContactIds ?? []);
+            toast.success("Disclosure consent saved.");
+        } catch (error) {
+            handleError(error, "Couldn't save disclosure consent");
+            setConsentError("Consent was not saved. Your selections are still here.");
         } finally {
             setSaving(false);
         }
@@ -205,6 +245,7 @@ export function RelationshipAgentSettingsTab() {
                             id="agent-base-url"
                             value={baseUrl}
                             onChange={(e) => setBaseUrl(e.target.value)}
+                            disabled={saving || testing}
                             placeholder="https://api.openai.com/v1"
                             autoComplete="off"
                             spellCheck={false}
@@ -223,6 +264,7 @@ export function RelationshipAgentSettingsTab() {
                             id="agent-model"
                             value={model}
                             onChange={(e) => setModel(e.target.value)}
+                            disabled={saving || testing}
                             placeholder="gpt-4o-mini"
                             autoComplete="off"
                             spellCheck={false}
@@ -240,6 +282,7 @@ export function RelationshipAgentSettingsTab() {
                             type="password"
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
+                            disabled={saving || testing}
                             placeholder={
                                 modelStatus?.configured
                                     ? "A key is already stored — leave blank to keep it"
@@ -256,7 +299,7 @@ export function RelationshipAgentSettingsTab() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button onClick={handleSave} disabled={saving}>
+                        <Button onClick={handleSave} disabled={saving || testing}>
                             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Save settings
                         </Button>
@@ -324,6 +367,19 @@ export function RelationshipAgentSettingsTab() {
                         Unchecking someone deletes queued processing for them and invalidates drafts derived from them.
                         It cannot recall data that was already transmitted.
                     </p>
+                    <p className="text-xs text-muted-foreground break-words">
+                        Saved destination: <span className="font-mono break-all">{modelStatus?.baseUrl || "No provider saved"}</span>
+                        {" · "}Model: {modelStatus?.model || "None"}. Your provider bills you directly.
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        Changing the provider or model clears previous disclosure choices. Save and test the new
+                        destination, then select people again and review affected workflows.
+                    </p>
+                    {!providerVerified && (
+                        <p className="text-xs text-muted-foreground">
+                            Save and test a provider before adding people. Existing consent can be removed without a verified connection.
+                        </p>
+                    )}
 
                     <div className="relative">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -363,6 +419,9 @@ export function RelationshipAgentSettingsTab() {
                                                                 : [...current, contact.id]
                                                         )
                                                     }
+                                                    disabled={saving || testing || (!providerVerified
+                                                        && !allowedIds.includes(contact.id)
+                                                        && !modelStatus?.allowedContactIds?.includes(contact.id))}
                                                     className="mt-0.5"
                                                 />
                                                 <span className="min-w-0">
@@ -390,10 +449,11 @@ export function RelationshipAgentSettingsTab() {
                             ? "No one selected — the provider receives no contact content."
                             : `${allowedIds.length} ${allowedIds.length === 1 ? "person" : "people"} selected.`}
                     </p>
-                    <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+                    <Button variant="outline" size="sm" onClick={handleSaveConsent} disabled={saving || testing || !canSaveConsent}>
                         {saving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                         Save consent
                     </Button>
+                    {consentError && <p className="text-xs text-destructive break-words" role="alert">{consentError}</p>}
                 </div>
             </SettingSection>
 
@@ -409,6 +469,7 @@ export function RelationshipAgentSettingsTab() {
                             max={100}
                             value={dailyLimit}
                             onChange={(e) => setDailyLimit(e.target.value)}
+                            disabled={saving || testing}
                             aria-label="Daily request limit"
                             className="h-8 w-20 text-center text-sm"
                         />
@@ -441,6 +502,7 @@ export function RelationshipAgentSettingsTab() {
                             checked={enabled}
                             onCheckedChange={(value) => setEnabled(value === true)}
                             aria-label="Enable AI features"
+                            disabled={saving || testing || (!enabled && !modelStatus?.connectionVerified)}
                         />
                         <Label htmlFor="agent-enabled" className="text-sm font-normal">
                             {enabled ? "On" : "Off"}

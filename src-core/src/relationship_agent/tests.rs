@@ -1680,3 +1680,78 @@ async fn a_workflow_without_timing_rules_can_be_saved_but_not_activated() {
     assert_eq!(stored.revision, draft.revision);
     assert!(stored.activated_at.is_none());
 }
+
+#[tokio::test]
+async fn changing_model_or_destination_requires_fresh_disclosure_consent() {
+    for (base_url, model_id) in [
+        ("https://second.example.invalid/v1", "old-model"),
+        ("https://first.example.invalid/v1", "new-model"),
+    ] {
+        let env = TestEnv::new().await;
+        add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+        enable_model(&env.pool, "https://first.example.invalid/v1", "old-model").await;
+        set_setting(&env.pool, "agent.allowed_contact_ids", r#"["c1"]"#).await;
+        let config = RelationshipModelConfig {
+            base_url: base_url.to_string(),
+            model: model_id.to_string(),
+            enabled: true,
+            daily_request_limit: 20,
+            allowed_contact_ids: vec!["c1".to_string()],
+        };
+        let changed = model::configure(&env.pool, config.clone(), Some("test-api-key".to_string()))
+            .await.unwrap();
+        assert!(changed.allowed_contact_ids.is_empty(),
+            "old disclosure choices cannot authorize a changed model destination");
+        assert!(!changed.connection_verified);
+
+        // A separate native save, after seeing the new destination, grants fresh consent.
+        let reconfirmed = model::configure(&env.pool, config, Some("test-api-key".to_string()))
+            .await.unwrap();
+        assert_eq!(reconfirmed.allowed_contact_ids, vec!["c1"]);
+    }
+}
+
+#[tokio::test]
+async fn revoking_model_consent_preserves_manual_work_and_blocks_derived_drafts() {
+    let env = TestEnv::new().await;
+    add_contact(&env.pool, "c1", "Alex", Some("alex@example.com")).await;
+    add_account(&env.pool, "acc1", "me@example.com").await;
+    enable_agent(&env.pool).await;
+    let user_memory = memory::create_user_memory(
+        &env.pool, "c1", MemoryKind::Context, "A note I wrote myself", None,
+    ).await.unwrap();
+    let reminder = actions::create_reminder(&env.pool, "c1", "Keep in touch".to_string(),
+        "A local reminder".to_string(), "2030-01-01T09:00:00.000Z".to_string()).await.unwrap();
+    let payload = EmailDraftPayload {
+        account_id: "acc1".to_string(), to: "alex@example.com".to_string(),
+        subject: "Hello".to_string(), body: "A draft to review".to_string(),
+    };
+    let external = actions::create_external_draft(&env.pool, "c1", payload.clone(), "external")
+        .await.unwrap();
+    let workflow = save_active_workflow(&env.pool, vec!["c1".to_string()],
+        vec![cadence_rule(45, RuleAction::EmailDraft)], Some("acc1".to_string())).await;
+    let derived = actions::create_external_draft(&env.pool, "c1", payload, "workflow")
+        .await.unwrap();
+    attach_draft_to_workflow(&env.pool, &derived.id, &workflow.id).await;
+    actions::review(&env.pool, &derived.id, derived.revision, ReviewDecision::Approve, None)
+        .await.unwrap();
+
+    store::revoke_contact_consent(&env.pool, "c1").await.unwrap();
+
+    assert_eq!(actions::get(&env.pool, &reminder.id).await.unwrap().status, "needs_review",
+        "a native manual reminder does not depend on model disclosure");
+    assert_eq!(actions::get(&env.pool, &external.id).await.unwrap().status, "needs_review",
+        "externally authored drafts do not disclose text to the configured model");
+    let blocked = actions::get(&env.pool, &derived.id).await.unwrap();
+    assert_eq!(blocked.status, "blocked");
+    assert_eq!(blocked.error_code.as_deref(), Some("CONSENT_REVOKED"));
+    assert!(blocked.approved_at.is_none());
+    assert!(blocked.approved_revision.is_none());
+    assert!(blocked.send_started_at.is_none());
+    let scope = store::get_workflow(&env.pool, &workflow.id).await.unwrap().unwrap();
+    assert!(scope.spec.contact_ids.is_empty());
+    assert_eq!(scope.status, "paused");
+    let memories = store::list_memory(&env.pool, "c1").await.unwrap();
+    assert!(memories.iter().any(|entry| entry.id == user_memory.id && entry.text == user_memory.text),
+        "revocation cannot delete explicit user content");
+}

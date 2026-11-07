@@ -220,9 +220,14 @@ pub async fn key_present() -> Result<bool> {
 }
 
 async fn store_key(key: String) -> Result<()> {
-    tokio::task::spawn_blocking(move || crate::crypto::store_secret(SECRET_NAME, &key))
-        .await
-        .map_err(|e| anyhow!("Keychain task failed: {}", e))??;
+    #[cfg(test)]
+    { *TEST_KEY.write().unwrap() = Some(key); }
+    #[cfg(not(test))]
+    {
+        tokio::task::spawn_blocking(move || crate::crypto::store_secret(SECRET_NAME, &key))
+            .await
+            .map_err(|e| anyhow!("Keychain task failed: {}", e))??;
+    }
     Ok(())
 }
 
@@ -237,9 +242,14 @@ async fn load_key() -> Result<String> {
 }
 
 async fn remove_key() -> Result<()> {
-    tokio::task::spawn_blocking(|| crate::crypto::remove_secret(SECRET_NAME))
-        .await
-        .map_err(|e| anyhow!("Keychain task failed: {}", e))??;
+    #[cfg(test)]
+    { *TEST_KEY.write().unwrap() = None; }
+    #[cfg(not(test))]
+    {
+        tokio::task::spawn_blocking(|| crate::crypto::remove_secret(SECRET_NAME))
+            .await
+            .map_err(|e| anyhow!("Keychain task failed: {}", e))??;
+    }
     Ok(())
 }
 
@@ -310,6 +320,10 @@ pub async fn configure(
     let endpoint_changed = previous.base_url != base_url;
     let previous_hash = config_hash(&previous.base_url, &previous.model);
     let new_hash = config_hash(&base_url, &model);
+    if previous_hash != new_hash || endpoint_changed {
+        // Consent belongs to the destination the user reviewed, not its replacement.
+        allowed.clear();
+    }
 
     // A new host must never receive the old host's credential.
     if endpoint_changed {

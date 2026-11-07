@@ -502,8 +502,8 @@ pub async fn purge_all_tx(tx: &mut sqlx::Transaction<'_, Sqlite>) -> Result<()> 
 }
 
 /// Consent revocation: drop model-derived memory, drop queued processing, take
-/// the contact out of every workflow scope and invalidate drafts derived from it.
-/// User-authored memory survives because the user wrote it, not the model.
+/// the contact out of workflow scopes and invalidate model-derived drafts.
+/// User-authored memory, native manual reminders and external drafts survive.
 pub async fn revoke_contact_consent(pool: &SqlitePool, contact_id: &str) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -522,6 +522,7 @@ pub async fn revoke_contact_consent(pool: &SqlitePool, contact_id: &str) -> Resu
         "UPDATE relationship_actions
          SET status = 'blocked', error_code = 'CONSENT_REVOKED', approved_at = NULL, approved_revision = NULL, updated_at = ?
          WHERE contact_id = ?
+           AND kind = 'email_draft' AND workflow_id IS NOT NULL
            AND status IN ('preparing', 'needs_review', 'approved', 'snoozed')",
     )
     .bind(now_iso())

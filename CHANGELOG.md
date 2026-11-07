@@ -28,11 +28,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Pin the JavaScript dialog plugin to the existing Rust plugin's 2.7.0 version so native packaging no longer fails its compatibility check.
 - Workflows without timing rules remain saveable as drafts but cannot activate; reopening a draft no longer silently inserts a rule.
 - Unresolved workflow proposals cannot be saved or activated without a new resolved proposal or an explicit manual-rules choice. Conflicting edits now show the saved version and preserve local fields until the user chooses which version to keep.
+- Changing the model or provider destination clears disclosure choices and requires fresh consent. Consent-only saves use the saved provider settings, preserve edits on failure, and allow revocation without reconnecting.
+- Revoking model disclosure blocks workflow-derived drafts without invalidating manual reminders, externally authored drafts, or user-authored notes.
+- Model configuration tests now isolate keychain writes and removals as well as reads.
 
 ### Verification limits
 - Isolated native smoke covers no-AI onboarding, synthetic contacts/reminders/context, workflow activation/pause and restart persistence; browser checks cover the 800×600 UI and local fixture isolation.
 - Regression suites exercise concurrent delivery claims, terminal-state protection, paused workflow/goal authority, consent preflight, scoped HTTP organization and interrupted scheduled-send recovery.
 - One scripted-provider integration exercises proposal, inactive draft save, explicit sending-account review, activation, quoted memory confirmation and one unsent review draft. Captured HTTP bodies exclude an unconsented person's data; unchanged reevaluation makes no further model request. This does not establish real-provider output quality.
+- Consent regressions cover destination/model changes and derived-draft cleanup. Browser checks at 800×600 cover failed-save edit retention and disconnected-provider revocation while blocking new grants.
 - Sender-account review was verified in browser mode; the final isolated native restart stalled during database initialization. Orca could not inspect a visible macOS SecurityAgent window, and the app process was stopped without approving unseen access.
 - A corrected local macOS app bundle passed strict code-signature verification and was installed without launching against the personal CRM. It remains ad-hoc signed; actual prompt count and authorization persistence across rebuilds are not verified.
 - Dedicated Gmail/Outlook pilots, native provider/consent flows, full authority regression coverage and release signing remain unverified. These changes are unreleased.
